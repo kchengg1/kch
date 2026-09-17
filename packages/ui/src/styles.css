@@ -1,0 +1,29 @@
+/*
+  Design tokens shared by every app. Import this from the app's globals.css
+  AFTER `@import "tailwindcss";`. Override any token in the app to re-skin it.
+*/
+@theme {
+  --color-background: oklch(99% 0 0);
+  --color-foreground: oklch(20% 0.02 260);
+  --color-muted: oklch(96% 0.005 260);
+  --color-muted-foreground: oklch(50% 0.02 260);
+  --color-border: oklch(90% 0.01 260);
+  --color-card: oklch(100% 0 0);
+  --color-primary: oklch(55% 0.2 265);
+  --color-primary-foreground: oklch(99% 0 0);
+  --color-destructive: oklch(58% 0.22 27);
+  --color-destructive-foreground: oklch(99% 0 0);
+  --color-success: oklch(60% 0.17 150);
+  --radius: 0.625rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    -webkit-font-smoothing: antialiased;
+  }
+}

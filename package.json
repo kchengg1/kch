@@ -1,0 +1,28 @@
+{
+  "name": "kch",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "check": "turbo run lint typecheck test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @kch/db generate",
+    "db:migrate": "pnpm --filter @kch/db migrate",
+    "db:push": "pnpm --filter @kch/db push",
+    "db:studio": "pnpm --filter @kch/db studio",
+    "new-app": "node scripts/new-app.mjs"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.7",
+    "turbo": "^2.10.13",
+    "typescript": "^5.9.3"
+  }
+}
