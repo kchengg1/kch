@@ -1,0 +1,37 @@
+{
+  "name": "@kch/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./client": "./src/client.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@kch/db": "workspace:*",
+    "@kch/email": "workspace:*",
+    "better-auth": "^1.7.5"
+  },
+  "peerDependencies": {
+    "next": "^16.0.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@kch/config": "workspace:*",
+    "@types/node": "^22.20.3",
+    "@types/react": "^19.3.0",
+    "eslint": "^9.39.5",
+    "next": "^16.3.5",
+    "react": "^19.3.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.1"
+  }
+}
