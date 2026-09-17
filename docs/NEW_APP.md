@@ -74,7 +74,7 @@ const ent = await getEntitlements(user.id, plans);
 if (!ent.isPaid) redirect("/pricing");
 ```
 
-Add tables to `packages/db/src/schema.ts` and run `pnpm db:generate`.
+Add tables in `packages/db/src/schema/<app>.ts`, export them from `index.ts`, and run `pnpm db:generate`.
 
 ## 7. Optional services
 
