@@ -83,24 +83,34 @@ export async function recordScan(codeId: string, meta: ScanMeta): Promise<void> 
   ]);
 }
 
+/** How many days of daily history the code page charts. */
+export const TREND_DAYS = 14;
+
 export type ScanStats = {
   last7: number;
   last30: number;
+  /** One entry per day, oldest first, including days with no scans. */
   byDay: { day: string; scans: number }[];
-  topReferers: { referer: string; scans: number }[];
+  topSources: { source: string; scans: number }[];
   topCountries: { country: string; scans: number }[];
 };
 
 export async function getScanStats(codeId: string): Promise<ScanStats> {
-  const now = Date.now();
-  const since7 = new Date(now - 7 * 86_400_000);
-  const since30 = new Date(now - 30 * 86_400_000);
+  // Align the windows to UTC day boundaries, the same buckets the daily
+  // breakdown uses, so the totals equal the sum of the bars shown.
+  const since7 = startOfUtcDayAgo(6);
+  const since30 = startOfUtcDayAgo(29);
   const day = sql<string>`to_char(${qrScan.scannedAt} at time zone 'UTC', 'YYYY-MM-DD')`;
-  const referer = sql<string>`coalesce(nullif(${qrScan.referer}, ''), 'Direct / camera app')`;
+  // Group by the referring host ("instagram.com"), not the full URL, so the list
+  // stays readable and one site does not occupy every row.
+  const source = sql<string>`coalesce(
+    substring(${qrScan.referer} from '^[a-z]+://(?:www\\.)?([^/?#]+)'),
+    'Direct scan'
+  )`;
   const country = sql<string>`coalesce(${qrScan.country}, 'Unknown')`;
   const inWindow = and(eq(qrScan.codeId, codeId), gte(qrScan.scannedAt, since30));
 
-  const [[l7], [l30], byDay, topReferers, topCountries] = await Promise.all([
+  const [[l7], [l30], byDay, topSources, topCountries] = await Promise.all([
     db
       .select({ n: count() })
       .from(qrScan)
@@ -108,10 +118,10 @@ export async function getScanStats(codeId: string): Promise<ScanStats> {
     db.select({ n: count() }).from(qrScan).where(inWindow),
     db.select({ day, scans: count() }).from(qrScan).where(inWindow).groupBy(day).orderBy(desc(day)),
     db
-      .select({ referer, scans: count() })
+      .select({ source, scans: count() })
       .from(qrScan)
       .where(inWindow)
-      .groupBy(referer)
+      .groupBy(source)
       .orderBy(desc(count()))
       .limit(5),
     db
@@ -123,5 +133,36 @@ export async function getScanStats(codeId: string): Promise<ScanStats> {
       .limit(5),
   ]);
 
-  return { last7: l7?.n ?? 0, last30: l30?.n ?? 0, byDay, topReferers, topCountries };
+  return {
+    last7: l7?.n ?? 0,
+    last30: l30?.n ?? 0,
+    byDay: fillMissingDays(byDay, TREND_DAYS),
+    topSources,
+    topCountries,
+  };
+}
+
+/** Midnight UTC, `daysAgo` days before today. */
+function startOfUtcDayAgo(daysAgo: number) {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - daysAgo));
+}
+
+/**
+ * The grouped query only returns days that had a scan. Charting those alone
+ * hides the quiet days and overstates the trend, so pad the window with zeros
+ * and return it oldest-first.
+ */
+function fillMissingDays(rows: { day: string; scans: number }[], days: number) {
+  const counts = new Map(rows.map((r) => [r.day, r.scans]));
+  const today = new Date();
+  const out: { day: string; scans: number }[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(
+      Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i),
+    );
+    const key = d.toISOString().slice(0, 10);
+    out.push({ day: key, scans: counts.get(key) ?? 0 });
+  }
+  return out;
 }

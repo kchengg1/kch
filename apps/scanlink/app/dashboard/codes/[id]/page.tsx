@@ -6,7 +6,7 @@ import { plans } from "@/app.config";
 import { CopyButton } from "@/components/copy-button";
 import { DeleteCodeButton } from "@/components/delete-code-button";
 import { EditCodeForm } from "@/components/edit-code-form";
-import { getCode, getScanStats } from "@/lib/codes";
+import { getCode, getScanStats, TREND_DAYS } from "@/lib/codes";
 import { requireSession } from "@/lib/session";
 import { scanUrl } from "@/lib/qr";
 
@@ -87,21 +87,24 @@ export default async function CodePage({ params }: { params: Promise<{ id: strin
                   <Stat label="Last 7 days" value={stats.last7} />
                   <Stat label="Last 30 days" value={stats.last30} />
                 </dl>
-                <div className="grid gap-6 md:grid-cols-3">
-                  <Breakdown
-                    title="By day"
-                    rows={stats.byDay.map((r) => [r.day, r.scans])}
-                    empty="No scans in the last 30 days."
-                  />
+                <Breakdown
+                  title={`Scans per day, last ${TREND_DAYS} days`}
+                  rows={stats.byDay.map((r) => ({ label: formatDay(r.day), value: r.scans }))}
+                  empty="No scans yet."
+                />
+                <div className="grid gap-6 sm:grid-cols-2">
                   <Breakdown
                     title="Top sources"
-                    rows={stats.topReferers.map((r) => [r.referer, r.scans])}
-                    empty="—"
+                    rows={stats.topSources.map((r) => ({ label: r.source, value: r.scans }))}
+                    empty="No scans yet."
                   />
                   <Breakdown
                     title="Top countries"
-                    rows={stats.topCountries.map((r) => [r.country, r.scans])}
-                    empty="—"
+                    rows={stats.topCountries.map((r) => ({
+                      label: formatCountry(r.country),
+                      value: r.scans,
+                    }))}
+                    empty="No scans yet."
                   />
                 </div>
               </div>
@@ -132,34 +135,72 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
+/**
+ * A compact single-series bar list: one row per item, label in ink, a bar
+ * carrying magnitude, and the value at the tip. One series, so no legend is
+ * needed; the title says what is plotted.
+ */
 function Breakdown({
   title,
   rows,
   empty,
 }: {
   title: string;
-  rows: [string, number][];
+  rows: { label: string; value: number }[];
   empty: string;
 }) {
+  const max = Math.max(1, ...rows.map((r) => r.value));
+  const hasData = rows.some((r) => r.value > 0);
+
   return (
-    <div>
+    <section>
       <h3 className="text-sm font-medium">{title}</h3>
-      {rows.length === 0 ? (
+      {!hasData ? (
         <p className="mt-2 text-sm text-muted-foreground">{empty}</p>
       ) : (
-        <table className="mt-2 w-full text-sm">
-          <tbody>
-            {rows.map(([label, n]) => (
-              <tr key={label} className="border-t">
-                <td className="max-w-0 truncate py-1.5 pr-2" title={label}>
-                  {label}
-                </td>
-                <td className="py-1.5 text-right tabular-nums">{n}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ul className="mt-3 space-y-1.5">
+          {rows.map((row) => (
+            <li
+              key={row.label}
+              className="grid grid-cols-[7rem_1fr_2.5rem] items-center gap-3"
+              title={`${row.label}: ${row.value} ${row.value === 1 ? "scan" : "scans"}`}
+            >
+              <span className="truncate text-sm text-muted-foreground">{row.label}</span>
+              {/* Bar: grows from a single baseline, rounded only at the data end. */}
+              <span className="h-2 w-full rounded-l-none bg-muted" aria-hidden="true">
+                <span
+                  className="block h-2 rounded-r-[4px] bg-primary"
+                  style={{
+                    width: `${Math.max(row.value === 0 ? 0 : 2, (row.value / max) * 100)}%`,
+                  }}
+                />
+              </span>
+              <span className="text-right text-sm tabular-nums">{row.value}</span>
+            </li>
+          ))}
+        </ul>
       )}
-    </div>
+    </section>
   );
+}
+
+/** "2026-09-12" -> "Sep 12". Parsed as UTC to match how scans are bucketed. */
+function formatDay(day: string) {
+  return new Date(`${day}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+const REGION = new Intl.DisplayNames(["en"], { type: "region" });
+
+/** "GB" -> "United Kingdom", leaving "Unknown" alone. */
+function formatCountry(code: string) {
+  if (!/^[A-Z]{2}$/.test(code)) return code;
+  try {
+    return REGION.of(code) ?? code;
+  } catch {
+    return code;
+  }
 }
