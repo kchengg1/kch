@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@import "@kch/ui/styles.css";
+
+/* Tailwind must scan the shared UI package for class names. */
+@source "../../../packages/ui/src";
+
+/* Per-app overrides go here, e.g.
+@theme {
+  --color-primary: oklch(60% 0.2 30);
+}
+*/

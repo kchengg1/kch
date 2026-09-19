@@ -59,5 +59,5 @@ email and analytics all switch on when their env vars are set. See
 
 - **A feature only one app needs** → inside that app (`apps/<name>/app/...`).
 - **Something two apps need** → a package under `packages/`. Import it as `@kch/<pkg>`.
-- **A new table** → `packages/db/src/schema.ts`, then `pnpm db:generate`. All apps
+- **A new table** → `packages/db/src/schema/<app>.ts` (export it from `index.ts`), then `pnpm db:generate`. All apps
   share one schema; give each app its own database so their data stays separate.
