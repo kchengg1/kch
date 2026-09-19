@@ -22,7 +22,7 @@ pnpm new-app invoice-buddy --title "Invoice Buddy"
 | `packages/analytics`  | PostHog provider + `track()` (no-op without a key)                     |
 | `packages/config`     | Shared tsconfig presets                                                |
 | `scripts/new-app.mjs` | Scaffolds a new app from the template                                  |
-| `docs/`               | Launch checklist and architecture notes                                |
+| `docs/`               | Launch checklist, architecture notes, testing guide                    |
 
 Stack: pnpm workspaces · Turborepo · Next.js 16 (App Router) · React 19 ·
 TypeScript · Tailwind v4 · Drizzle + Postgres · better-auth · Stripe · Resend · PostHog.
@@ -43,17 +43,18 @@ email and analytics all switch on when their env vars are set. See
 
 ## Commands
 
-| Command               | What it does                                       |
-| --------------------- | -------------------------------------------------- |
-| `pnpm dev`            | Dev servers for every app (use `--filter` for one) |
-| `pnpm check`          | Lint + typecheck + tests for the whole repo        |
-| `pnpm build`          | Production build of everything                     |
-| `pnpm format`         | Prettier                                           |
-| `pnpm db:generate`    | Write a SQL migration after editing the schema     |
-| `pnpm db:migrate`     | Apply migrations (production)                      |
-| `pnpm db:push`        | Push schema directly (dev)                         |
-| `pnpm db:studio`      | Browse the database                                |
-| `pnpm new-app <name>` | Scaffold a new app                                 |
+| Command                        | What it does                                         |
+| ------------------------------ | ---------------------------------------------------- |
+| `pnpm dev`                     | Dev servers for every app (use `--filter` for one)   |
+| `pnpm check`                   | Lint + typecheck + tests for the whole repo          |
+| `pnpm --filter @kch/<app> e2e` | Browser + database checks ([guide](docs/TESTING.md)) |
+| `pnpm build`                   | Production build of everything                       |
+| `pnpm format`                  | Prettier                                             |
+| `pnpm db:generate`             | Write a SQL migration after editing the schema       |
+| `pnpm db:migrate`              | Apply migrations (production)                        |
+| `pnpm db:push`                 | Push schema directly (dev)                           |
+| `pnpm db:studio`               | Browse the database                                  |
+| `pnpm new-app <name>`          | Scaffold a new app                                   |
 
 ## Where to put things
 
