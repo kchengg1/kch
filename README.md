@@ -14,6 +14,7 @@ pnpm new-app invoice-buddy --title "Invoice Buddy"
 | --------------------- | ---------------------------------------------------------------------- |
 | `apps/template`       | The Next.js app every new app is cloned from                           |
 | `apps/<name>`         | Your apps (one folder each, all deploy independently)                  |
+| `apps/trader`         | Autonomous Claude trading agent for Alpaca (CLI, not a web app)        |
 | `packages/ui`         | Shared components + design tokens (Tailwind v4)                        |
 | `packages/db`         | Drizzle schema + Postgres client. Auth and billing tables              |
 | `packages/auth`       | better-auth config: email/password, Google, password reset             |
