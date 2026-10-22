@@ -1,9 +1,9 @@
 # TV Launcher
 
 A quiet home screen for the living-room **Samsung The Frame QN65LS03B** (2022, Tizen 6.5): a
-clock, Netflix, YouTube, and nothing else.
+clock over a rotating photo, Netflix, YouTube, and nothing else.
 
-![Home screen: clock, Netflix and YouTube tiles, All apps](docs/preview.png)
+![Home screen: greeting and clock over the Milky Way wallpaper, with Netflix, YouTube (focused, glowing red) and All apps tiles](docs/preview.png)
 
 Based on [NelsonEU/arn0-tv](https://github.com/NelsonEU/arn0-tv) (MIT, see [LICENSE](LICENSE)),
 which was built and tested on a 2022 Samsung Q70B, the same Tizen 6.5 generation as this Frame.
@@ -17,6 +17,8 @@ The full upstream reference (remote shortcuts, settings, wallpapers, HDMI, perfo
 | Apps row | Netflix and YouTube, matched by any of Samsung's known app ids or the exact store name |
 | Consoles row | Empty, so it is hidden. Add consoles later in Settings → Consoles |
 | Locale / clock | `en-US`, 12-hour clock by default |
+| Look | Photo wallpapers on by default (rotating hourly, crossfading), a greeting above a larger clock, big 16:9 tiles that lift and glow in the brand's colour when focused, the photo's credit bottom-right. With consoles added, Home switches back to the compact two-row layout |
+| Settings | Rows tightened so the last one no longer sits under the remote hints (also happens upstream) |
 | Tizen app id | `KchTvLnchr.Launcher` (package `KchTvLnchr`), shown as "TV Launcher" |
 | Build output | `dist/tv-launcher.wgt` |
 | Not copied | `native/` and the Home-button / power-on guide. Upstream only tested that on one Q70B and calls The Frame untested; it rewrites undocumented TV preferences. The launcher works fine opened from the app list |

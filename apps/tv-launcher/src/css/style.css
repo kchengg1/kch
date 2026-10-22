@@ -954,3 +954,175 @@ html.preview, html.preview body {
     opacity: 0;
     transition: opacity 10000ms linear;
 }
+
+/*
+ * ---------- Home, cinematic ----------
+ *
+ * Layered over the rules above. Everything here stays inside the measured budget: soft
+ * box-shadows (free), opacity and transform transitions on elements that already have their own
+ * layer, and no runtime gradients bigger than a tile. The tile sheen is a small static gradient
+ * rasterised once with its tile; if it ever costs frames, the Lab render probe will show it.
+ */
+
+#bg-next {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1920px;
+    height: 1080px;
+    background: center / cover no-repeat;
+    opacity: 0;
+    will-change: opacity;
+    transition: opacity 1.2s ease-in-out;   /* keep in step with FADE_MS in wallpaper.js */
+}
+
+#bg-next.in { opacity: 1; }
+
+@keyframes rise {
+    from { opacity: 0; transform: translateY(28px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+#home .clock,
+#home .shelf,
+#home .gear,
+#home .photo-credit {
+    animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+#home .gear { animation-delay: 0.05s; }
+#home #apps-section { animation-delay: 0.12s; }
+#home #inputs-section { animation-delay: 0.2s; }
+#home .photo-credit { animation-delay: 0.3s; }
+
+#greeting {
+    margin-bottom: 6px;
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: rgba(244, 245, 247, 0.72);
+}
+
+#greeting:empty { display: none; }
+
+#time {
+    font-size: 176px;
+    font-weight: 200;
+    letter-spacing: -6px;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 6px 40px rgba(0, 0, 0, 0.35);
+}
+
+#time-suffix {
+    margin-left: 18px;
+    font-size: 48px;
+    font-weight: 300;
+    color: rgba(244, 245, 247, 0.8);
+}
+
+#date {
+    margin-top: 10px;
+    font-size: 36px;
+    color: rgba(244, 245, 247, 0.78);
+}
+
+#apps-section { top: 576px; }
+
+.shelf h2 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    color: rgba(244, 245, 247, 0.6);
+}
+
+/* Bigger 16:9 tiles when the apps row has the lower half to itself. */
+#home .app {
+    width: 448px;
+    margin-right: 44px;
+}
+
+#home .tile { height: 252px; }
+
+#home .app .mark {
+    top: 30%;
+    left: 30%;
+    width: 40%;
+    height: 40%;
+}
+
+.row-track .tile {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 18px 44px rgba(0, 0, 0, 0.4);
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.row-track .tile::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: inherit;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 45%);
+    pointer-events: none;
+}
+
+.row-track .app.focused .tile,
+.row-track .input.focused .tile {
+    transform: translateY(-10px) scale(1.06);
+    box-shadow: 0 0 0 4px var(--ring), 0 40px 90px -10px var(--glow, rgba(255, 255, 255, 0.3));
+}
+
+#home .app .label {
+    margin-top: 22px;
+    font-size: 28px;
+    font-weight: 600;
+    color: rgba(244, 245, 247, 0.55);
+    transition: color 0.2s;
+}
+
+#home .app.focused .label { color: var(--fg); }
+
+.all-tile {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#home .all-tile svg {
+    width: 72px;
+    height: 72px;
+    margin: -36px 0 0 -36px;
+}
+
+.gear {
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+    color: rgba(244, 245, 247, 0.8);
+}
+
+.gear.focused {
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
+.photo-credit {
+    position: absolute;
+    right: var(--edge);
+    bottom: 52px;
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: rgba(244, 245, 247, 0.5);
+}
+
+/* With consoles there are two rows to fit: back to the compact layout. */
+#home.has-inputs #greeting { display: none; }
+#home.has-inputs #time { font-size: 132px; letter-spacing: -3px; }
+#home.has-inputs #time-suffix { font-size: 44px; }
+#home.has-inputs #apps-section { top: 350px; }
+#home.has-inputs .app { width: 300px; margin-right: 36px; }
+#home.has-inputs .tile { height: 170px; }
+#home.has-inputs .input .tile { height: 190px; }
+#home.has-inputs .app .mark { top: 26%; left: 22%; width: 56%; height: 48%; }
+
+/* Settings: eight rows have to clear the remote hints at the bottom. */
+#settings .settings-list { top: 206px; }
+#settings .setting-row { padding-top: 18px; padding-bottom: 18px; margin-bottom: 10px; }

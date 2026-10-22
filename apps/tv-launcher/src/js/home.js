@@ -59,10 +59,31 @@
         img.src = path.charAt(0) === '/' ? 'file://' + path : path;
     }
 
+    // Colour of the soft glow under a focused tile: the brand's most vivid colour, so a dark
+    // tile with a coloured mark (Netflix) glows red rather than grey.
+    function glowOf(brand) {
+        var hexes = String(brand.bg).match(/#[0-9a-f]{6}/gi) || [];
+        var base = hexes[hexes.length - 1];
+        if (!base || luminance(base) < 0.08) base = brand.fg;
+        return rgba(base, 0.55);
+    }
+
+    function luminance(hex) {
+        var n = parseInt(hex.slice(1), 16);
+        return (0.2126 * (n >> 16 & 255) + 0.7152 * (n >> 8 & 255) + 0.0722 * (n & 255)) / 255;
+    }
+
+    function rgba(hex, a) {
+        if (!/^#[0-9a-f]{6}$/i.test(hex)) return 'rgba(255,255,255,' + a + ')';
+        var n = parseInt(hex.slice(1), 16);
+        return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+    }
+
     function tileFace(item) {
         var tile = el('div', 'tile');
         if (item.brand) {
             tile.style.background = item.brand.bg;
+            tile.style.setProperty('--glow', glowOf(item.brand));
             if (item.brand.text) {
                 var word = el('div', 'wordmark', item.brand.text);
                 word.style.color = item.brand.fg;
@@ -72,6 +93,7 @@
             }
         } else {
             tile.style.background = 'hsl(' + hue(item.label) + ',32%,24%)';
+            tile.style.setProperty('--glow', 'hsla(' + hue(item.label) + ',60%,55%,0.45)');
             var mono = el('div', 'mono', initials(item.label).toUpperCase());
             tile.appendChild(mono);
             if (item.iconPath) tryIcon(tile, mono, item.iconPath);
@@ -178,6 +200,8 @@
             if (!input.hidden) row2.appendChild(inputTile(input));
         });
         $('inputs-section').classList.toggle('hidden', !row2.children.length);
+        // Without consoles the apps row gets the whole lower half (bigger, cinematic tiles).
+        $('home').classList.toggle('has-inputs', row2.children.length > 0);
         applyInputStatus();
         if (UI.isVisible('home')) UI.refresh();
     }
@@ -293,8 +317,8 @@
     }
 
     function nextWallpaper() {
-        var w = Wallpaper.next();
-        if (w) UI.toast(w.title + (w.credit ? ' · ' + w.credit : ''));
+        // The photo's title and credit update in the bottom-right corner of Home.
+        Wallpaper.next();
     }
 
     // Colour keys are hidden shortcuts; everything is also reachable from Settings.
@@ -326,6 +350,17 @@
         $('time-main').textContent = t.time;
         $('time-suffix').textContent = t.suffix;
         $('date').textContent = Appearance.date(d);
+        $('greeting').textContent = greeting(d);
+    }
+
+    // English only; other date languages simply show no greeting.
+    function greeting(d) {
+        if (!/^en/.test(Prefs.get().appearance.locale)) return '';
+        var h = d.getHours();
+        if (h < 5) return 'Good night';
+        if (h < 12) return 'Good morning';
+        if (h < 18) return 'Good afternoon';
+        return 'Good evening';
     }
 
     // The TV takes ~4 s to list its ~450 apps, so Home is drawn from the last list we saw

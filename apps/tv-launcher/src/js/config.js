@@ -35,7 +35,10 @@ window.LAUNCHER_CONFIG = {
     theme: {
         // Starting wallpaper (key from js/wallpapers.js), or null for none (plain gradient).
         // Changed from Settings → Background; the TV remembers the choice.
-        wallpaper: null
+        wallpaper: 'milky-way',
+        // Rotate through all the photos at this interval (a key from Wallpaper.INTERVALS),
+        // or null to keep the one above.
+        rotate: '1h'
     },
 
     /*

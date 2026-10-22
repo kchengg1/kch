@@ -24,19 +24,48 @@
         return find(key) || find('15m');
     }
 
+    var FADE_MS = 1200;   // keep in step with #bg-next in style.css
+
     function bg() { return document.getElementById('bg'); }
+
+    function caption(w) {
+        var el = document.getElementById('photo-credit');
+        if (el) el.textContent = w ? w.title + (w.credit ? '  ·  ' + w.credit : '') : '';
+    }
+
+    // Fades the new photo in on a second layer, then hands it to #bg. Only opacity animates, so
+    // the compositor does the work; nothing repaints mid-fade.
+    function crossfade(url, t) {
+        var next = document.getElementById('bg-next');
+        if (!next || !bg().style.backgroundImage) {
+            bg().style.backgroundImage = url;
+            return;
+        }
+        next.style.backgroundImage = url;
+        void next.offsetWidth;
+        next.classList.add('in');
+        setTimeout(function () {
+            if (t !== token) return;
+            bg().style.backgroundImage = url;
+            next.style.transition = 'none';
+            next.classList.remove('in');
+            void next.offsetWidth;
+            next.style.transition = '';
+        }, FADE_MS + 50);
+    }
 
     // The next image is decoded before it replaces the current one, so the screen never flashes empty.
     // No wallpaper falls back to the stylesheet's plain gradient (img/bg.jpg).
     function display(w) {
         var t = ++token;
+        caption(w);
         if (!w) {
             bg().style.backgroundImage = '';
             return;
         }
         var img = new Image();
         img.onload = function () {
-            if (t === token) bg().style.backgroundImage = 'url("' + w.file + '")';
+            if (t === token) crossfade('url("' + w.file + '")', t);
         };
         img.onerror = function () { DevLog.log('Wallpaper failed to load: ' + w.file); };
         img.src = w.file;

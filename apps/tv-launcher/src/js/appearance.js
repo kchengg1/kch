@@ -10,7 +10,8 @@
     ];
 
     var LOCALES = [
-        { key: 'en-GB', label: 'English' },
+        { key: 'en-US', label: 'English (US)' },
+        { key: 'en-GB', label: 'English (UK)' },
         { key: 'es-ES', label: 'Español' },
         { key: 'fr-FR', label: 'Français' }
     ];
