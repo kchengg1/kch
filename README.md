@@ -10,19 +10,20 @@ pnpm new-app invoice-buddy --title "Invoice Buddy"
 
 ## What's inside
 
-| Path                  | Purpose                                                                |
-| --------------------- | ---------------------------------------------------------------------- |
-| `apps/template`       | The Next.js app every new app is cloned from                           |
-| `apps/<name>`         | Your apps (one folder each, all deploy independently)                  |
-| `packages/ui`         | Shared components + design tokens (Tailwind v4)                        |
-| `packages/db`         | Drizzle schema + Postgres client. Auth and billing tables              |
-| `packages/auth`       | better-auth config: email/password, Google, password reset             |
-| `packages/payments`   | Stripe Checkout, Customer Portal, webhook sync, entitlements           |
-| `packages/email`      | Resend wrapper + HTML templates (prints to console without an API key) |
-| `packages/analytics`  | PostHog provider + `track()` (no-op without a key)                     |
-| `packages/config`     | Shared tsconfig presets                                                |
-| `scripts/new-app.mjs` | Scaffolds a new app from the template                                  |
-| `docs/`               | Launch checklist, architecture notes, testing guide                    |
+| Path                  | Purpose                                                                   |
+| --------------------- | ------------------------------------------------------------------------- |
+| `apps/template`       | The Next.js app every new app is cloned from                              |
+| `apps/<name>`         | Your apps (one folder each, all deploy independently)                     |
+| `apps/tv-launcher`    | Samsung Frame TV home screen (Tizen web app, not Next.js; see its README) |
+| `packages/ui`         | Shared components + design tokens (Tailwind v4)                           |
+| `packages/db`         | Drizzle schema + Postgres client. Auth and billing tables                 |
+| `packages/auth`       | better-auth config: email/password, Google, password reset                |
+| `packages/payments`   | Stripe Checkout, Customer Portal, webhook sync, entitlements              |
+| `packages/email`      | Resend wrapper + HTML templates (prints to console without an API key)    |
+| `packages/analytics`  | PostHog provider + `track()` (no-op without a key)                        |
+| `packages/config`     | Shared tsconfig presets                                                   |
+| `scripts/new-app.mjs` | Scaffolds a new app from the template                                     |
+| `docs/`               | Launch checklist, architecture notes, testing guide                       |
 
 Stack: pnpm workspaces · Turborepo · Next.js 16 (App Router) · React 19 ·
 TypeScript · Tailwind v4 · Drizzle + Postgres · better-auth · Stripe · Resend · PostHog.

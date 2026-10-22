@@ -1,0 +1,325 @@
+/*
+ * Screen saver: photos with a slow zoom, a clock and a caption, after a stretch with no input
+ * on Home. Any key closes it, and that press does nothing else.
+ *
+ * Adapted from a design mockup rather than ported from it. The mockup's backdrop was nine
+ * radial-gradients over a linear-gradient — the exact shape the Lab render probe measured at
+ * 4.6 fps with 88 of 90 frames dropped (see the header of css/style.css). Here a photo fills
+ * that role, the one gradient left is static and painted once, and everything that moves does
+ * so through `transform` and `opacity`, which the compositor animates with no JavaScript per
+ * frame. The poll below ticks once a second and only decides what is due.
+ *
+ * Burn-in is the reason anything moves at all: on this kind of panel a clock parked in one
+ * corner for an hour is a real risk, so the zoom never settles, the corner text shifts on each
+ * photo change, the clock moves to another corner every couple of minutes, and the whole thing
+ * fades to black once the configured hour is up.
+ */
+(function () {
+    'use strict';
+
+    var $ = UI.$;
+
+    var DELAYS = [
+        { key: '3m', label: '3 min', ms: 3 * 60 * 1000 },
+        { key: '5m', label: '5 min', ms: 5 * 60 * 1000 },
+        { key: '10m', label: '10 min', ms: 10 * 60 * 1000 },
+        { key: '15m', label: '15 min', ms: 15 * 60 * 1000 }
+    ];
+
+    // The design asks for a photo change every 60-90 s; these are the ends and the middle.
+    var PHOTO_EVERY = [
+        { key: '60s', label: '60 s', ms: 60 * 1000 },
+        { key: '75s', label: '75 s', ms: 75 * 1000 },
+        { key: '90s', label: '90 s', ms: 90 * 1000 }
+    ];
+
+    var DARK_AFTER = [
+        { key: '30m', label: '30 min', ms: 30 * 60 * 1000 },
+        { key: '1h', label: '1 hour', ms: 60 * 60 * 1000 },
+        { key: '2h', label: '2 hours', ms: 2 * 60 * 60 * 1000 },
+        { key: 'never', label: 'Never', ms: 0 }
+    ];
+
+    var ZOOM_MS = 90 * 1000;        // one leg of the zoom; a held photo then reverses
+    var ZOOM_TO = 1.06;
+    var CLOCK_MOVE_MS = 150 * 1000; // "every 2-3 minutes"
+    var CLOCK_POSITIONS = 4;        // .ss-clock.pos-0 .. pos-3
+    var NUDGES = [[0, 0], [7, -5], [-6, 6], [4, 8]];
+    var POLL_MS = 1000;
+
+    var open = false;
+    var returnTo = 'home';
+    var lastInput = Date.now();
+    var layers = [];
+    var front = 0;              // which of the two photo layers is showing
+    var photoToken = 0;
+    var photoIndex = 0;
+    var openedAt = 0;
+    var nextPhotoAt = 0;
+    var nextClockMoveAt = 0;
+    var nextZoomAt = 0;
+    var zoomedIn = false;
+    var nudge = 0;
+    var clockPos = 0;
+    var dark = false;
+
+    function prefs() { return Prefs.get().screensaver; }
+
+    function option(list, key, fallback) {
+        return list.find(function (o) { return o.key === key; }) ||
+            list.find(function (o) { return o.key === fallback; });
+    }
+
+    function delay() { return option(DELAYS, prefs().delay, '5m'); }
+    function photoEvery() { return option(PHOTO_EVERY, prefs().photoEvery, '75s'); }
+    function darkAfter() { return option(DARK_AFTER, prefs().dark, '1h'); }
+
+    // ---------- Photos
+
+    function rotating() {
+        return Prefs.get().wallpaper.mode === 'rotate' && Wallpaper.list().length > 1;
+    }
+
+    /*
+     * The photo follows the Background setting: Off shows no photo, Photo holds the chosen one,
+     * Rotate cycles the lot. The index is the screen saver's own — advancing it must not rewrite
+     * the Home wallpaper or restart its rotation clock, so Prefs.wallpaper is read, never written.
+     */
+    function photoAt(i) {
+        var p = Prefs.get().wallpaper;
+        if (p.mode === 'off') return null;
+        var list = Wallpaper.list();
+        if (!list.length) return null;
+        if (p.mode !== 'rotate') return Wallpaper.find(p.photo);
+        return list[((i % list.length) + list.length) % list.length];
+    }
+
+    // Continue from whatever is already on Home, so opening the screen saver is not a jump cut.
+    function startIndex() {
+        var key = Prefs.get().wallpaper.photo;
+        var i = Wallpaper.list().findIndex(function (w) { return w.key === key; });
+        return i < 0 ? 0 : i;
+    }
+
+    // The zoom is a CSS transition: set once, run by the compositor.
+    function resetZoom(layer) {
+        layer.classList.add('ss-instant');
+        layer.style.transform = 'scale(1)';
+        // Reading a layout property flushes that, so the next transition starts from scale(1)
+        // instead of being collapsed into it.
+        void layer.offsetWidth;
+        layer.classList.remove('ss-instant');
+    }
+
+    function startZoom() {
+        zoomedIn = true;
+        nextZoomAt = Date.now() + ZOOM_MS;
+        layers[front].style.transform = 'scale(' + ZOOM_TO + ')';
+    }
+
+    function flipZoom() {
+        zoomedIn = !zoomedIn;
+        nextZoomAt = Date.now() + ZOOM_MS;
+        layers[front].style.transform = 'scale(' + (zoomedIn ? ZOOM_TO : 1) + ')';
+    }
+
+    /*
+     * The incoming photo is decoded on the hidden layer before anything fades, so a slow decode
+     * cannot show as a flash of empty background. A token abandons a decode that finishes after
+     * the next change, or after the screen saver has closed.
+     */
+    function showPhoto(w) {
+        var token = ++photoToken;
+        if (!w) {
+            layers[0].style.opacity = '0';
+            layers[1].style.opacity = '0';
+            nextZoomAt = 0;
+            return;
+        }
+        var swapped = false;
+        var swap = function () {
+            if (swapped || token !== photoToken || !open) return;
+            swapped = true;
+            var back = layers[1 - front];
+            back.style.backgroundImage = 'url("' + w.file + '")';
+            resetZoom(back);
+            back.style.opacity = '1';
+            layers[front].style.opacity = '0';
+            front = 1 - front;
+            startZoom();
+        };
+        var img = new Image();
+        img.onload = swap;
+        img.onerror = function () { DevLog.log('Screen saver photo failed: ' + w.file); };
+        img.src = w.file;
+        if (img.complete && img.naturalWidth) swap();
+    }
+
+    // ---------- Text
+
+    // The design asks for "Wed 21 Oct"; Appearance.date is the long form Home uses.
+    function shortDate(d) {
+        try {
+            var text = d.toLocaleDateString(Prefs.get().appearance.locale,
+                { weekday: 'short', day: 'numeric', month: 'short' });
+            return text.charAt(0).toUpperCase() + text.slice(1);
+        } catch (e) {
+            return d.toDateString();
+        }
+    }
+
+    function updateClock() {
+        var d = new Date();
+        var t = Appearance.time(d);
+        $('ss-time').textContent = t.time + (t.suffix ? ' ' + t.suffix : '');
+        $('ss-date').textContent = Prefs.get().appearance.showDate ? shortDate(d) : '';
+    }
+
+    function caption(w) {
+        $('ss-title').textContent = w ? w.title : '';
+        $('ss-caption').classList.toggle('hidden', !w);
+    }
+
+    // A few pixels on each photo change, so even the text that stays put does not stay put.
+    function nudgeText() {
+        nudge = (nudge + 1) % NUDGES.length;
+        var shift = 'translate(' + NUDGES[nudge][0] + 'px, ' + NUDGES[nudge][1] + 'px)';
+        $('ss-caption').style.transform = shift;
+        $('ss-clock').style.transform = shift;
+    }
+
+    function moveClock() {
+        clockPos = (clockPos + 1) % CLOCK_POSITIONS;
+        $('ss-clock').className = 'ss-clock pos-' + clockPos;
+        nextClockMoveAt = Date.now() + CLOCK_MOVE_MS;
+    }
+
+    // ---------- Open, tick, close
+
+    function openSaver() {
+        if (open) return;
+        returnTo = UI.current() || 'home';
+        open = true;
+        dark = false;
+        front = 0;
+        nudge = 0;
+        clockPos = 0;
+        photoIndex = startIndex();
+        layers[0].style.opacity = '0';
+        layers[1].style.opacity = '0';
+        resetZoom(layers[0]);
+        resetZoom(layers[1]);
+        $('ss-dark').style.opacity = '0';
+        $('ss-caption').style.transform = '';
+        $('ss-clock').className = 'ss-clock pos-0';
+        $('ss-clock').style.transform = '';
+
+        var now = Date.now();
+        openedAt = now;
+        nextPhotoAt = now + photoEvery().ms;
+        nextClockMoveAt = now + CLOCK_MOVE_MS;
+        nextZoomAt = 0;
+
+        UI.show('screensaver');
+        updateClock();
+        var w = photoAt(photoIndex);
+        caption(w);
+        showPhoto(w);
+        DevLog.log('Screen saver on');
+    }
+
+    function goDark() {
+        dark = true;
+        $('ss-dark').style.opacity = '1';
+        DevLog.log('Screen saver dark after ' + darkAfter().label);
+    }
+
+    function tick() {
+        var now = Date.now();
+        updateClock();
+        var until = darkAfter().ms;
+        if (!dark && until && now - openedAt >= until) goDark();
+        // Behind an opaque black layer there is nothing worth moving.
+        if (dark) return;
+        if (now >= nextClockMoveAt) moveClock();
+        if (rotating() && now >= nextPhotoAt) {
+            photoIndex++;
+            nextPhotoAt = now + photoEvery().ms;
+            var w = photoAt(photoIndex);
+            caption(w);
+            nudgeText();
+            showPhoto(w);
+        } else if (nextZoomAt && now >= nextZoomAt) {
+            flipZoom();
+        }
+    }
+
+    function close() {
+        if (!open) return;
+        open = false;
+        lastInput = Date.now();
+        photoToken++;
+        // Dropping the images releases two full-screen textures on a 2 GB device.
+        layers.forEach(function (l) {
+            l.style.opacity = '0';
+            l.style.backgroundImage = '';
+        });
+        UI.show(returnTo, { back: true });
+    }
+
+    // Never over a console input or another screen, and never while the app is in the background.
+    function eligible() {
+        return prefs().enabled && UI.isVisible('home') && !document.hidden &&
+            !(window.Home && Home.tvMode());
+    }
+
+    /*
+     * One poll for everything. The dismissing key is swallowed by the view's onKey below, so it
+     * only closes the screen saver; this listener exists to notice input while it is closed.
+     */
+    document.addEventListener('keydown', function () {
+        if (!open) lastInput = Date.now();
+    });
+
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+            if (open) close();
+            return;
+        }
+        // Coming back from another app is not idle time: JavaScript was paused, not waiting.
+        lastInput = Date.now();
+    });
+
+    function init() {
+        layers = [$('ss-photo-a'), $('ss-photo-b')];
+        UI.register('screensaver', {
+            el: $('screensaver'),
+            hints: [],
+            rows: function () { return []; },
+            onKey: function () { close(); return true; },
+            onBack: function () { close(); return true; }
+        });
+        setInterval(function () {
+            if (open) {
+                tick();
+                return;
+            }
+            if (eligible() && Date.now() - lastInput >= delay().ms) openSaver();
+        }, POLL_MS);
+    }
+
+    window.Screensaver = {
+        DELAYS: DELAYS,
+        PHOTO_EVERY: PHOTO_EVERY,
+        DARK_AFTER: DARK_AFTER,
+        delay: delay,
+        photoEvery: photoEvery,
+        darkAfter: darkAfter,
+        init: init,
+        open: openSaver,
+        close: close,
+        isOpen: function () { return open; },
+        // Settings should not leave a countdown that started before the change.
+        poke: function () { lastInput = Date.now(); }
+    };
+})();

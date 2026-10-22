@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets"
+        id="http://kch.tv/launcher" version="0.6.12" viewmodes="maximized">
+    <!-- package must be exactly 10 alphanumeric characters -->
+    <!-- Keep this id stable once installed: changing it installs a second app instead of updating
+         this one (and settings saved on the TV belong to the old one). -->
+    <tizen:application id="KchTvLnchr.Launcher" package="KchTvLnchr" required_version="3.0"/>
+    <content src="index.html"/>
+    <icon src="icon.png"/>
+    <name>TV Launcher</name>
+
+    <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
+
+    <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+    <tizen:privilege name="http://tizen.org/privilege/application.info"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.window"/>
+    <!-- Only for the development log sent to the Mac (devLogUrl in js/config.js) -->
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <access origin="*" subdomains="true"/>
+
+    <!-- Lets the TV start the app in the background at power-on so opening it is faster -->
+    <tizen:metadata key="http://samsung.com/tv/metadata/prelaunch.support" value="true"/>
+
+    <tizen:profile name="tv-samsung"/>
+    <tizen:setting screen-orientation="landscape" context-menu="disable"
+                   background-support="disable" encryption="disable"
+                   install-location="auto" hwkey-event="enable"/>
+</widget>
