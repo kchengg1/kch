@@ -52,7 +52,7 @@ a scratch database, never at anything you care about.
 
 ### Writing them for a new app
 
-Copy `apps/scanlink/e2e/run.mjs` and rewrite the checks. The parts worth keeping:
+Copy `apps/scanlink/e2e/run.mjs` (or `apps/perks/e2e/run.mjs`, which needs no Stripe) and rewrite the checks. The parts worth keeping:
 
 - Truncate up front so runs are reproducible and order-independent.
 - Sign up through the real form rather than inserting a user, so auth is covered.

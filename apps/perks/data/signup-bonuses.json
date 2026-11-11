@@ -1,0 +1,103 @@
+{
+  "asOf": "2026-11-11",
+  "source": "https://www.doctorofcredit.com/best-current-credit-card-sign-bonuses/",
+  "offers": [
+    {
+      "id": "chase-aeroplan",
+      "card": "Chase Aeroplan",
+      "issuer": "Chase",
+      "business": false,
+      "bonus": "Up to 115,000 points",
+      "spend": null,
+      "annualFee": 95,
+      "estValue": 1725,
+      "note": "Reported as the card's best-ever offer. Aeroplan points also transfer in from Chase and Amex.",
+      "url": "https://awardwallet.com/credit-cards/best-credit-card-offers/",
+      "match": "aeroplan",
+      "elevated": true
+    },
+    {
+      "id": "chase-sapphire-reserve-business",
+      "card": "Chase Sapphire Reserve for Business",
+      "issuer": "Chase",
+      "business": true,
+      "bonus": "200,000 points",
+      "spend": "$30,000 in 6 months",
+      "annualFee": 795,
+      "estValue": 4000,
+      "note": "Large spend requirement. A separate product from the personal Sapphire Reserve.",
+      "url": "https://www.doctorofcredit.com/best-current-credit-card-sign-bonuses/",
+      "match": "sapphire reserve.*business"
+    },
+    {
+      "id": "capital-one-venture",
+      "card": "Capital One Venture Rewards",
+      "issuer": "Capital One",
+      "business": false,
+      "bonus": "75,000 miles + $300 Capital One Travel credit",
+      "spend": "$4,000 in 3 months",
+      "annualFee": 95,
+      "estValue": 1350,
+      "note": "Limited-time travel credit on top of the standard 75,000 miles.",
+      "url": "https://awardwallet.com/credit-cards/best-credit-card-offers/",
+      "match": "venture(?! ?x)",
+      "elevated": true
+    },
+    {
+      "id": "amex-bonvoy-brilliant",
+      "card": "Amex Marriott Bonvoy Brilliant",
+      "issuer": "American Express",
+      "business": false,
+      "bonus": "150,000 points + $250 credit",
+      "spend": null,
+      "annualFee": 650,
+      "estValue": 1525,
+      "note": "Comes with a $300 annual dining credit and a yearly 85,000-point free night.",
+      "url": "https://www.doctorofcredit.com/best-current-credit-card-sign-bonuses/",
+      "match": "bonvoy brilliant",
+      "noLifetimeLanguage": true,
+      "elevated": true
+    },
+    {
+      "id": "amex-platinum",
+      "card": "Amex Platinum",
+      "issuer": "American Express",
+      "business": false,
+      "bonus": "Up to 175,000 points",
+      "spend": "$12,000 in 6 months",
+      "annualFee": 895,
+      "estValue": 3500,
+      "note": "Personalized: the amount you are shown varies by applicant.",
+      "url": "https://www.forbes.com/advisor/credit-cards/best/sign-up-bonuses/",
+      "match": "amex(?!.*(delta|bus|biz)).*plat",
+      "templateKey": "amex-platinum"
+    },
+    {
+      "id": "amex-business-platinum",
+      "card": "Amex Business Platinum",
+      "issuer": "American Express",
+      "business": true,
+      "bonus": "Up to 300,000 points",
+      "spend": null,
+      "annualFee": 895,
+      "estValue": 6000,
+      "note": "Personalized: the amount you are shown varies by applicant.",
+      "url": "https://www.forbes.com/advisor/credit-cards/best/sign-up-bonuses/",
+      "match": "amex.*(bus\\w*|biz)\\s+plat",
+      "templateKey": "amex-business-platinum"
+    },
+    {
+      "id": "chase-sapphire-reserve",
+      "card": "Chase Sapphire Reserve",
+      "issuer": "Chase",
+      "business": false,
+      "bonus": "100,000 points",
+      "spend": "$6,000 in 3 months",
+      "annualFee": 795,
+      "estValue": 2000,
+      "url": "https://www.forbes.com/advisor/credit-cards/best/sign-up-bonuses/",
+      "match": "sapphire reserve(?!.*business)",
+      "templateKey": "chase-sapphire-reserve"
+    }
+  ]
+}
