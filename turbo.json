@@ -21,7 +21,10 @@
         "RESEND_API_KEY",
         "EMAIL_FROM",
         "NEXT_PUBLIC_POSTHOG_KEY",
-        "NEXT_PUBLIC_POSTHOG_HOST"
+        "NEXT_PUBLIC_POSTHOG_HOST",
+        "ALLOWED_EMAILS",
+        "PERKS_TIMEZONE",
+        "CRON_SECRET"
       ]
     },
     "dev": {

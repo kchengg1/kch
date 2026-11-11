@@ -1,6 +1,7 @@
 import { db, schema } from "@kch/db";
 import { resetPasswordEmail, sendEmail, verifyEmailTemplate } from "@kch/email";
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { lazy } from "./lazy";
@@ -10,9 +11,16 @@ export type AuthOptions = {
   appName: string;
   /** Require users to verify their email before signing in. Default false (less friction). */
   requireEmailVerification?: boolean;
+  /**
+   * When non-empty, only these addresses may create an account (any sign-up
+   * method). For personal apps that should not be open to the public.
+   */
+  allowedEmails?: string[];
 };
 
 export function createAuth(options: AuthOptions) {
+  const allowed = new Set((options.allowedEmails ?? []).map((e) => e.toLowerCase()));
+
   const google =
     process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
       ? {
@@ -49,6 +57,18 @@ export function createAuth(options: AuthOptions) {
       },
     },
     socialProviders: google,
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            if (allowed.size > 0 && !allowed.has(user.email.toLowerCase())) {
+              throw new APIError("FORBIDDEN", { message: "Sign-up is closed for this app." });
+            }
+            return { data: user };
+          },
+        },
+      },
+    },
     user: {
       additionalFields: {
         stripeCustomerId: { type: "string", required: false, input: false },
