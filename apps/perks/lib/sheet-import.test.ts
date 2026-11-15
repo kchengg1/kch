@@ -89,3 +89,18 @@ describe("parseCardSheet", () => {
     expect(parseCardSheet("just some text").error).toMatch(/Card Name/);
   });
 });
+
+describe("onStatement", () => {
+  it("knows which credits are applied in an app rather than on the statement", async () => {
+    const { onStatement } = await import("./catalog");
+    expect(onStatement("chase-sapphire-reserve", "Lyft credit")).toBe(false);
+    expect(onStatement("chase-sapphire-reserve", "DoorDash credit")).toBe(false);
+    expect(onStatement("capital-one-venture-x", "Travel credit")).toBe(false);
+    expect(onStatement("amex-gold", "Uber Cash")).toBe(false);
+    // The Sapphire Reserve travel credit does post as a statement credit.
+    expect(onStatement("chase-sapphire-reserve", "Travel credit")).toBe(true);
+    expect(onStatement("amex-gold", "Resy credit")).toBe(true);
+    // Custom cards and renamed benefits are assumed to post.
+    expect(onStatement(null, "Lyft credit")).toBe(true);
+  });
+});

@@ -248,6 +248,34 @@ check(
   sql(`select count(*) from perks_usage where benefit_id in ('${dining}','${resy}')`) === "2",
 );
 
+// Chase file with a Lyft ride refund: Lyft credit is applied in the app, so it is never offered.
+const csrId = sql(`select id from perks_card where name='Chase Sapphire Reserve'`);
+const chaseCsv = [
+  "Transaction Date,Post Date,Description,Category,Type,Amount,Memo",
+  `${us2(today)},${us2(today)},LYFT   *RIDE SUN 11AM,Travel,Sale,-18.40,`,
+  `${us2(today)},${us2(today)},LYFT   *RIDE SUN 11AM,Travel,Return,18.40,`,
+  `${us2(today)},${us2(today)},STARBUCKS,Food & Drink,Sale,-6.10,`,
+].join("\n");
+await page.selectOption("#stmt-card", csrId);
+await page.setInputFiles("#stmt-file", {
+  name: "chase.csv",
+  mimeType: "text/csv",
+  buffer: Buffer.from(chaseCsv),
+});
+await page.waitForSelector("text=credits found");
+const lyftSelect = page.locator('select[aria-label^="Benefit for LYFT"]');
+check("a Lyft refund is not matched to a benefit", (await lyftSelect.inputValue()) === "");
+check(
+  "in-app credits are not offered for statement lines",
+  !(await lyftSelect.locator("option").allInnerTexts()).some((o) => /Lyft|DoorDash/.test(o)),
+);
+check(
+  "in-app credits are labelled on the page",
+  (await page.locator("li", { hasText: "Lyft credit" }).first().innerText()).includes(
+    "Applied in app",
+  ),
+);
+
 await page.goto(`${BASE}/dashboard`);
 check(
   "Overview keeps a Catch up link after credits are logged",
