@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OfferLike } from "./offer-groups";
-import { firstName, liveMerchantKeys, offersByPerson } from "./shared-offers";
+import { firstName, onCardMerchantKeys, offersByPerson } from "./shared-offers";
 
 type O = OfferLike & { userId: string };
 const offer = (over: Partial<O>): O => ({
@@ -39,19 +39,36 @@ describe("offersByPerson", () => {
     expect(result.map((p) => p.firstName)).toEqual(["Ann", "Bob"]);
   });
 
-  it("drops used, skipped and expired offers but keeps added ones", () => {
+  it("drops used and expired offers but keeps skipped, hidden and added ones", () => {
     const [ann] = offersByPerson(
       people,
       [
         offer({ merchant: "Old", expiresOn: "2026-11-14" }),
+        offer({ merchant: "Used", status: "used" }),
         offer({ merchant: "Skipped", status: "dismissed" }),
+        offer({ merchant: "Hidden", status: "hidden" }),
         offer({ merchant: "Added", status: "added" }),
         offer({ merchant: "No date", expiresOn: null }),
       ],
       "me",
       today,
     );
-    expect(ann!.groups.map((g) => g.merchant).sort()).toEqual(["Added", "No date"]);
+    expect(ann!.groups.map((g) => g.merchant).sort()).toEqual([
+      "Added",
+      "Hidden",
+      "No date",
+      "Skipped",
+    ]);
+  });
+
+  it("reports when each person last pasted", () => {
+    const [ann] = offersByPerson(people, [offer({})], "me", today, [
+      { userId: "ann", offersCheckedAt: new Date("2026-11-01") },
+      { userId: "ann", offersCheckedAt: new Date("2026-11-10") },
+      { userId: "ann", offersCheckedAt: null },
+      { userId: "bob", offersCheckedAt: new Date("2026-11-14") },
+    ]);
+    expect(ann!.lastPastedAt).toEqual(new Date("2026-11-10"));
   });
 
   it("groups the same deal across cards and sorts best return first", () => {
@@ -78,7 +95,7 @@ describe("helpers", () => {
   });
 
   it("collects the viewer's live merchants", () => {
-    const keys = liveMerchantKeys(
+    const keys = onCardMerchantKeys(
       [offer({ merchant: "Walmart.com®" }), offer({ merchant: "Hulu", status: "used" })],
       today,
     );

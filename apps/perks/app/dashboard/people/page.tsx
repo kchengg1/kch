@@ -5,14 +5,14 @@ import { dueLabel } from "@/components/credit-row";
 import { formatCents } from "@/lib/money";
 import { merchantKey } from "@/lib/offer-groups";
 import { rateLabel, WEAK_RATE } from "@/lib/offer-value";
-import { listEveryonesOffers, today as getToday } from "@/lib/perks";
+import { dateOf, listEveryonesOffers, today as getToday } from "@/lib/perks";
 import { daysBetween, formatDate } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
-import { liveMerchantKeys, offersByPerson } from "@/lib/shared-offers";
+import { onCardMerchantKeys, offersByPerson } from "@/lib/shared-offers";
 
 export const metadata: Metadata = { title: "People" };
 
-/** Read-only view of the Amex and Chase offers everyone else in the group has saved. */
+/** Read-only view of the Amex and Chase offers on everyone else's cards. */
 export default async function PeoplePage({
   searchParams,
 }: {
@@ -23,8 +23,8 @@ export default async function PeoplePage({
   const { p } = await searchParams;
   const { people, offers, cards } = await listEveryonesOffers();
   const cardById = new Map(cards.map((c) => [c.id, c]));
-  const everyone = offersByPerson(people, offers, user.id, today);
-  const mine = liveMerchantKeys(
+  const everyone = offersByPerson(people, offers, user.id, today, cards);
+  const mine = onCardMerchantKeys(
     offers.filter((o) => o.userId === user.id),
     today,
   );
@@ -35,16 +35,16 @@ export default async function PeoplePage({
       <div>
         <h1 className="text-2xl font-bold">People</h1>
         <p className="text-muted-foreground">
-          Amex Offers and Chase Offers others in the group have saved. Offers are targeted, so a
-          deal here may not be on your cards.
+          Every Amex Offer and Chase Offer on other people&rsquo;s cards, as of the last time they
+          pasted their offers page. Offers are targeted, so a deal here may not be on your cards.
         </p>
       </div>
 
       {!person ? (
         <Card>
           <p className="text-sm text-muted-foreground">
-            Nobody else has saved offers yet. Once someone pastes their offers page, it shows up
-            here.
+            Nobody else has pasted an offers page yet. Once someone does, every offer on their cards
+            shows up here.
           </p>
         </Card>
       ) : (
@@ -74,9 +74,25 @@ export default async function PeoplePage({
             <h2 className="font-semibold">
               {person.firstName}&rsquo;s offers{" "}
               <span className="font-normal text-muted-foreground">
-                · {person.groups.length} live
+                · {person.groups.length} available
               </span>
             </h2>
+            {(() => {
+              const at = person.lastPastedAt;
+              const ago = at ? daysBetween(dateOf(at), today) : null;
+              return (
+                <p
+                  className={cn(
+                    "text-sm",
+                    ago === null || ago > 14 ? "text-destructive" : "text-muted-foreground",
+                  )}
+                >
+                  {at
+                    ? `Last pasted ${formatDate(dateOf(at), today)}${ago! > 14 ? ", so this may be out of date" : ""}.`
+                    : "Pasted without picking a card, so freshness is unknown."}
+                </p>
+              );
+            })()}
             <Card className="py-2">
               <ul className="divide-y">
                 {person.groups.map((g) => {

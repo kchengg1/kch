@@ -110,7 +110,7 @@ export const perksOffer = pgTable(
     /** Maximum reward when the offer states one in dollars. */
     valueCents: integer("value_cents"),
     expiresOn: date("expires_on", { mode: "string" }),
-    /** available | added | used | dismissed */
+    /** available | added | used | dismissed | hidden (merchant the owner hid; shown only to others) */
     status: text("status").notNull().default("available"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },

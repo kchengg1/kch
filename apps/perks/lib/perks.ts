@@ -82,7 +82,7 @@ export async function listOffers(userId: string): Promise<PerksOffer[]> {
 }
 
 /**
- * Everyone's saved offers with the cards they are on, for the People tab.
+ * Everyone's pasted offers with the cards they are on, for the People tab.
  * Perks is limited to a small group (ALLOWED_EMAILS), so like referral links
  * these are visible to everyone signed in. Only fields shown on the page are
  * returned: no emails, card dates or spending.
@@ -109,6 +109,8 @@ export async function listEveryonesOffers() {
         name: perksCard.name,
         issuer: perksCard.issuer,
         templateKey: perksCard.templateKey,
+        userId: perksCard.userId,
+        offersCheckedAt: perksCard.offersCheckedAt,
       })
       .from(perksCard),
   ]);

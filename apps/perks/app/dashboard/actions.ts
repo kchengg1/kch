@@ -431,13 +431,13 @@ export async function saveOffersAction(_prev: FormState, form: FormData): Promis
     const details = String(o.details ?? "").slice(0, 300);
     const expiresOn = o.expiresOn ? parseSheetDate(String(o.expiresOn)) : null;
     if (!merchant) continue;
-    if (hiddenKeys.has(merchantKey(merchant))) {
-      hiddenCount++;
-      continue;
-    }
     const key = offerKey({ merchant, details, expiresOn });
     if (have.has(key)) continue;
     have.add(key);
+    // Merchants the owner hid are kept out of their own pages but still saved,
+    // so the People tab shows everything that is on the card.
+    const isHidden = hiddenKeys.has(merchantKey(merchant));
+    if (isHidden) hiddenCount++;
     rows.push({
       id: crypto.randomUUID(),
       userId: user.id,
@@ -446,7 +446,7 @@ export async function saveOffersAction(_prev: FormState, form: FormData): Promis
       details,
       valueCents: Number.isInteger(o.valueCents) ? o.valueCents : null,
       expiresOn,
-      status: o.added ? "added" : "available",
+      status: isHidden ? "hidden" : o.added ? "added" : "available",
     });
   }
   if (rows.length) await db.insert(perksOffer).values(rows);
@@ -457,13 +457,14 @@ export async function saveOffersAction(_prev: FormState, form: FormData): Promis
       .set({ offersCheckedAt: new Date() })
       .where(eq(perksCard.id, card.id));
   refresh();
-  const skipped = parsed.length - rows.length - hiddenCount;
+  const skipped = parsed.length - rows.length;
+  const shown = rows.length - hiddenCount;
   const notes = [
     skipped ? `skipped ${skipped} already saved` : "",
     hiddenCount ? `left out ${hiddenCount} from merchants you hid` : "",
   ].filter(Boolean);
   return {
-    message: `Saved ${rows.length} offer${rows.length === 1 ? "" : "s"}${notes.length ? `, ${notes.join(", ")}` : ""}.`,
+    message: `Saved ${shown} offer${shown === 1 ? "" : "s"}${notes.length ? `, ${notes.join(", ")}` : ""}.`,
   };
 }
 
@@ -521,6 +522,15 @@ export async function unhideMerchantAction(key: string) {
   await db
     .delete(perksHiddenMerchant)
     .where(and(eq(perksHiddenMerchant.userId, user.id), eq(perksHiddenMerchant.merchantKey, key)));
+  // Offers pasted while the merchant was hidden come back as available.
+  const ids = (await listOffers(user.id))
+    .filter((o) => o.status === "hidden" && merchantKey(o.merchant) === key)
+    .map((o) => o.id);
+  if (ids.length)
+    await db
+      .update(perksOffer)
+      .set({ status: "available" })
+      .where(and(inArray(perksOffer.id, ids), eq(perksOffer.userId, user.id)));
   refresh();
 }
 

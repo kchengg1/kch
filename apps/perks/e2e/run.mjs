@@ -591,15 +591,22 @@ await page.waitForSelector("text=will be skipped");
 await page.click('button:has-text("Save 1 offer")');
 await page.waitForSelector("text=left out 1 from merchants you hid");
 check(
-  "future pastes skip a hidden merchant",
-  sql(`select count(*) from perks_offer where merchant='St. Regis' and expires_on='2027-01-31'`) ===
-    "0",
+  "future pastes of a hidden merchant are kept out of sight",
+  sql(`select status from perks_offer where merchant='St. Regis' and expires_on='2027-01-31'`) ===
+    "hidden",
 );
 await page.locator("summary", { hasText: "not interested" }).click();
 await page.locator('button:has-text("Show again")').click();
 check(
   "Show again brings the merchant back",
   await until(`select count(*) from perks_hidden_merchant`, 0),
+);
+check(
+  "offers pasted while hidden come back",
+  await until(
+    `select status from perks_offer where merchant='St. Regis' and expires_on='2027-01-31'`,
+    "available",
+  ),
 );
 
 /* 8. Sign-up bonus eligibility ------------------------------------------ */
