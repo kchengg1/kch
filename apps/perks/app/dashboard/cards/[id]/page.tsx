@@ -9,6 +9,8 @@ import { Meter } from "@/components/meter";
 import { UsageChips } from "@/components/usage-chips";
 import { CATALOG, CATALOG_REVIEWED, getTemplate } from "@/lib/catalog";
 import { formatCents } from "@/lib/money";
+import { msrStatus } from "@/lib/msr";
+import { cardWorth, faceValueCents, myValueCents } from "@/lib/worth";
 import { getCard, loadPortfolio, today as getToday } from "@/lib/perks";
 import { CADENCE_LABEL, formatDate, isCadence, type Cadence } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
@@ -20,6 +22,8 @@ import {
   deleteCardAction,
   setBenefitFlagAction,
   updateBenefitAction,
+  saveWorthAction,
+  updateBonusAction,
   updateCardAction,
 } from "../../actions";
 
@@ -40,6 +44,9 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
   const template = getTemplate(card.templateKey);
   const credits = benefits.filter((b) => b.cadence !== "perk");
   const perks = benefits.filter((b) => b.cadence === "perk");
+  const msr = msrStatus(card, today);
+  const worth = cardWorth(benefits, card.annualFeeCents, today);
+  const worthRows = benefits.filter((b) => !(b.endsOn && b.endsOn < today));
 
   return (
     <div className="space-y-8">
@@ -88,6 +95,29 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
             {summary.capturedCents >= card.annualFeeCents
               ? `That covers the ${formatCents(card.annualFeeCents)} fee.`
               : `${formatCents(card.annualFeeCents - summary.capturedCents)} more to cover the fee.`}
+          </p>
+        </Card>
+      )}
+
+      {msr && msr.state !== "received" && (
+        <Card className="max-w-xl">
+          <p className="text-sm text-muted-foreground">
+            Sign-up bonus{card.bonusText ? `: ${card.bonusText}` : ""}
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight">
+            {formatCents(msr.spentCents)}
+            <span className="text-base font-normal text-muted-foreground">
+              {" "}
+              of {formatCents(msr.requiredCents)} spent
+            </span>
+          </p>
+          <Meter value={msr.spentCents} max={msr.requiredCents} className="mt-3" />
+          <p className="mt-2 text-sm text-muted-foreground">
+            {msr.state === "met"
+              ? "Spend requirement met. Mark the bonus received once it posts."
+              : msr.state === "missed"
+                ? `The deadline passed with ${formatCents(msr.leftCents)} to go.`
+                : `${formatCents(msr.leftCents)} to go${msr.daysLeft !== null ? `, ${msr.daysLeft} days left (about ${formatCents(msr.perDayCents ?? 0)} a day)` : ""}.`}
           </p>
         </Card>
       )}
@@ -266,6 +296,137 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
           </div>
         </details>
       )}
+
+      {worthRows.length > 0 && (
+        <details className="group max-w-3xl rounded-[calc(var(--radius)+4px)] border bg-card shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 sm:p-6">
+            <span>
+              <CardTitle>Is it worth the {formatCents(card.annualFeeCents)} fee?</CardTitle>
+              <CardDescription className="mt-1">
+                Advertised {formatCents(worth.advertisedCents)} a year, worth{" "}
+                {formatCents(worth.worthCents)} to you:{" "}
+                <span
+                  className={
+                    worth.netCents >= 0
+                      ? "font-medium text-success"
+                      : "font-medium text-destructive"
+                  }
+                >
+                  {worth.netCents >= 0
+                    ? `${formatCents(worth.netCents)} ahead`
+                    : `${formatCents(-worth.netCents)} short`}
+                </span>
+              </CardDescription>
+            </span>
+            <ChevronDown
+              aria-hidden
+              className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+            />
+          </summary>
+          <div className="px-5 pb-5 sm:px-6 sm:pb-6">
+            <p className="mb-3 text-sm text-muted-foreground">
+              Put what each benefit is really worth to you per year. Blank uses the advertised value
+              for credits you track and $0 for everything else. Status and lounge access count too
+              if they matter to you.
+            </p>
+            <ActionForm action={saveWorthAction} submit="Save values" className="space-y-3">
+              <input type="hidden" name="cardId" value={card.id} />
+              <ul className="divide-y text-sm">
+                {worthRows.map((b) => (
+                  <li key={b.id} className="flex items-center justify-between gap-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{b.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {faceValueCents(b) > 0
+                          ? `Advertised ${formatCents(faceValueCents(b))}/yr`
+                          : "No dollar value"}
+                        {!b.tracked && " · not tracked"}
+                      </p>
+                    </div>
+                    <label className="flex shrink-0 items-center gap-1 text-muted-foreground">
+                      $
+                      <Input
+                        name={`worth_${b.id}`}
+                        inputMode="decimal"
+                        aria-label={`Worth to me per year: ${b.name}`}
+                        defaultValue={b.myValueCents === null ? "" : String(b.myValueCents / 100)}
+                        placeholder={String(myValueCents(b) / 100)}
+                        className="h-9 w-24"
+                      />
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </ActionForm>
+          </div>
+        </details>
+      )}
+
+      <details
+        className="group max-w-3xl rounded-[calc(var(--radius)+4px)] border bg-card shadow-sm"
+        open={Boolean(msr && msr.state === "active")}
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 sm:p-6">
+          <CardTitle>Sign-up bonus</CardTitle>
+          <ChevronDown
+            aria-hidden
+            className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+          />
+        </summary>
+        <div className="px-5 pb-5 sm:px-6 sm:pb-6">
+          <ActionForm action={updateBonusAction} submit="Save" className="space-y-4">
+            <input type="hidden" name="id" value={card.id} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="bonus-text">Bonus</Label>
+                <Input
+                  id="bonus-text"
+                  name="bonus"
+                  defaultValue={card.bonusText}
+                  placeholder="60,000 points"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bonus-msr">Spend required, $</Label>
+                <Input
+                  id="bonus-msr"
+                  name="msr"
+                  inputMode="decimal"
+                  defaultValue={card.msrCents ? String(card.msrCents / 100) : ""}
+                  placeholder="4000"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bonus-deadline">Spend by</Label>
+                <Input
+                  id="bonus-deadline"
+                  name="deadline"
+                  type="date"
+                  defaultValue={card.msrDeadline ?? ""}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bonus-spent">Spent so far, $</Label>
+                <Input
+                  id="bonus-spent"
+                  name="spent"
+                  inputMode="decimal"
+                  defaultValue={String(card.msrSpentCents / 100)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bonus-received">Bonus received on</Label>
+                <Input
+                  id="bonus-received"
+                  name="received"
+                  type="date"
+                  defaultValue={card.bonusReceivedOn ?? ""}
+                />
+              </div>
+            </div>
+          </ActionForm>
+        </div>
+      </details>
 
       {/* Open by default while the opened date is missing, since credits and fees depend on it. */}
       <details

@@ -33,6 +33,12 @@ export const perksCard = pgTable(
     openedOn: date("opened_on", { mode: "string" }),
     closedOn: date("closed_on", { mode: "string" }),
     closed: boolean("closed").notNull().default(false),
+    /** Sign-up bonus: spend required, by when, how much is done, and what it pays. */
+    msrCents: integer("msr_cents"),
+    msrDeadline: date("msr_deadline", { mode: "string" }),
+    msrSpentCents: integer("msr_spent_cents").notNull().default(0),
+    bonusText: text("bonus_text").notNull().default(""),
+    bonusReceivedOn: date("bonus_received_on", { mode: "string" }),
     /** Last time an offers page was pasted for this card, even if nothing new was found. */
     offersCheckedAt: timestamp("offers_checked_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -58,6 +64,8 @@ export const perksBenefit = pgTable(
     notes: text("notes").notNull().default(""),
     enrollRequired: boolean("enroll_required").notNull().default(false),
     enrolled: boolean("enrolled").notNull().default(false),
+    /** What the benefit is worth to the owner per year, when it differs from face value. */
+    myValueCents: integer("my_value_cents"),
     /** False for credits the owner has decided are not worth chasing. */
     tracked: boolean("tracked").notNull().default(true),
     /** Last day the benefit exists, for limited-time credits. */
@@ -109,6 +117,45 @@ export const perksOffer = pgTable(
   (t) => [index("perks_offer_user_id_idx").on(t.userId)],
 );
 
+/** A points or miles balance, with the owner's value for one point. */
+export const perksPoints = pgTable(
+  "perks_points",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    program: text("program").notNull(),
+    balance: integer("balance").notNull().default(0),
+    /** Cents per point in hundredths, so 1.7 cents is stored as 170. */
+    centsPerPointX100: integer("cents_per_point_x100").notNull().default(100),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [uniqueIndex("perks_points_user_program_idx").on(t.userId, t.program)],
+);
+
+/** A past award booking, to see what points were actually worth. */
+export const perksRedemption = pgTable(
+  "perks_redemption",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    program: text("program").notNull(),
+    redeemedOn: date("redeemed_on", { mode: "string" }).notNull(),
+    points: integer("points").notNull(),
+    feesCents: integer("fees_cents").notNull().default(0),
+    cashCents: integer("cash_cents").notNull(),
+    note: text("note").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("perks_redemption_user_id_idx").on(t.userId)],
+);
+
 /** Merchants whose offers the owner never wants to see. */
 export const perksHiddenMerchant = pgTable(
   "perks_hidden_merchant",
@@ -152,3 +199,5 @@ export type PerksUsage = typeof perksUsage.$inferSelect;
 export type PerksOffer = typeof perksOffer.$inferSelect;
 export type PerksSettings = typeof perksSettings.$inferSelect;
 export type PerksHiddenMerchant = typeof perksHiddenMerchant.$inferSelect;
+export type PerksPoints = typeof perksPoints.$inferSelect;
+export type PerksRedemption = typeof perksRedemption.$inferSelect;

@@ -25,7 +25,7 @@ const check = (name, cond, extra = "") => {
 
 // Clean slate so the run is reproducible.
 sql(
-  `truncate "user", perks_card, perks_benefit, perks_usage, perks_offer, perks_settings, session, account cascade;`,
+  `truncate "user", perks_points, perks_redemption, perks_card, perks_benefit, perks_usage, perks_offer, perks_settings, session, account cascade;`,
 );
 
 // The app decides "today" in PERKS_TIMEZONE; use the same day here.
@@ -298,6 +298,96 @@ check(
 check("Cards tab active on Catch up", (await activeTab("/dashboard/catch-up")).join() === "Cards");
 check("Offers tab active on Offers", (await activeTab("/dashboard/offers")).join() === "Offers");
 
+/* 6d. Sign-up bonus, card worth, points and application rules ----------- */
+const bonusCard = sql(`select id from perks_card where name='Chase Sapphire Reserve'`);
+await page.goto(`${BASE}/dashboard/cards/${bonusCard}`);
+await page.locator("summary", { hasText: "Sign-up bonus" }).click();
+await page.fill("#bonus-text", "100,000 points");
+await page.fill("#bonus-msr", "6000");
+await page.fill("#bonus-deadline", new Date(Date.UTC(year + 1, 0, 31)).toISOString().slice(0, 10));
+await page.fill("#bonus-spent", "1500");
+await page
+  .locator("form", { has: page.locator("#bonus-msr") })
+  .locator('button[type="submit"]')
+  .click();
+check(
+  "sign-up bonus saved",
+  await until(
+    `select msr_cents || '/' || msr_spent_cents from perks_card where id='${bonusCard}'`,
+    "600000/150000",
+  ),
+);
+await page.goto(`${BASE}/dashboard`);
+const bonusRow = page.locator("li", { hasText: "100,000 points" });
+check(
+  "Overview shows the bonus in progress",
+  (await bonusRow.innerText()).includes("$4,500 to go"),
+);
+await bonusRow.locator('input[name="spent"]').fill("6000");
+await bonusRow.locator('button:has-text("Update")').click();
+await page.waitForSelector("text=requirement met");
+check("updating spend to the target marks it met", true);
+await page
+  .locator("li", { hasText: "100,000 points" })
+  .locator('button:has-text("Bonus posted")')
+  .click();
+check(
+  "Bonus posted records the date",
+  await until(
+    `select (bonus_received_on is not null)::text from perks_card where id='${bonusCard}'`,
+    "true",
+  ),
+);
+
+// Is it worth it: value Uber Cash at $0 on the gold card.
+await page.goto(`${BASE}/dashboard/cards/${goldId}`);
+await page.locator("summary", { hasText: "Is it worth the" }).click();
+await page.getByLabel("Worth to me per year: Uber Cash").fill("0");
+await page.locator('button:has-text("Save values")').click();
+check(
+  "a benefit's worth-to-me value is saved",
+  await until(
+    `select my_value_cents from perks_benefit where card_id='${goldId}' and name='Uber Cash'`,
+    0,
+  ),
+);
+await page.reload();
+check(
+  "the card shows advertised value against worth to you",
+  /Advertised \$[\d,]+ a year, worth \$[\d,]+ to you/.test(
+    await page.locator("summary", { hasText: "Is it worth the" }).innerText(),
+  ),
+);
+
+// Points: paste balances from the sheet, check an award, log it.
+await page.goto(`${BASE}/dashboard/points`);
+await page.fill(
+  'textarea[name="balances"]',
+  "American Express Membership Rewards\t270520\nMarriott Rewards\t1000",
+);
+await page.click('button:has-text("Update balances")');
+await page.waitForSelector("text=Updated 2 balances");
+check(
+  "pasted balances get the sheet's values",
+  sql(
+    `select string_agg(program || '=' || cents_per_point_x100, ',' order by program) from perks_points`,
+  ) === "American Express Membership Rewards=200,Marriott Bonvoy=85",
+);
+await page.reload();
+check("total portfolio value shown", (await bodyText()).includes("worth about $5,419"));
+await page.selectOption("#calc-program", "Marriott Bonvoy");
+await page.fill("#calc-cash", "2300");
+await page.fill("#calc-points", "318000");
+await page.waitForSelector("text=Pay cash");
+check("the sheet's Marriott example says pay cash", (await bodyText()).includes("0.72¢ per point"));
+await page.click('button:has-text("Log as a redemption I made")');
+await page.waitForSelector("text=Logged.");
+check("redemption logged", sql(`select points from perks_redemption`) === "318000");
+
+// Application rules from card history.
+await page.goto(`${BASE}/dashboard/bonuses`);
+check("application rules listed", (await bodyText()).includes("Bank of America 2/3/4"));
+
 /* 7. Paste offers -------------------------------------------------------- */
 await page.goto(`${BASE}/dashboard/offers`);
 await page.selectOption("#cardId", goldId);
@@ -543,7 +633,7 @@ const phone = await (
 await signup(phone, "Pat Phone", "phone@example.com");
 const tabBar = phone.getByRole("navigation", { name: "Sections" });
 check("phone shows the bottom tab bar", await tabBar.isVisible());
-for (const label of ["Overview", "Cards", "Offers", "Bonuses", "Settings"]) {
+for (const label of ["Overview", "Cards", "Offers", "Points", "Bonuses", "Settings"]) {
   check(
     `${label} is reachable on a phone`,
     await tabBar.getByRole("link", { name: label }).isVisible(),
