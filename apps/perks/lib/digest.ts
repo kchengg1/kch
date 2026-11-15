@@ -3,6 +3,7 @@ import { sendEmail, type EmailContent } from "@kch/email";
 import { appConfig } from "@/app.config";
 import { formatCents } from "./money";
 import { msrStatus } from "./msr";
+import { sendPush } from "./push";
 import { groupOffers, merchantKey } from "./offer-groups";
 import { isWeakOffer } from "./offer-value";
 import { listHiddenMerchants, listOffers, loadPortfolio } from "./perks";
@@ -135,7 +136,26 @@ export async function sendDigest(
     });
   const content = buildDigest(credits, expiring, today, spend);
   if (!content) return false;
-  await sendEmail({ to: user.email, ...content });
+  // Email and push are independent: one failing (e.g. an address Resend won't
+  // deliver to yet) must not stop the other.
+  try {
+    await sendEmail({ to: user.email, ...content });
+  } catch (err) {
+    console.error("[digest] email failed for", user.id, err);
+  }
+  const parts = [
+    spend.length ? `${formatCents(spend[0]!.leftCents)} to spend on ${spend[0]!.cardName}` : "",
+    credits.length
+      ? `${formatCents(credits.reduce((n, c) => n + c.remainingCents, 0))} in credits ending soon`
+      : "",
+    expiring.length ? `${expiring.length} offer${expiring.length === 1 ? "" : "s"} expiring` : "",
+  ].filter(Boolean);
+  await sendPush(user.id, {
+    title: content.subject,
+    body: parts.join(" · "),
+    url: "/dashboard",
+    tag: "digest",
+  }).catch((err) => console.error("[digest] push failed for", user.id, err));
   return true;
 }
 

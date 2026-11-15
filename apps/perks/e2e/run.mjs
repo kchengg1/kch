@@ -25,7 +25,7 @@ const check = (name, cond, extra = "") => {
 
 // Clean slate so the run is reproducible.
 sql(
-  `truncate "user", perks_points, perks_redemption, perks_card, perks_benefit, perks_usage, perks_offer, perks_settings, session, account cascade;`,
+  `truncate "user", perks_push_subscription, perks_referral, perks_spend_target, perks_points, perks_redemption, perks_card, perks_benefit, perks_usage, perks_offer, perks_settings, session, account cascade;`,
 );
 
 // The app decides "today" in PERKS_TIMEZONE; use the same day here.
@@ -388,6 +388,70 @@ check("redemption logged", sql(`select points from perks_redemption`) === "31800
 await page.goto(`${BASE}/dashboard/bonuses`);
 check("application rules listed", (await bodyText()).includes("Bank of America 2/3/4"));
 
+/* 6e. Card picker, spending goals, notifications, referrals -------------- */
+await page.goto(`${BASE}/dashboard`);
+await page.fill('input[name="q"]', "Whole Foods");
+await Promise.all([
+  page.waitForURL("**/dashboard/pick?q=*"),
+  page.click('form[action="/dashboard/pick"] button'),
+]);
+let picked = await page.locator("main ol > li").allInnerTexts();
+check(
+  "the picker counts Whole Foods as groceries",
+  (await bodyText()).includes("counts as groceries"),
+);
+check(
+  "Amex Gold wins at the supermarket",
+  picked[0]?.includes("Amex PRG") && picked[0]?.includes("8%"),
+  picked[0],
+);
+await page.goto(`${BASE}/dashboard/pick?q=Hyatt%20Regency`);
+picked = await page.locator("main ol > li").allInnerTexts();
+check(
+  "the picker ranks a hotel booking",
+  picked.length >= 2 && picked[0].includes("Best"),
+  picked[0],
+);
+
+await page.goto(`${BASE}/dashboard`);
+const goal = page.locator("li", { hasText: "$75,000 spend perks" });
+check("Sapphire Reserve gets its $75,000 spending goal", (await goal.count()) === 1);
+await goal.locator('input[name="spent"]').fill("12500");
+await goal.locator('button:has-text("Update")').click();
+check(
+  "spending toward the goal is saved for this year",
+  await until(
+    `select spent_cents || '/' || period_key from perks_spend_target where name='$75,000 spend perks'`,
+    `1250000/${year}`,
+  ),
+);
+
+await page.goto(`${BASE}/dashboard/cards`);
+check(
+  "card rows say what's inside and that they open",
+  (await page.locator('a[aria-label^="Chase Sapphire Reserve: see credits"]').innerText()).includes(
+    "credits",
+  ),
+);
+
+await page.goto(`${BASE}/dashboard/settings`);
+check("Settings offers phone notifications", (await bodyText()).includes("Phone notifications"));
+check(
+  "push signing keys are created on first use",
+  sql(`select count(*) from perks_vapid`) === "1",
+);
+
+await page.goto(`${BASE}/dashboard/bonuses`);
+await page.selectOption("#ref-card", "chase-sapphire-reserve");
+await page.fill("#ref-url", "https://www.referyourchasecard.com/19/EXAMPLE");
+await page.fill("#ref-reward", "10,000 points");
+await page.click('button:has-text("Share link")');
+await page.waitForSelector("text=Shared your Chase Sapphire Reserve link.");
+check(
+  "a referral link is saved",
+  sql(`select card_name from perks_referral`) === "Chase Sapphire Reserve",
+);
+
 /* 7. Paste offers -------------------------------------------------------- */
 await page.goto(`${BASE}/dashboard/offers`);
 await page.selectOption("#cardId", goldId);
@@ -620,6 +684,40 @@ check(
   sql(
     `select count(*) from perks_card c join "user" u on u.id=c.user_id where u.email='owner@example.com'`,
   ) === "4",
+);
+
+// The second person sees the first person's referral on the matching bonus.
+await other.goto(`${BASE}/dashboard/bonuses`);
+check(
+  "others see the group's referral link on the bonus",
+  (await other.locator('a:has-text("Apply with Sam’s referral")').count()) >= 1,
+);
+
+// Group rankings: both people hold an Amex Gold, so each card page compares them.
+const eveGold = sql(
+  `select c.id from perks_card c join "user" u on u.id = c.user_id where u.email='eve@example.com' and c.template_key='amex-gold'`,
+);
+await other.goto(`${BASE}/dashboard/cards/${eveGold}`);
+let otherBody = await other.innerText("body");
+check(
+  "people with the same card see how they rank",
+  otherBody.includes("How you compare on this card") &&
+    otherBody.includes("Sam") &&
+    /1st\s*Sam/.test(otherBody),
+);
+await page.goto(`${BASE}/dashboard/settings`);
+await page.click('button:has-text("Stop sharing my totals")');
+check(
+  "opting out is saved",
+  await until(
+    `select share_rankings from perks_settings s join "user" u on u.id=s.user_id where u.email='owner@example.com'`,
+    "f",
+  ),
+);
+await other.reload();
+check(
+  "an opted-out person disappears from rankings",
+  !(await other.innerText("body")).includes("How you compare"),
 );
 
 /* 11. Phone layout ------------------------------------------------------- */

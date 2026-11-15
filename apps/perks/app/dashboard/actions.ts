@@ -10,6 +10,9 @@ import {
   perksCard,
   perksHiddenMerchant,
   perksPoints,
+  perksPushSubscription,
+  perksReferral,
+  perksSpendTarget,
   perksRedemption,
   perksOffer,
   perksSettings,
@@ -18,6 +21,7 @@ import {
 } from "@kch/db";
 import { getTemplate } from "@/lib/catalog";
 import { sendDigest } from "@/lib/digest";
+import { sendPush } from "@/lib/push";
 import { parseDollars } from "@/lib/money";
 import { merchantKey } from "@/lib/offer-groups";
 import { defaultCentsPerPoint, normalizeProgram, parseBalances } from "@/lib/points";
@@ -537,6 +541,15 @@ export async function setDigestAction(enabled: boolean) {
   refresh();
 }
 
+export async function setShareRankingsAction(share: boolean) {
+  const { user } = await requireSession();
+  await db
+    .insert(perksSettings)
+    .values({ userId: user.id, shareRankings: share })
+    .onConflictDoUpdate({ target: perksSettings.userId, set: { shareRankings: share } });
+  refresh();
+}
+
 export async function sendDigestNowAction(): Promise<FormState> {
   const { user } = await requireSession();
   const sent = await sendDigest({ id: user.id, email: user.email, name: user.name }, today());
@@ -718,5 +731,100 @@ export async function deleteRedemptionAction(id: string) {
   await db
     .delete(perksRedemption)
     .where(and(eq(perksRedemption.id, id), eq(perksRedemption.userId, user.id)));
+  refresh();
+}
+
+/* ---- Push notifications ------------------------------------------------- */
+
+export async function savePushSubscriptionAction(sub: {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}) {
+  const { user } = await requireSession();
+  if (!/^https:\/\//.test(sub.endpoint) || !sub.p256dh || !sub.auth) return;
+  await db
+    .insert(perksPushSubscription)
+    .values({ id: crypto.randomUUID(), userId: user.id, ...sub })
+    .onConflictDoUpdate({
+      target: perksPushSubscription.endpoint,
+      set: { userId: user.id, p256dh: sub.p256dh, auth: sub.auth },
+    });
+}
+
+export async function removePushSubscriptionAction(endpoint: string) {
+  const { user } = await requireSession();
+  await db
+    .delete(perksPushSubscription)
+    .where(
+      and(eq(perksPushSubscription.endpoint, endpoint), eq(perksPushSubscription.userId, user.id)),
+    );
+}
+
+export async function sendTestPushAction(): Promise<number> {
+  const { user } = await requireSession();
+  return sendPush(user.id, {
+    title: "Perks notifications are on",
+    body: "You'll get credit and offer reminders here.",
+    url: "/dashboard",
+    tag: "test",
+  });
+}
+
+/* ---- Referrals ---------------------------------------------------------- */
+
+export async function addReferralAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const { user } = await requireSession();
+  const choice = text(form, "card");
+  const template = getTemplate(choice);
+  const cardName = (template?.name ?? text(form, "cardName")).slice(0, 120);
+  const url = text(form, "url");
+  if (!cardName) return { error: "Choose the card the link is for." };
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") throw new Error();
+  } catch {
+    return { error: "Paste the full referral link, starting with https://" };
+  }
+  await db.insert(perksReferral).values({
+    id: crypto.randomUUID(),
+    userId: user.id,
+    templateKey: template?.key ?? null,
+    cardName,
+    url: url.slice(0, 500),
+    reward: text(form, "reward").slice(0, 80),
+  });
+  refresh();
+  return { message: `Shared your ${cardName} link.` };
+}
+
+export async function deleteReferralAction(id: string) {
+  const { user } = await requireSession();
+  await db
+    .delete(perksReferral)
+    .where(and(eq(perksReferral.id, id), eq(perksReferral.userId, user.id)));
+  refresh();
+}
+
+/* ---- Spend goals -------------------------------------------------------- */
+
+/** Records the total spent on the card so far this calendar year. */
+export async function setSpendTargetAction(id: string, form: FormData) {
+  const { user } = await requireSession();
+  const spent = parseDollars(text(form, "spent"));
+  if (spent === null) return;
+  await db
+    .update(perksSpendTarget)
+    .set({ spentCents: spent, periodKey: today().slice(0, 4) })
+    .where(and(eq(perksSpendTarget.id, id), eq(perksSpendTarget.userId, user.id)));
+  refresh();
+}
+
+export async function setSpendTargetTrackedAction(id: string, tracked: boolean) {
+  const { user } = await requireSession();
+  await db
+    .update(perksSpendTarget)
+    .set({ tracked })
+    .where(and(eq(perksSpendTarget.id, id), eq(perksSpendTarget.userId, user.id)));
   refresh();
 }

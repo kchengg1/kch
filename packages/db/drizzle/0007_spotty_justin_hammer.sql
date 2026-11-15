@@ -1,0 +1,1 @@
+ALTER TABLE "perks_settings" ADD COLUMN "share_rankings" boolean DEFAULT true NOT NULL;

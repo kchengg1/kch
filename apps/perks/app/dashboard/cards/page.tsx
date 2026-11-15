@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { Badge, Button, Card, CardDescription, CardTitle, Input, Label } from "@kch/ui";
 import { ActionForm } from "@/components/action-form";
 import { CardIcon } from "@/components/card-icon";
@@ -9,7 +10,7 @@ import { formatCents } from "@/lib/money";
 import { loadPortfolio, today as getToday } from "@/lib/perks";
 import { formatDate } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
-import { summarizeCards } from "@/lib/summary";
+import { actionable, buildStatuses, summarizeCards } from "@/lib/summary";
 import { addCardAction } from "../actions";
 
 export const metadata: Metadata = { title: "Cards" };
@@ -21,6 +22,22 @@ export default async function CardsPage() {
   const { user } = await requireSession();
   const today = getToday();
   const { cards, benefits, usage } = await loadPortfolio(user.id);
+  // How many credits each card has, and how many still need using this period.
+  const todo = actionable(buildStatuses(cards, benefits, usage, today));
+  const tracked = (cardId: string) =>
+    benefits.filter((b) => b.cardId === cardId && b.cadence !== "perk" && b.tracked);
+  /** "3 credits", "1 reminder" or "3 credits, 1 reminder": reminders have no dollar value. */
+  const contents = (cardId: string) => {
+    const credits = tracked(cardId).filter((b) => b.amountCents > 0).length;
+    const reminders = tracked(cardId).length - credits;
+    return [
+      credits ? `${credits} credit${credits === 1 ? "" : "s"}` : "",
+      reminders ? `${reminders} reminder${reminders === 1 ? "" : "s"}` : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+  };
+  const openCount = (cardId: string) => todo.filter((t) => t.card.id === cardId).length;
   const summaries = summarizeCards(cards, benefits, usage, today).sort(
     (a, b) =>
       b.card.annualFeeCents - a.card.annualFeeCents || a.card.name.localeCompare(b.card.name),
@@ -32,7 +49,12 @@ export default async function CardsPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Cards</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Cards</h1>
+          <p className="text-sm text-muted-foreground">
+            Tap a card to see and tick off its credits.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/dashboard/catch-up">
             <Button variant="outline">Catch up on credits used</Button>
@@ -50,7 +72,8 @@ export default async function CardsPage() {
               <li key={s.card.id}>
                 <Link
                   href={`/dashboard/cards/${s.card.id}`}
-                  className="grid items-center gap-x-6 gap-y-2 py-4 hover:bg-muted/40 sm:grid-cols-[1fr_220px]"
+                  aria-label={`${s.card.name}: see credits and details`}
+                  className="group -mx-3 grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-[var(--radius)] px-3 py-4 hover:bg-muted/50 sm:grid-cols-[1fr_220px_auto]"
                 >
                   <div className="flex items-center gap-3">
                     <CardIcon
@@ -64,10 +87,17 @@ export default async function CardsPage() {
                         {formatCents(s.card.annualFeeCents)} fee
                         {s.nextFeeOn && ` · next due ${formatDate(s.nextFeeOn, today)}`}
                       </p>
+                      {contents(s.card.id) && (
+                        <p className="text-sm text-primary">
+                          {contents(s.card.id)}
+                          {openCount(s.card.id) > 0 &&
+                            ` · ${openCount(s.card.id)} to do this period`}
+                        </p>
+                      )}
                     </div>
                   </div>
                   {s.availableCents > 0 ? (
-                    <div>
+                    <div className="col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto">
                       <p className="text-sm">
                         <span className="font-semibold tabular-nums">
                           {formatCents(s.capturedCents)}
@@ -79,9 +109,17 @@ export default async function CardsPage() {
                       </p>
                       <Meter value={s.capturedCents} max={s.availableCents} className="mt-1.5" />
                     </div>
+                  ) : contents(s.card.id) ? (
+                    <span className="hidden sm:block" />
                   ) : (
-                    <p className="text-sm text-muted-foreground">No credits to track</p>
+                    <p className="col-span-2 row-start-2 text-sm text-muted-foreground sm:col-span-1 sm:row-start-auto">
+                      No credits to track
+                    </p>
                   )}
+                  <ChevronRight
+                    aria-hidden
+                    className="col-start-2 row-start-1 h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:col-start-3"
+                  />
                 </Link>
               </li>
             ))}
