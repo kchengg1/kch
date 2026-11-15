@@ -238,6 +238,22 @@ check(
   sql(`select count(*) from perks_usage where benefit_id in ('${dining}','${resy}')`) === "2",
 );
 
+/* 6c. Navigation shows where you are ------------------------------------- */
+const activeTab = async (path) => {
+  await page.goto(`${BASE}${path}`);
+  return page.locator('header a[aria-current="page"]').allInnerTexts();
+};
+check(
+  "Overview tab active on the dashboard",
+  (await activeTab("/dashboard")).join() === "Overview",
+);
+check(
+  "Cards tab active on a card page",
+  (await activeTab(`/dashboard/cards/${goldId}`)).join() === "Cards",
+);
+check("Cards tab active on Catch up", (await activeTab("/dashboard/catch-up")).join() === "Cards");
+check("Offers tab active on Offers", (await activeTab("/dashboard/offers")).join() === "Offers");
+
 /* 7. Paste offers -------------------------------------------------------- */
 await page.goto(`${BASE}/dashboard/offers`);
 await page.selectOption("#cardId", goldId);
