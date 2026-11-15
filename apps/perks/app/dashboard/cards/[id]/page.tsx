@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge, Button, Card, CardDescription, CardTitle, Input, Label, cn } from "@kch/ui";
 import { ActionForm } from "@/components/action-form";
 import { BenefitFields } from "@/components/benefit-fields";
+import { CardIcon } from "@/components/card-icon";
 import { Meter } from "@/components/meter";
 import { UsageChips } from "@/components/usage-chips";
 import { CATALOG, CATALOG_REVIEWED, getTemplate } from "@/lib/catalog";
@@ -49,6 +50,12 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
           ← Cards
         </Link>
         <div className="mt-1 flex flex-wrap items-center gap-3">
+          <CardIcon
+            templateKey={card.templateKey}
+            issuer={card.issuer}
+            closed={card.closed}
+            className="h-7 w-11"
+          />
           <h1 className="text-2xl font-bold">{card.name}</h1>
           {card.business && <Badge variant="secondary">Business</Badge>}
           {card.closed && <Badge variant="outline">Closed</Badge>}

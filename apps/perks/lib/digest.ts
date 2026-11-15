@@ -2,7 +2,9 @@ import "server-only";
 import { sendEmail, type EmailContent } from "@kch/email";
 import { appConfig } from "@/app.config";
 import { formatCents } from "./money";
-import { listOffers, loadPortfolio } from "./perks";
+import { groupOffers, merchantKey } from "./offer-groups";
+import { isWeakOffer } from "./offer-value";
+import { listHiddenMerchants, listOffers, loadPortfolio } from "./perks";
 import { daysBetween, formatDate } from "./periods";
 import { actionable, buildStatuses, type BenefitStatus } from "./summary";
 
@@ -14,7 +16,8 @@ export type DigestOffer = {
   merchant: string;
   details: string;
   expiresOn: string;
-  cardName: string | null;
+  /** Every card the offer is on; the same offer often appears on several. */
+  cardNames: string[];
 };
 
 const escape = (s: string) =>
@@ -33,7 +36,7 @@ export function buildDigest(
   const creditLine = (c: BenefitStatus) =>
     `${c.remainingCents > 0 ? `${formatCents(c.remainingCents)} ` : ""}${c.benefit.name} (${c.card.name}), ends ${formatDate(c.deadline!, today)}, ${due(c.daysLeft!)}`;
   const offerLine = (o: DigestOffer) =>
-    `${o.merchant}${o.details ? `: ${o.details}` : ""}${o.cardName ? ` (${o.cardName})` : ""}, expires ${formatDate(o.expiresOn, today)}, ${due(daysBetween(today, o.expiresOn))}`;
+    `${o.merchant}${o.details ? `: ${o.details}` : ""}${o.cardNames.length ? ` (${o.cardNames.join(", ")})` : ""}, expires ${formatDate(o.expiresOn, today)}, ${due(daysBetween(today, o.expiresOn))}`;
 
   const subject =
     credits.length > 0
@@ -70,28 +73,34 @@ export async function sendDigest(
   user: { id: string; email: string; name: string },
   today: string,
 ): Promise<boolean> {
-  const [{ cards, benefits, usage }, offers] = await Promise.all([
+  const [{ cards, benefits, usage }, offers, hidden] = await Promise.all([
     loadPortfolio(user.id),
     listOffers(user.id),
+    listHiddenMerchants(user.id),
   ]);
+  const hiddenKeys = new Set(hidden.map((h) => h.merchantKey));
   const credits = actionable(buildStatuses(cards, benefits, usage, today)).filter(
     (s) => s.daysLeft !== null && s.daysLeft <= DIGEST_WINDOW_DAYS,
   );
   const cardName = new Map(cards.map((c) => [c.id, c.name]));
-  const expiring = offers
-    .filter(
-      (o) =>
-        (o.status === "available" || o.status === "added") &&
-        o.expiresOn !== null &&
-        o.expiresOn >= today &&
-        daysBetween(today, o.expiresOn) <= OFFER_WINDOW_DAYS,
-    )
-    .map((o) => ({
-      merchant: o.merchant,
-      details: o.details,
-      expiresOn: o.expiresOn!,
-      cardName: o.cardId ? (cardName.get(o.cardId) ?? null) : null,
-    }));
+  const live = offers.filter(
+    (o) =>
+      (o.status === "available" || o.status === "added") &&
+      o.expiresOn !== null &&
+      o.expiresOn >= today &&
+      daysBetween(today, o.expiresOn) <= OFFER_WINDOW_DAYS &&
+      // Merchants marked not interested and offers under 10% back are not worth an email.
+      !hiddenKeys.has(merchantKey(o.merchant)) &&
+      !isWeakOffer(o.details),
+  );
+  const expiring = groupOffers(live).map((g) => ({
+    merchant: g.merchant,
+    details: g.details,
+    expiresOn: g.expiresOn!,
+    cardNames: g.items.flatMap((o) =>
+      o.cardId && cardName.has(o.cardId) ? [cardName.get(o.cardId)!] : [],
+    ),
+  }));
   const content = buildDigest(credits, expiring, today);
   if (!content) return false;
   await sendEmail({ to: user.email, ...content });

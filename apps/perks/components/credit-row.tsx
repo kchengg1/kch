@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CardIcon } from "@/components/card-icon";
 import { Badge, Button, Input } from "@kch/ui";
 import { logAmountAction, markUsedAction } from "@/app/dashboard/actions";
 import { formatCents } from "@/lib/money";
@@ -29,7 +30,15 @@ export function CreditRow({ status, today }: { status: BenefitStatus; today: str
           )}
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          <Link href={`/dashboard/cards/${card.id}`} className="hover:underline">
+          <Link
+            href={`/dashboard/cards/${card.id}`}
+            className="inline-flex items-center gap-1.5 align-middle hover:underline"
+          >
+            <CardIcon
+              templateKey={card.templateKey}
+              issuer={card.issuer}
+              className="h-3.5 w-[22px]"
+            />
             {card.name}
           </Link>
           {" · "}

@@ -317,16 +317,135 @@ await page.fill("#paste", `lululemon\nSpend $150 or more, get $30 back\nExpires 
 await page.click('button:has-text("Save 1 offer")');
 await page.waitForSelector("text=skipped 1 already saved");
 check("pasting again skips duplicates", sql(`select count(*) from perks_offer`) === "2");
+check(
+  "the paste is recorded on the card even when nothing new was found",
+  sql(
+    `select (offers_checked_at > now() - interval '5 minutes')::text from perks_card where id='${goldId}'`,
+  ) === "true",
+);
+await page.goto(`${BASE}/dashboard/offers`);
+check(
+  "Offers shows when each card was last pasted",
+  (await page.locator("li", { hasText: "Amex PRG" }).first().innerText()).includes("updated today"),
+);
+check(
+  "a card never pasted is flagged",
+  (await page.locator("li", { hasText: "Chase Sapphire Reserve" }).first().innerText()).includes(
+    "never pasted",
+  ),
+);
 await page.goto(`${BASE}/dashboard`);
 check(
   "expiring offer appears on the dashboard",
   (await bodyText()).includes("Offers expiring soon"),
 );
 await page.goto(`${BASE}/dashboard/offers`);
+// The same offer on a second card is shown once, with a chip per card.
+const csrCard = sql(`select id from perks_card where name='Chase Sapphire Reserve'`);
+await page.selectOption("#cardId", csrCard);
+await page.fill("#paste", `lululemon\nSpend $150 or more, get $30 back\nExpires in 5 days`);
+await page.click('button:has-text("Save 1 offer")');
+await page.waitForSelector("text=Saved 1 offer");
+check(
+  "same offer saved for the second card",
+  sql(`select count(*) from perks_offer where merchant='lululemon'`) === "2",
+);
+const lulu = page
+  .locator("li", { hasText: "lululemon" })
+  .filter({ has: page.locator('button:has-text("Used")') });
+check("an offer on two cards is listed once", (await lulu.count()) === 1);
+check("it shows a chip for each card", (await lulu.locator("button[aria-pressed]").count()) === 2);
+await lulu.locator('button[aria-pressed]:has-text("Chase Sapphire Reserve")').click();
+check(
+  "tapping a card chip marks the offer added on that card only",
+  await until(
+    `select status from perks_offer where merchant='lululemon' and card_id='${csrCard}'`,
+    "added",
+  ),
+);
+check(
+  "the other card is unchanged",
+  sql(`select status from perks_offer where merchant='lululemon' and card_id='${goldId}'`) ===
+    "available",
+);
 await page.locator("li", { hasText: "lululemon" }).locator('button:has-text("Used")').click();
 check(
-  "offer marked used",
-  await until(`select status from perks_offer where merchant='lululemon'`, "used"),
+  "Used applies to the offer on every card",
+  await until(
+    `select string_agg(distinct status, ',') from perks_offer where merchant='lululemon'`,
+    "used",
+  ),
+);
+
+// Offers are scored by return, weak ones collapse, and merchants can be hidden.
+await page.goto(`${BASE}/dashboard/offers`);
+await page.selectOption("#cardId", goldId);
+await page.fill(
+  "#paste",
+  [
+    "Misfits Market",
+    "Spend $5 or more, earn $5 back",
+    "Expires 12/31/26",
+    "St. Regis",
+    "Spend $1,000 or more, earn $200 back",
+    "Expires 12/31/26",
+    "dyson.com",
+    "Earn 2% back on purchases, up to a total of $250",
+    "Expires 12/31/26",
+  ].join("\n"),
+);
+await page.waitForSelector("text=100% back");
+await page.click('button:has-text("Save 3 offers")');
+await page.waitForSelector("text=Saved 3 offers");
+await page.goto(`${BASE}/dashboard/offers`);
+const order = await page.locator("section ul > li p.font-medium").allInnerTexts();
+check(
+  "best return first: $5 on $5 beats $200 on $1,000",
+  order.findIndex((t) => t.includes("Misfits")) < order.findIndex((t) => t.includes("St. Regis")),
+  order.join(" | "),
+);
+check(
+  "an offer under 10% back is tucked away",
+  (await page.locator("details", { hasText: "weaker offer" }).innerText()).includes(
+    "1 weaker offer",
+  ),
+);
+await page.goto(`${BASE}/dashboard/offers?sort=value`);
+const byValue = await page.locator("section ul > li p.font-medium").allInnerTexts();
+check(
+  "sorting by biggest reward puts St. Regis first",
+  byValue[0]?.includes("St. Regis"),
+  byValue[0],
+);
+await page
+  .locator("li", { hasText: "St. Regis" })
+  .locator('button:has-text("Not interested")')
+  .click();
+check(
+  "Not interested stores the merchant",
+  await until(`select label from perks_hidden_merchant`, "St. Regis"),
+);
+await page.waitForFunction(
+  () => !document.querySelector("section")?.innerText.includes("Spend $1,000"),
+);
+check(
+  "its offers disappear",
+  !(await page.locator("section").first().innerText()).includes("Spend $1,000"),
+);
+await page.fill("#paste", "St. Regis\nSpend $1,000 or more, earn $200 back\nExpires 1/31/27");
+await page.waitForSelector("text=will be skipped");
+await page.click('button:has-text("Save 1 offer")');
+await page.waitForSelector("text=left out 1 from merchants you hid");
+check(
+  "future pastes skip a hidden merchant",
+  sql(`select count(*) from perks_offer where merchant='St. Regis' and expires_on='2027-01-31'`) ===
+    "0",
+);
+await page.locator("summary", { hasText: "not interested" }).click();
+await page.locator('button:has-text("Show again")').click();
+check(
+  "Show again brings the merchant back",
+  await until(`select count(*) from perks_hidden_merchant`, 0),
 );
 
 /* 8. Sign-up bonus eligibility ------------------------------------------ */

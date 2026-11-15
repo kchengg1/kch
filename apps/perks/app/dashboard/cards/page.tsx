@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge, Button, Card, CardDescription, CardTitle, Input, Label } from "@kch/ui";
 import { ActionForm } from "@/components/action-form";
+import { CardIcon } from "@/components/card-icon";
 import { Meter } from "@/components/meter";
 import { CATALOG } from "@/lib/catalog";
 import { formatCents } from "@/lib/money";
@@ -51,12 +52,19 @@ export default async function CardsPage() {
                   href={`/dashboard/cards/${s.card.id}`}
                   className="grid items-center gap-x-6 gap-y-2 py-4 hover:bg-muted/40 sm:grid-cols-[1fr_220px]"
                 >
-                  <div>
-                    <p className="font-medium">{s.card.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatCents(s.card.annualFeeCents)} fee
-                      {s.nextFeeOn && ` · next due ${formatDate(s.nextFeeOn, today)}`}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <CardIcon
+                      templateKey={s.card.templateKey}
+                      issuer={s.card.issuer}
+                      className="h-6 w-10"
+                    />
+                    <div>
+                      <p className="font-medium">{s.card.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatCents(s.card.annualFeeCents)} fee
+                        {s.nextFeeOn && ` · next due ${formatDate(s.nextFeeOn, today)}`}
+                      </p>
+                    </div>
                   </div>
                   {s.availableCents > 0 ? (
                     <div>
@@ -131,7 +139,11 @@ export default async function CardsPage() {
             <ul className="divide-y text-sm">
               {closed.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-4 py-2.5">
-                  <Link href={`/dashboard/cards/${c.id}`} className="hover:underline">
+                  <Link
+                    href={`/dashboard/cards/${c.id}`}
+                    className="inline-flex items-center gap-2 hover:underline"
+                  >
+                    <CardIcon templateKey={c.templateKey} issuer={c.issuer} closed />
                     {c.name}
                   </Link>
                   <span className="flex items-center gap-2 text-muted-foreground">

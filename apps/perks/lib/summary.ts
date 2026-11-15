@@ -16,6 +16,8 @@ export type CardRow = {
   annualFeeCents: number;
   openedOn: string | null;
   closed: boolean;
+  templateKey?: string | null;
+  issuer?: string;
 };
 export type BenefitRow = {
   id: string;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge, Card, CardDescription, CardTitle } from "@kch/ui";
+import { CardIcon } from "@/components/card-icon";
 import { StatementImport } from "@/components/statement-import";
 import { onStatement } from "@/lib/catalog";
 import { UsageChips } from "@/components/usage-chips";
@@ -79,7 +80,11 @@ export default async function CatchUpPage() {
         <div className="mt-4 space-y-4">
           {withCredits.map((card) => (
             <Card key={card.id} className="p-5">
-              <Link href={`/dashboard/cards/${card.id}`} className="font-semibold hover:underline">
+              <Link
+                href={`/dashboard/cards/${card.id}`}
+                className="inline-flex items-center gap-2 font-semibold hover:underline"
+              >
+                <CardIcon templateKey={card.templateKey} issuer={card.issuer} />
                 {card.name}
               </Link>
               <ul className="mt-2 divide-y">
