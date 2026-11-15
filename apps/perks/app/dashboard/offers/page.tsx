@@ -81,7 +81,8 @@ export default async function OffersPage({
       !hiddenKeys.has(merchantKey(o.merchant)),
   );
   const past = offers.filter(
-    (o) => !(o.status === "available" || o.status === "added") || expired(o),
+    (o) =>
+      o.status !== "hidden" && (!(o.status === "available" || o.status === "added") || expired(o)),
   );
 
   const scored = groupOffers(live).map((g) => {
