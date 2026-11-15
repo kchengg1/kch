@@ -90,7 +90,7 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Stat
           label="Expiring this month"
           value={formatCents(sum(thisMonth))}
@@ -281,11 +281,12 @@ function Stat({
   meter?: { value: number; max: number };
 }) {
   return (
-    <Card>
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight">{value}</p>
-      {meter && <Meter {...meter} className="mt-3" />}
-      <p className="mt-2 text-sm text-muted-foreground">{detail}</p>
+    // Three across even on a phone: compact padding and type, details from tablet width up.
+    <Card className="p-3 sm:p-6">
+      <p className="text-xs leading-tight text-muted-foreground sm:text-sm">{label}</p>
+      <p className="mt-1 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{value}</p>
+      {meter && <Meter {...meter} className="mt-2 sm:mt-3" />}
+      <p className="mt-2 hidden text-sm text-muted-foreground sm:block">{detail}</p>
     </Card>
   );
 }

@@ -532,6 +532,33 @@ check(
   ) === "4",
 );
 
+/* 11. Phone layout ------------------------------------------------------- */
+const phone = await (
+  await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  })
+).newPage();
+await signup(phone, "Pat Phone", "phone@example.com");
+const tabBar = phone.getByRole("navigation", { name: "Sections" });
+check("phone shows the bottom tab bar", await tabBar.isVisible());
+for (const label of ["Overview", "Cards", "Offers", "Bonuses", "Settings"]) {
+  check(
+    `${label} is reachable on a phone`,
+    await tabBar.getByRole("link", { name: label }).isVisible(),
+  );
+}
+check(
+  "nothing scrolls sideways on a phone",
+  (await phone.evaluate(() => document.documentElement.scrollWidth)) <= 390,
+);
+const manifest = await phone.request.get(`${BASE}/manifest.webmanifest`);
+check(
+  "home-screen manifest is served",
+  manifest.status() === 200 && (await manifest.json()).display === "standalone",
+);
+
 await browser.close();
 log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

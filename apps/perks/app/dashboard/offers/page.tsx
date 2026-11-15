@@ -150,7 +150,7 @@ export default async function OffersPage({
                         : `Not added on ${card?.name ?? "this card"} yet. Tap once you add it.`
                     }
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                      "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors sm:min-h-0 sm:px-2.5",
                       added
                         ? "border-success/40 bg-success/10 text-foreground"
                         : "bg-card text-muted-foreground hover:bg-muted",
@@ -238,7 +238,10 @@ export default async function OffersPage({
 
       {scored.length > 0 && (
         <section className="space-y-3">
-          <nav aria-label="Sort offers" className="flex flex-wrap items-center gap-1 text-sm">
+          <nav
+            aria-label="Sort offers"
+            className="-mx-4 flex items-center gap-1 overflow-x-auto px-4 text-sm whitespace-nowrap sm:mx-0 sm:flex-wrap sm:px-0"
+          >
             <span className="mr-1 text-muted-foreground">Sort by</span>
             {(Object.keys(SORTS) as Sort[]).map((k) => (
               <a

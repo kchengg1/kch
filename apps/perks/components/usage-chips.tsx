@@ -52,7 +52,7 @@ export function UsageChips({
                     : `${p.label}: not used`
               }
               className={cn(
-                "min-w-12 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40",
+                "min-h-9 min-w-12 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40 sm:min-h-0",
                 full && "border-transparent bg-success text-white",
                 partial && "border-success bg-success/15",
                 !full && !partial && "bg-card hover:bg-muted",

@@ -1,9 +1,18 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { AnalyticsProvider } from "@kch/analytics";
 import { appConfig } from "@/app.config";
 import "./globals.css";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // Lets the page run under the iPhone notch and home bar; layouts pad with safe-area insets.
+  viewportFit: "cover",
+  themeColor: "#fbfbfb",
+};
+
 export const metadata: Metadata = {
+  appleWebApp: { capable: true, title: appConfig.name, statusBarStyle: "default" },
   metadataBase: new URL(appConfig.url),
   title: {
     default: `${appConfig.name} – ${appConfig.tagline}`,
