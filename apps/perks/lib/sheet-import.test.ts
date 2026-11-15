@@ -181,3 +181,30 @@ Amex Plat Personal #2`;
     expect(parseCardSheet("Card one, the good one").cards[0]?.name).toBe("Card one, the good one");
   });
 });
+
+describe("Andy's revised list", () => {
+  it("matches every card", () => {
+    const list = `Amex gold
+Amex Schwab plat
+Amex everyday
+Amex blue business
+Citi Costco anywhere
+Citi double cash
+Chase Sapphire preferred
+Chase Marriott boundless
+Chase IHG premier
+Atmos reward summit infinite card`;
+    expect(parseCardSheet(list).cards.map((c) => c.templateKey)).toEqual([
+      "amex-gold",
+      "amex-platinum",
+      "amex-everyday",
+      "amex-blue-business-plus",
+      "costco-citi",
+      "citi-double-cash",
+      "chase-sapphire-preferred",
+      "chase-marriott-boundless",
+      "chase-ihg-premier",
+      "atmos-summit",
+    ]);
+  });
+});

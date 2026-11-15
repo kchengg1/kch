@@ -772,6 +772,67 @@ export const CATALOG: CardTemplate[] = [
     benefits: [{ name: "2% back on everything", cadence: "perk" }],
   },
   {
+    key: "chase-marriott-boundless",
+    name: "Marriott Bonvoy Boundless",
+    issuer: "Chase",
+    business: false,
+    annualFee: 95,
+    match: /boundless/i,
+    benefits: [
+      {
+        name: "Free night award (up to 35,000 points)",
+        cadence: "anniversary",
+        notes: "Posts after each card anniversary and expires a year later. Book it before then.",
+        inApp: true,
+      },
+      {
+        name: "Airline credit",
+        cadence: "annual",
+        amount: 100,
+        notes:
+          "Reported for 2026 on purchases made directly with airlines. Needs a one-time activation; confirm it continues.",
+        enroll: true,
+      },
+      {
+        name: "Silver Elite status",
+        cadence: "perk",
+        notes:
+          "Gold Elite after $35,000 of spend in a calendar year. 1 elite night credit per $5,000 spent.",
+      },
+    ],
+  },
+  {
+    key: "chase-ihg-premier",
+    name: "IHG One Rewards Premier",
+    issuer: "Chase",
+    business: false,
+    annualFee: 99,
+    match: /ihg/i,
+    benefits: [
+      {
+        name: "Anniversary free night (up to 40,000 points)",
+        cadence: "anniversary",
+        notes:
+          "Posts after each card anniversary. Not confirmed in this review; check your IHG account.",
+        inApp: true,
+      },
+      {
+        name: "United TravelBank credit",
+        cadence: "annual",
+        amount: 50,
+        notes: "Loads into a linked United MileagePlus account's TravelBank.",
+        enroll: true,
+        inApp: true,
+      },
+      GLOBAL_ENTRY,
+      {
+        name: "Platinum Elite status and 4th award night free",
+        cadence: "perk",
+        notes: "The fourth night of an award stay is free when you redeem points.",
+      },
+    ],
+  },
+  {
     key: "discover-it",
     name: "Discover it",
     issuer: "Discover",

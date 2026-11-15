@@ -77,6 +77,13 @@ const BY_TEMPLATE: Record<string, CardStyle> = {
   },
   "costco-citi": { from: "#3e5f8a", to: "#1a2f4d", chip: METAL, label: "Navy finish" },
   "citi-double-cash": { from: "#5a7088", to: "#25374a", chip: METAL, label: "Slate finish" },
+  "chase-marriott-boundless": {
+    from: "#6b7684",
+    to: "#2c333c",
+    chip: METAL,
+    label: "Slate finish",
+  },
+  "chase-ihg-premier": { from: "#4a4f57", to: "#16191d", chip: METAL, label: "Charcoal finish" },
   "discover-it": { from: "#f7a24b", to: "#d0600d", chip: METAL, label: "Orange finish" },
 };
 
