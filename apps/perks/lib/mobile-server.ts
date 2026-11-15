@@ -1,0 +1,56 @@
+import "server-only";
+import { auth } from "./auth";
+import { buildMobileBootstrap, type MobileBootstrap } from "./mobile-api";
+import {
+  dateOf,
+  getSettings,
+  listHiddenMerchants,
+  listOffers,
+  listPoints,
+  listRedemptions,
+  loadPortfolio,
+  today,
+} from "./perks";
+
+export type MobileUser = { id: string; name: string; email: string };
+
+/** Read the authenticated user from either a Bearer token or session cookie. */
+export async function getMobileUser(request: Request): Promise<MobileUser | null> {
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session?.user) return null;
+  return {
+    id: session.user.id,
+    name: session.user.name,
+    email: session.user.email,
+  };
+}
+
+/** Load and shape the caller's complete Perks snapshot. */
+export async function loadMobileBootstrap(user: MobileUser): Promise<MobileBootstrap> {
+  const now = today();
+  const [portfolio, offers, hiddenMerchants, points, redemptions, settings] = await Promise.all([
+    loadPortfolio(user.id),
+    listOffers(user.id),
+    listHiddenMerchants(user.id),
+    listPoints(user.id),
+    listRedemptions(user.id),
+    getSettings(user.id),
+  ]);
+
+  return buildMobileBootstrap({
+    user,
+    today: now,
+    cards: portfolio.cards,
+    benefits: portfolio.benefits,
+    usage: portfolio.usage,
+    offers,
+    hiddenMerchants,
+    points,
+    redemptions,
+    settings: {
+      digestEnabled: settings.digestEnabled,
+      lastDigestOn: settings.lastDigestOn,
+    },
+    dateOf,
+  });
+}

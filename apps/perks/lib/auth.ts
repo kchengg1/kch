@@ -9,4 +9,5 @@ export const auth = defineAuth({
     .split(",")
     .map((e) => e.trim())
     .filter(Boolean),
+  trustedOrigins: ["perks://*", "exp://*"],
 });

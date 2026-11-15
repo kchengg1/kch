@@ -4,6 +4,7 @@ import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
+import { bearer } from "better-auth/plugins";
 import { lazy } from "./lazy";
 
 export type AuthOptions = {
@@ -16,6 +17,8 @@ export type AuthOptions = {
    * method). For personal apps that should not be open to the public.
    */
   allowedEmails?: string[];
+  /** Additional URL schemes or origins allowed by mobile clients (e.g. "perks://*"). */
+  trustedOrigins?: string[];
 };
 
 export function createAuth(options: AuthOptions) {
@@ -35,6 +38,7 @@ export function createAuth(options: AuthOptions) {
     appName: options.appName,
     baseURL: process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL,
     secret: process.env.BETTER_AUTH_SECRET,
+    trustedOrigins: options.trustedOrigins,
     database: drizzleAdapter(db, { provider: "pg", schema }),
     emailAndPassword: {
       enabled: true,
@@ -78,7 +82,7 @@ export function createAuth(options: AuthOptions) {
       // Avoid a DB hit on every request; cookie is re-validated every 5 minutes.
       cookieCache: { enabled: true, maxAge: 5 * 60 },
     },
-    plugins: [nextCookies()],
+    plugins: [bearer(), nextCookies()],
   });
 }
 
