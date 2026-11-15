@@ -18,6 +18,10 @@ on:
         description: "Override EXPO_PUBLIC_API_URL (optional)"
         type: string
         required: false
+      asc_app_id:
+        description: "App Store Connect numeric Apple ID for auto-submit (optional)"
+        type: string
+        required: false
   push:
     tags:
       - "ios-v*"
@@ -31,6 +35,13 @@ jobs:
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PUBLIC_API_URL: ${{ inputs.api_url || vars.EXPO_PUBLIC_API_URL || secrets.EXPO_PUBLIC_API_URL }}
+      EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID || secrets.EAS_PROJECT_ID }}
+      ASC_APP_ID: ${{ inputs.asc_app_id || vars.ASC_APP_ID || secrets.ASC_APP_ID }}
+      EXPO_APPLE_TEAM_ID: ${{ secrets.EXPO_APPLE_TEAM_ID || vars.EXPO_APPLE_TEAM_ID }}
+      EXPO_APPLE_TEAM_TYPE: ${{ secrets.EXPO_APPLE_TEAM_TYPE || vars.EXPO_APPLE_TEAM_TYPE || 'INDIVIDUAL' }}
+      EXPO_ASC_KEY_ID: ${{ secrets.EXPO_ASC_KEY_ID }}
+      EXPO_ASC_ISSUER_ID: ${{ secrets.EXPO_ASC_ISSUER_ID }}
+      EXPO_ASC_API_KEY: ${{ secrets.EXPO_ASC_API_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,6 +77,49 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Ensure EAS project is linked
+        working-directory: apps/perks-ios
+        run: |
+          if ! node -e 'const a = require("./app.json"); process.exit(a.expo?.extra?.eas?.projectId ? 0 : 1)'; then
+            if [ -n "${EAS_PROJECT_ID:-}" ]; then
+              eas init --id "$EAS_PROJECT_ID" --force --non-interactive
+            else
+              ACCOUNT="$(eas whoami | tail -n 1 | tr -d '[:space:]')"
+              eas init --account "$ACCOUNT" --force --non-interactive
+            fi
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app.json
+            git commit -m "chore(perks-ios): link EAS projectId for cloud build"
+          fi
+
+      - name: Configure App Store Connect submission & signing (if provided)
+        run: |
+          KEY_FILE=""
+          if [ -n "${EXPO_ASC_API_KEY:-}" ]; then
+            KEY_FILE="$RUNNER_TEMP/AuthKey.p8"
+            printf '%s\n' "$EXPO_ASC_API_KEY" > "$KEY_FILE"
+            chmod 600 "$KEY_FILE"
+            echo "EXPO_ASC_API_KEY_PATH=$KEY_FILE" >> "$GITHUB_ENV"
+          fi
+          KEY_FILE="$KEY_FILE" node -e '
+            const fs = require("fs");
+            const eas = JSON.parse(fs.readFileSync("apps/perks-ios/eas.json", "utf8"));
+            const ios = { ...(eas.submit?.production?.ios || {}) };
+            if (process.env.ASC_APP_ID) {
+              ios.ascAppId = process.env.ASC_APP_ID;
+            }
+            if (process.env.KEY_FILE && process.env.EXPO_ASC_KEY_ID) {
+              ios.ascApiKeyPath = process.env.KEY_FILE;
+              ios.ascApiKeyId = process.env.EXPO_ASC_KEY_ID;
+              if (process.env.EXPO_ASC_ISSUER_ID) {
+                ios.ascApiKeyIssuerId = process.env.EXPO_ASC_ISSUER_ID;
+              }
+            }
+            eas.submit = { ...(eas.submit || {}), production: { ...(eas.submit?.production || {}), ios } };
+            fs.writeFileSync("apps/perks-ios/eas.json", JSON.stringify(eas, null, 2) + "\n");
+          '
+
       - name: Sync EXPO_PUBLIC_API_URL to EAS environment (if set)
         if: env.EXPO_PUBLIC_API_URL != ''
         working-directory: apps/perks-ios
@@ -79,8 +133,10 @@ jobs:
           PROFILE="${{ inputs.profile || 'production' }}"
           EXTRA_FLAGS=""
           if [ "$PROFILE" = "production" ] && [ "${{ inputs.auto_submit != false }}" = "true" ]; then
-            EXTRA_FLAGS="--auto-submit"
-          elif [ "$PROFILE" = "preview" ]; then
-            EXTRA_FLAGS="--refresh-ad-hoc-provisioning-profile"
+            if node -e 'const e = require("./eas.json"); process.exit(e.submit?.production?.ios?.ascAppId ? 0 : 1)'; then
+              EXTRA_FLAGS="--auto-submit"
+            else
+              echo "::warning::Skipping --auto-submit because ASC_APP_ID is not set yet. Set ASC_APP_ID (your numeric Apple ID from App Store Connect -> App Information) in GitHub Variables/Secrets, or click Submit in https://expo.dev once the build finishes."
+            fi
           fi
           eas build --platform ios --profile "$PROFILE" $EXTRA_FLAGS --non-interactive --no-wait
