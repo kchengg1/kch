@@ -459,6 +459,20 @@ export async function setOffersStatusAction(ids: string[], status: "used" | "dis
   refresh();
 }
 
+/** Put offers back the way they were before a swipe: the Undo bar on phones. */
+export async function restoreOffersAction(items: { id: string; status: string }[]) {
+  const { user } = await requireSession();
+  const allowed = new Set(["available", "added", "used", "dismissed"]);
+  for (const { id, status } of items.slice(0, 50)) {
+    if (!allowed.has(status)) continue;
+    await db
+      .update(perksOffer)
+      .set({ status })
+      .where(and(eq(perksOffer.id, id), eq(perksOffer.userId, user.id)));
+  }
+  refresh();
+}
+
 /** Never show offers from this merchant again, on any card. */
 export async function hideMerchantAction(merchant: string) {
   const { user } = await requireSession();
