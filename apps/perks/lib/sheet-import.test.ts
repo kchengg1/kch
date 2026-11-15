@@ -86,7 +86,7 @@ describe("parseCardSheet", () => {
 
   it("skips blank rows and explains a missing header", () => {
     expect(parseCardSheet(sheet("", "\t\t\t", "Discover IT\t3/1/2014")).cards).toHaveLength(1);
-    expect(parseCardSheet("just some text").error).toMatch(/Card Name/);
+    expect(parseCardSheet("").error).toMatch(/one per line/);
   });
 });
 
@@ -102,5 +102,82 @@ describe("onStatement", () => {
     expect(onStatement("amex-gold", "Resy credit")).toBe(true);
     // Custom cards and renamed benefits are assumed to post.
     expect(onStatement(null, "Lyft credit")).toBe(true);
+  });
+});
+
+describe("parseCardList", () => {
+  it("reads a typed list of cards and matches them to the catalog", () => {
+    const list = `Discover It
+Amex Everyday
+Chase Freedom Unlimited
+Chase Freedom
+Chase Freedom Flex
+Chase Sapphire Pref
+Amex Gold Personal
+Amex Plat Personal #1
+Chase Ink Business Cash
+Chase Ink Business Unlimited
+Venture X Personal
+Chase Aeroplan Card
+Citi AAdvantage Card
+Chase Sapphire Reserved
+Amex Plat Personal #2`;
+    const { cards, error } = parseCardSheet(list);
+    expect(error).toBeUndefined();
+    expect(cards.map((c) => [c.name, c.templateKey])).toEqual([
+      ["Discover It", "discover-it"],
+      ["Amex Everyday", "amex-everyday"],
+      ["Chase Freedom Unlimited", "chase-freedom-unlimited"],
+      ["Chase Freedom", "chase-freedom"],
+      ["Chase Freedom Flex", "chase-freedom-flex"],
+      ["Chase Sapphire Pref", "chase-sapphire-preferred"],
+      ["Amex Gold Personal", "amex-gold"],
+      ["Amex Plat Personal #1", "amex-platinum"],
+      ["Chase Ink Business Cash", "chase-ink-business-cash"],
+      ["Chase Ink Business Unlimited", "chase-ink-business-unlimited"],
+      ["Venture X Personal", "capital-one-venture-x"],
+      ["Chase Aeroplan Card", "chase-aeroplan"],
+      ["Citi AAdvantage Card", "citi-aadvantage-platinum-select"],
+      ["Chase Sapphire Reserved", "chase-sapphire-reserve"],
+      ["Amex Plat Personal #2", "amex-platinum"],
+    ]);
+    expect(cards.every((c) => !c.closed && c.openedOn === null)).toBe(true);
+    expect(cards.find((c) => c.name === "Chase Ink Business Cash")?.business).toBe(true);
+  });
+
+  it("matches the other list's shorthand", () => {
+    const names = [
+      "Amex plat",
+      "Amex gold",
+      "Amex everyday",
+      "Amex blue business",
+      "Chase preferred",
+      "Costco citi",
+      "Citi double cash",
+    ];
+    expect(parseCardSheet(names.join("\n")).cards.map((c) => c.templateKey)).toEqual([
+      "amex-platinum",
+      "amex-gold",
+      "amex-everyday",
+      "amex-blue-business-plus",
+      null,
+      "costco-citi",
+      "citi-double-cash",
+    ]);
+  });
+
+  it("takes an optional opened date and ignores bullets", () => {
+    const { cards } = parseCardSheet(
+      "- Chase Sapphire Pref, 3/2024\n2. Amex Gold Personal\t2/18/2018\n• Citi Double Cash",
+    );
+    expect(cards.map((c) => [c.name, c.openedOn])).toEqual([
+      ["Chase Sapphire Pref", "2024-03-01"],
+      ["Amex Gold Personal", "2018-02-18"],
+      ["Citi Double Cash", null],
+    ]);
+  });
+
+  it("keeps commas that are part of a name", () => {
+    expect(parseCardSheet("Card one, the good one").cards[0]?.name).toBe("Card one, the good one");
   });
 });

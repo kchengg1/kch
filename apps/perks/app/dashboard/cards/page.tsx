@@ -38,7 +38,7 @@ export default async function CardsPage() {
             <Button variant="outline">Catch up on credits used</Button>
           </Link>
           <Link href="/dashboard/cards/import">
-            <Button variant="outline">Import from spreadsheet</Button>
+            <Button variant="outline">Import cards</Button>
           </Link>
         </div>
       </div>

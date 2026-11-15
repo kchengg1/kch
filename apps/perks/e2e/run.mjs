@@ -71,7 +71,7 @@ const until = async (query, expected) => {
 /* 1. Sign up ------------------------------------------------------------ */
 await signup(page, "Sam Owner", "owner@example.com");
 check("signup lands on dashboard", page.url().endsWith("/dashboard"), page.url());
-check("empty dashboard offers the import", (await bodyText()).includes("Import from spreadsheet"));
+check("empty dashboard offers the import", (await bodyText()).includes("Import cards"));
 
 /* 2. Import the spreadsheet --------------------------------------------- */
 await page.goto(`${BASE}/dashboard/cards/import`);
@@ -496,6 +496,40 @@ check(
   (await (await other.goto(`${BASE}/dashboard`), other.innerText("body"))).includes(
     "Add your cards to get started",
   ),
+);
+
+// A second person imports a plain typed list of cards, no spreadsheet.
+await other.goto(`${BASE}/dashboard/cards/import`);
+await other.fill(
+  'textarea[name="sheet"]',
+  "Chase Sapphire Pref\nAmex Gold Personal, 2/2024\nChase Freedom Flex\nCiti Double Cash",
+);
+await other.waitForSelector("text=4 open cards");
+await Promise.all([
+  other.waitForURL("**/dashboard/cards"),
+  other.click('button:has-text("Import 4 cards")'),
+]);
+const eveId = sql(`select id from "user" where email='eve@example.com'`);
+check(
+  "a typed list imports for the second person",
+  sql(`select count(*) from perks_card where user_id='${eveId}'`) === "4",
+);
+check(
+  "listed cards get their credits",
+  sql(
+    `select count(*) from perks_benefit b join perks_card c on c.id=b.card_id where c.user_id='${eveId}' and c.name='Chase Sapphire Pref' and b.name='Chase Travel hotel credit'`,
+  ) === "1",
+);
+check(
+  "an opened month is kept",
+  sql(`select opened_on from perks_card where user_id='${eveId}' and name='Amex Gold Personal'`) ===
+    "2024-02-01",
+);
+check(
+  "the first person's cards are untouched",
+  sql(
+    `select count(*) from perks_card c join "user" u on u.id=c.user_id where u.email='owner@example.com'`,
+  ) === "4",
 );
 
 await browser.close();
