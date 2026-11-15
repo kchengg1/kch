@@ -4,26 +4,18 @@ import { Badge, Button, Card, CardDescription, CardTitle, Input, Label, cn } fro
 import { ActionForm } from "@/components/action-form";
 import { BenefitFields } from "@/components/benefit-fields";
 import { Meter } from "@/components/meter";
+import { UsageChips } from "@/components/usage-chips";
 import { CATALOG, CATALOG_REVIEWED, getTemplate } from "@/lib/catalog";
 import { formatCents } from "@/lib/money";
 import { getCard, loadPortfolio, today as getToday } from "@/lib/perks";
-import {
-  CADENCE_LABEL,
-  formatDate,
-  isCadence,
-  periodsThisYear,
-  shortLabel,
-  type Cadence,
-} from "@/lib/periods";
+import { CADENCE_LABEL, formatDate, isCadence, type Cadence } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
-import { indexUsage, summarizeCards, usedIn } from "@/lib/summary";
+import { indexUsage, summarizeCards } from "@/lib/summary";
 import {
   addBenefitAction,
   applyTemplateAction,
-  clearUsedAction,
   deleteBenefitAction,
   deleteCardAction,
-  markUsedAction,
   setBenefitFlagAction,
   updateBenefitAction,
   updateCardAction,
@@ -131,7 +123,6 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
             <div className="mt-3 space-y-3">
               {credits.map((b) => {
                 const cadence = isCadence(b.cadence) ? b.cadence : ("annual" as Cadence);
-                const periods = periodsThisYear(cadence, today, card.openedOn);
                 const expired = Boolean(b.endsOn && b.endsOn < today);
                 return (
                   <Card key={b.id} className={cn("p-5", (!b.tracked || expired) && "opacity-60")}>
@@ -172,46 +163,14 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
                       </div>
                     </div>
 
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {periods.map((p) => {
-                        const logged = usedIn(usage, b.id, p.key);
-                        const full = logged !== undefined && logged >= b.amountCents;
-                        const partial = !full && (logged ?? 0) > 0;
-                        const future = p.start > today;
-                        const action = (full || partial ? clearUsedAction : markUsedAction).bind(
-                          null,
-                          b.id,
-                          p.key,
-                        );
-                        return (
-                          <form key={p.key} action={action}>
-                            <button
-                              type="submit"
-                              disabled={future}
-                              aria-pressed={full}
-                              title={
-                                full
-                                  ? `${p.label}: used`
-                                  : partial
-                                    ? `${p.label}: ${formatCents(logged!)} used`
-                                    : `${p.label}: not used`
-                              }
-                              className={cn(
-                                "min-w-12 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40",
-                                full && "border-transparent bg-success text-white",
-                                partial && "border-success bg-success/15",
-                                !full && !partial && "bg-card hover:bg-muted",
-                                p.start <= today && p.end >= today && "ring-2 ring-primary/40",
-                              )}
-                            >
-                              {full ? "✓ " : ""}
-                              {shortLabel(cadence, p)}
-                              {partial ? ` · ${formatCents(logged!)}` : ""}
-                            </button>
-                          </form>
-                        );
-                      })}
-                    </div>
+                    <UsageChips
+                      benefitId={b.id}
+                      amountCents={b.amountCents}
+                      cadence={cadence}
+                      openedOn={card.openedOn}
+                      usage={usage}
+                      today={today}
+                    />
 
                     <details className="mt-3">
                       <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">

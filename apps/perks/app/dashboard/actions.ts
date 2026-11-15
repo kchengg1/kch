@@ -76,6 +76,112 @@ export async function clearUsedAction(benefitId: string, periodKey: string) {
   refresh();
 }
 
+/** Mark every earlier period of this year used, keeping any amounts already logged. */
+export async function markPastUsedAction(benefitId: string) {
+  const { user } = await requireSession();
+  const benefit = await getBenefit(benefitId, user.id);
+  if (!benefit || !isCadence(benefit.cadence) || benefit.amountCents === 0) return;
+  const card = await getCard(benefit.cardId, user.id);
+  if (!card) return;
+  const now = today();
+  const past = periodsThisYear(benefit.cadence, now, card.openedOn).filter((p) => p.end < now);
+  if (past.length === 0) return;
+  await db
+    .insert(perksUsage)
+    .values(
+      past.map((p) => ({
+        id: crypto.randomUUID(),
+        benefitId,
+        userId: user.id,
+        periodKey: p.key,
+        usedCents: benefit.amountCents,
+      })),
+    )
+    .onConflictDoNothing({ target: [perksUsage.benefitId, perksUsage.periodKey] });
+  refresh();
+}
+
+/**
+ * Save statement credits the owner matched to benefits. Each credit counts
+ * toward the period its date falls in. Re-importing the same file is safe:
+ * a period keeps the larger of what was logged and what the file shows.
+ */
+export async function saveStatementCreditsAction(
+  _prev: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const { user } = await requireSession();
+  const card = await getCard(text(form, "cardId"), user.id);
+  if (!card) return { error: "Pick the card this statement is for." };
+
+  let rows: { date: unknown; amountCents: unknown; benefitId: unknown }[];
+  try {
+    rows = JSON.parse(text(form, "credits"));
+    if (!Array.isArray(rows)) throw new Error();
+  } catch {
+    return { error: "Could not read the matched credits. Upload the file again." };
+  }
+
+  const { benefits, usage } = await loadPortfolio(user.id);
+  const cardBenefits = new Map(benefits.filter((b) => b.cardId === card.id).map((b) => [b.id, b]));
+  const existing = new Map(usage.map((u) => [`${u.benefitId}|${u.periodKey}`, u.usedCents]));
+  const now = today();
+  const totals = new Map<
+    string,
+    { benefitId: string; periodKey: string; cents: number; cap: number }
+  >();
+  let outside = 0;
+
+  for (const row of rows.slice(0, 2000)) {
+    const benefit = cardBenefits.get(String(row.benefitId ?? ""));
+    const date = parseSheetDate(String(row.date ?? ""));
+    const cents = Number(row.amountCents);
+    if (!benefit || !date || !Number.isInteger(cents) || cents <= 0) continue;
+    if (!isCadence(benefit.cadence) || benefit.cadence === "perk") continue;
+    const period = currentPeriod(benefit.cadence, date, card.openedOn);
+    const valid = [
+      ...periodsThisYear(benefit.cadence, now, card.openedOn),
+      currentPeriod(benefit.cadence, now, card.openedOn),
+    ].some((p) => p?.key === period?.key);
+    if (!period || !valid || date > now) {
+      outside++;
+      continue;
+    }
+    const key = `${benefit.id}|${period.key}`;
+    const entry = totals.get(key) ?? {
+      benefitId: benefit.id,
+      periodKey: period.key,
+      cents: 0,
+      cap: benefit.amountCents,
+    };
+    entry.cents += cents;
+    totals.set(key, entry);
+  }
+
+  let changed = 0;
+  for (const [key, t] of totals) {
+    const usedCents = Math.max(existing.get(key) ?? 0, Math.min(t.cents, t.cap));
+    if (usedCents === existing.get(key)) continue;
+    await setUsage(t.benefitId, user.id, t.periodKey, usedCents);
+    changed++;
+  }
+  refresh();
+  if (totals.size === 0) {
+    return {
+      error: outside
+        ? `None of the matched credits fall in the tracker's current periods (${outside} from earlier years skipped).`
+        : "Match at least one credit to a benefit before saving.",
+    };
+  }
+  const skipped = outside ? ` Skipped ${outside} from before this year.` : "";
+  return {
+    message:
+      changed === 0
+        ? `Everything in this file was already recorded.${skipped}`
+        : `Updated ${changed} credit period${changed === 1 ? "" : "s"} on ${card.name}.${skipped}`,
+  };
+}
+
 /** Record a partial amount, e.g. $6 of a $10 credit. */
 export async function logAmountAction(benefitId: string, periodKey: string, form: FormData) {
   const owned = await ownedPeriod(benefitId, periodKey);

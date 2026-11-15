@@ -17,6 +17,11 @@ export type ImportedCard = {
 
 /** Split pasted spreadsheet text into rows of cells, honouring quoted cells. */
 export function parseTsv(text: string): string[][] {
+  return parseDelimited(text, "\t");
+}
+
+/** Split delimited text (CSV, TSV) into rows of trimmed cells, honouring quoted cells. */
+export function parseDelimited(text: string, delimiter: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -31,7 +36,7 @@ export function parseTsv(text: string): string[][] {
       } else if (ch === '"') quoted = false;
       else cell += ch;
     } else if (ch === '"' && cell === "") quoted = true;
-    else if (ch === "\t") {
+    else if (ch === delimiter) {
       row.push(cell);
       cell = "";
     } else if (ch === "\n") {

@@ -32,9 +32,14 @@ export default async function CardsPage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Cards</h1>
-        <Link href="/dashboard/cards/import">
-          <Button variant="outline">Import from spreadsheet</Button>
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/dashboard/catch-up">
+            <Button variant="outline">Catch up on credits used</Button>
+          </Link>
+          <Link href="/dashboard/cards/import">
+            <Button variant="outline">Import from spreadsheet</Button>
+          </Link>
+        </div>
       </div>
 
       {summaries.length > 0 && (

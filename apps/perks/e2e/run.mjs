@@ -178,6 +178,66 @@ check(
 await page.goto(`${BASE}/dashboard`);
 check("untracked credit is off the dashboard", !(await bodyText()).includes("Dunkin' credit"));
 
+/* 6b. Catch up: bulk-mark earlier months, then import a statement CSV ----- */
+await page.goto(`${BASE}/dashboard/catch-up`);
+const month = Number(today.slice(5, 7));
+if (month >= 3) {
+  // Uber Cash on Amex PRG: every month before this one becomes used in one tap.
+  const uberRow = page.locator("li", { hasText: "Uber Cash" }).first();
+  await uberRow.locator('button:has-text("earlier periods used")').click();
+  check(
+    "one tap marks every earlier month used",
+    await until(
+      `select count(*) from perks_usage where benefit_id='${uberId}' and period_key < '${monthKey}'`,
+      month - 1,
+    ),
+  );
+}
+const us2 = (iso) => `${iso.slice(5, 7)}/${iso.slice(8, 10)}/${iso.slice(0, 4)}`;
+const csv = [
+  "Date,Description,Amount,Extended Details",
+  `${us2(today)},"AMEX DINING CREDIT",-10.00,""`,
+  `${us2(today)},"AMEX RESY CREDIT",-50.00,""`,
+  `${us2(today)},"GRUBHUB",31.50,""`,
+  `${us2(today)},"NORDSTROM RETURN",-40.00,""`,
+  `12/15/${year - 1},"AMEX DINING CREDIT",-10.00,""`,
+].join("\n");
+await page.selectOption("#stmt-card", goldId);
+await page.setInputFiles("#stmt-file", {
+  name: "activity.csv",
+  mimeType: "text/csv",
+  buffer: Buffer.from(csv),
+});
+await page.waitForSelector("text=credits found");
+body = await bodyText();
+check(
+  "statement credits listed and matched",
+  body.includes("4 credits found, 3 matched"),
+  body.match(/\d+ credits found, \d+ matched/)?.[0],
+);
+await page.click('button:has-text("Save 3 matched credits")');
+await page.waitForSelector("text=Skipped 1 from before this year");
+const dining = sql(
+  `select id from perks_benefit where card_id='${goldId}' and name='Dining credit'`,
+);
+const resy = sql(`select id from perks_benefit where card_id='${goldId}' and name='Resy credit'`);
+check(
+  "statement dining credit recorded for this month",
+  sql(
+    `select used_cents from perks_usage where benefit_id='${dining}' and period_key='${monthKey}'`,
+  ) === "1000",
+);
+check(
+  "statement Resy credit recorded for this half",
+  sql(`select used_cents from perks_usage where benefit_id='${resy}'`) === "5000",
+);
+await page.click('button:has-text("Save 3 matched credits")');
+await page.waitForSelector("text=already recorded");
+check(
+  "re-uploading the same file changes nothing",
+  sql(`select count(*) from perks_usage where benefit_id in ('${dining}','${resy}')`) === "2",
+);
+
 /* 7. Paste offers -------------------------------------------------------- */
 await page.goto(`${BASE}/dashboard/offers`);
 await page.selectOption("#cardId", goldId);
