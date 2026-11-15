@@ -76,6 +76,20 @@ export default async function DashboardPage() {
         </p>
       </div>
 
+      {captured === 0 && (
+        <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="text-base">Already used some credits this year?</CardTitle>
+            <CardDescription className="mt-1">
+              Import them from a statement download, or tap them off, so your totals are right.
+            </CardDescription>
+          </div>
+          <Link href="/dashboard/catch-up">
+            <Button variant="outline">Catch up on {today.slice(0, 4)}</Button>
+          </Link>
+        </Card>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat
           label="Expiring this month"
