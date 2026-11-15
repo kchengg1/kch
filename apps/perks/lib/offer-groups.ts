@@ -24,7 +24,11 @@ export type OfferGroup<T extends OfferLike> = {
 };
 
 /** Normalise merchant names so "Marriott Bonvoy®" and "Marriott Bonvoy" group together. */
-const norm = (s: string) => s.toLowerCase().replace(/[®™©]/g, "").replace(/\s+/g, " ").trim();
+export const norm = (s: string) =>
+  s.toLowerCase().replace(/[®™©]/g, "").replace(/\s+/g, " ").trim();
+
+/** Key used to match a merchant across pastes and cards, e.g. for "Not interested". */
+export const merchantKey = (merchant: string) => norm(merchant);
 
 export function groupOffers<T extends OfferLike>(offers: T[]): OfferGroup<T>[] {
   const groups = new Map<string, OfferGroup<T>>();

@@ -8,6 +8,7 @@ import {
   eq,
   perksBenefit,
   perksCard,
+  perksHiddenMerchant,
   perksOffer,
   perksSettings,
   perksUsage,
@@ -16,11 +17,13 @@ import {
 import { getTemplate } from "@/lib/catalog";
 import { sendDigest } from "@/lib/digest";
 import { parseDollars } from "@/lib/money";
+import { merchantKey } from "@/lib/offer-groups";
 import { offerKey, type ParsedOffer } from "@/lib/offer-parse";
 import {
   addTemplateBenefits,
   getBenefit,
   getCard,
+  listHiddenMerchants,
   listOffers,
   loadPortfolio,
   today,
@@ -387,7 +390,9 @@ export async function saveOffersAction(_prev: FormState, form: FormData): Promis
     };
   }
 
-  const existing = await listOffers(user.id);
+  const [existing, hidden] = await Promise.all([listOffers(user.id), listHiddenMerchants(user.id)]);
+  const hiddenKeys = new Set(hidden.map((h) => h.merchantKey));
+  let hiddenCount = 0;
   const have = new Set(existing.filter((o) => o.cardId === (card?.id ?? null)).map(offerKey));
   const rows = [];
   for (const o of parsed.slice(0, 300)) {
@@ -395,6 +400,10 @@ export async function saveOffersAction(_prev: FormState, form: FormData): Promis
     const details = String(o.details ?? "").slice(0, 300);
     const expiresOn = o.expiresOn ? parseSheetDate(String(o.expiresOn)) : null;
     if (!merchant) continue;
+    if (hiddenKeys.has(merchantKey(merchant))) {
+      hiddenCount++;
+      continue;
+    }
     const key = offerKey({ merchant, details, expiresOn });
     if (have.has(key)) continue;
     have.add(key);
@@ -417,9 +426,13 @@ export async function saveOffersAction(_prev: FormState, form: FormData): Promis
       .set({ offersCheckedAt: new Date() })
       .where(eq(perksCard.id, card.id));
   refresh();
-  const skipped = parsed.length - rows.length;
+  const skipped = parsed.length - rows.length - hiddenCount;
+  const notes = [
+    skipped ? `skipped ${skipped} already saved` : "",
+    hiddenCount ? `left out ${hiddenCount} from merchants you hid` : "",
+  ].filter(Boolean);
   return {
-    message: `Saved ${rows.length} offer${rows.length === 1 ? "" : "s"}${skipped ? `, skipped ${skipped} already saved` : ""}.`,
+    message: `Saved ${rows.length} offer${rows.length === 1 ? "" : "s"}${notes.length ? `, ${notes.join(", ")}` : ""}.`,
   };
 }
 
@@ -443,6 +456,26 @@ export async function setOffersStatusAction(ids: string[], status: "used" | "dis
     .update(perksOffer)
     .set({ status })
     .where(and(inArray(perksOffer.id, ids.slice(0, 50)), eq(perksOffer.userId, user.id)));
+  refresh();
+}
+
+/** Never show offers from this merchant again, on any card. */
+export async function hideMerchantAction(merchant: string) {
+  const { user } = await requireSession();
+  const key = merchantKey(merchant);
+  if (!key) return;
+  await db
+    .insert(perksHiddenMerchant)
+    .values({ userId: user.id, merchantKey: key, label: merchant.slice(0, 120) })
+    .onConflictDoNothing();
+  refresh();
+}
+
+export async function unhideMerchantAction(key: string) {
+  const { user } = await requireSession();
+  await db
+    .delete(perksHiddenMerchant)
+    .where(and(eq(perksHiddenMerchant.userId, user.id), eq(perksHiddenMerchant.merchantKey, key)));
   refresh();
 }
 

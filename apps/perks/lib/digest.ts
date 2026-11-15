@@ -2,8 +2,9 @@ import "server-only";
 import { sendEmail, type EmailContent } from "@kch/email";
 import { appConfig } from "@/app.config";
 import { formatCents } from "./money";
-import { groupOffers } from "./offer-groups";
-import { listOffers, loadPortfolio } from "./perks";
+import { groupOffers, merchantKey } from "./offer-groups";
+import { isWeakOffer } from "./offer-value";
+import { listHiddenMerchants, listOffers, loadPortfolio } from "./perks";
 import { daysBetween, formatDate } from "./periods";
 import { actionable, buildStatuses, type BenefitStatus } from "./summary";
 
@@ -72,10 +73,12 @@ export async function sendDigest(
   user: { id: string; email: string; name: string },
   today: string,
 ): Promise<boolean> {
-  const [{ cards, benefits, usage }, offers] = await Promise.all([
+  const [{ cards, benefits, usage }, offers, hidden] = await Promise.all([
     loadPortfolio(user.id),
     listOffers(user.id),
+    listHiddenMerchants(user.id),
   ]);
+  const hiddenKeys = new Set(hidden.map((h) => h.merchantKey));
   const credits = actionable(buildStatuses(cards, benefits, usage, today)).filter(
     (s) => s.daysLeft !== null && s.daysLeft <= DIGEST_WINDOW_DAYS,
   );
@@ -85,7 +88,10 @@ export async function sendDigest(
       (o.status === "available" || o.status === "added") &&
       o.expiresOn !== null &&
       o.expiresOn >= today &&
-      daysBetween(today, o.expiresOn) <= OFFER_WINDOW_DAYS,
+      daysBetween(today, o.expiresOn) <= OFFER_WINDOW_DAYS &&
+      // Merchants marked not interested and offers under 10% back are not worth an email.
+      !hiddenKeys.has(merchantKey(o.merchant)) &&
+      !isWeakOffer(o.details),
   );
   const expiring = groupOffers(live).map((g) => ({
     merchant: g.merchant,

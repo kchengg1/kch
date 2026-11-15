@@ -377,6 +377,77 @@ check(
   ),
 );
 
+// Offers are scored by return, weak ones collapse, and merchants can be hidden.
+await page.goto(`${BASE}/dashboard/offers`);
+await page.selectOption("#cardId", goldId);
+await page.fill(
+  "#paste",
+  [
+    "Misfits Market",
+    "Spend $5 or more, earn $5 back",
+    "Expires 12/31/26",
+    "St. Regis",
+    "Spend $1,000 or more, earn $200 back",
+    "Expires 12/31/26",
+    "dyson.com",
+    "Earn 2% back on purchases, up to a total of $250",
+    "Expires 12/31/26",
+  ].join("\n"),
+);
+await page.waitForSelector("text=100% back");
+await page.click('button:has-text("Save 3 offers")');
+await page.waitForSelector("text=Saved 3 offers");
+await page.goto(`${BASE}/dashboard/offers`);
+const order = await page.locator("section ul > li p.font-medium").allInnerTexts();
+check(
+  "best return first: $5 on $5 beats $200 on $1,000",
+  order.findIndex((t) => t.includes("Misfits")) < order.findIndex((t) => t.includes("St. Regis")),
+  order.join(" | "),
+);
+check(
+  "an offer under 10% back is tucked away",
+  (await page.locator("details", { hasText: "weaker offer" }).innerText()).includes(
+    "1 weaker offer",
+  ),
+);
+await page.goto(`${BASE}/dashboard/offers?sort=value`);
+const byValue = await page.locator("section ul > li p.font-medium").allInnerTexts();
+check(
+  "sorting by biggest reward puts St. Regis first",
+  byValue[0]?.includes("St. Regis"),
+  byValue[0],
+);
+await page
+  .locator("li", { hasText: "St. Regis" })
+  .locator('button:has-text("Not interested")')
+  .click();
+check(
+  "Not interested stores the merchant",
+  await until(`select label from perks_hidden_merchant`, "St. Regis"),
+);
+await page.waitForFunction(
+  () => !document.querySelector("section")?.innerText.includes("Spend $1,000"),
+);
+check(
+  "its offers disappear",
+  !(await page.locator("section").first().innerText()).includes("Spend $1,000"),
+);
+await page.fill("#paste", "St. Regis\nSpend $1,000 or more, earn $200 back\nExpires 1/31/27");
+await page.waitForSelector("text=will be skipped");
+await page.click('button:has-text("Save 1 offer")');
+await page.waitForSelector("text=left out 1 from merchants you hid");
+check(
+  "future pastes skip a hidden merchant",
+  sql(`select count(*) from perks_offer where merchant='St. Regis' and expires_on='2027-01-31'`) ===
+    "0",
+);
+await page.locator("summary", { hasText: "not interested" }).click();
+await page.locator('button:has-text("Show again")').click();
+check(
+  "Show again brings the merchant back",
+  await until(`select count(*) from perks_hidden_merchant`, 0),
+);
+
 /* 8. Sign-up bonus eligibility ------------------------------------------ */
 await page.goto(`${BASE}/dashboard/bonuses`);
 body = await bodyText();

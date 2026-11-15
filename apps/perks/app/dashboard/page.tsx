@@ -4,8 +4,9 @@ import { CardIcon } from "@/components/card-icon";
 import { CreditRow, dueLabel } from "@/components/credit-row";
 import { Meter } from "@/components/meter";
 import { formatCents } from "@/lib/money";
-import { groupOffers } from "@/lib/offer-groups";
-import { listOffers, loadPortfolio, today as getToday } from "@/lib/perks";
+import { groupOffers, merchantKey } from "@/lib/offer-groups";
+import { isWeakOffer } from "@/lib/offer-value";
+import { listHiddenMerchants, listOffers, loadPortfolio, today as getToday } from "@/lib/perks";
 import { daysBetween, formatDate } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
 import { actionable, buildStatuses, summarizeCards } from "@/lib/summary";
@@ -18,10 +19,12 @@ const FEE_DAYS = 60;
 export default async function DashboardPage() {
   const { user } = await requireSession();
   const today = getToday();
-  const [{ cards, benefits, usage }, offers] = await Promise.all([
+  const [{ cards, benefits, usage }, offers, hidden] = await Promise.all([
     loadPortfolio(user.id),
     listOffers(user.id),
+    listHiddenMerchants(user.id),
   ]);
+  const hiddenKeys = new Set(hidden.map((h) => h.merchantKey));
   const open = cards.filter((c) => !c.closed);
 
   if (open.length === 0) {
@@ -61,7 +64,9 @@ export default async function DashboardPage() {
       (o.status === "available" || o.status === "added") &&
       o.expiresOn !== null &&
       o.expiresOn >= today &&
-      daysBetween(today, o.expiresOn) <= OFFER_DAYS,
+      daysBetween(today, o.expiresOn) <= OFFER_DAYS &&
+      !hiddenKeys.has(merchantKey(o.merchant)) &&
+      !isWeakOffer(o.details),
   );
   const feesDue = summaries
     .filter((s) => s.nextFeeOn && daysBetween(today, s.nextFeeOn) <= FEE_DAYS)

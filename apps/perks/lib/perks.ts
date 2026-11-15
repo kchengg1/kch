@@ -6,6 +6,7 @@ import {
   eq,
   perksBenefit,
   perksCard,
+  perksHiddenMerchant,
   perksOffer,
   perksSettings,
   perksUsage,
@@ -70,6 +71,14 @@ export async function listOffers(userId: string): Promise<PerksOffer[]> {
     .from(perksOffer)
     .where(eq(perksOffer.userId, userId))
     .orderBy(asc(perksOffer.expiresOn), asc(perksOffer.merchant));
+}
+
+export async function listHiddenMerchants(userId: string) {
+  return db
+    .select()
+    .from(perksHiddenMerchant)
+    .where(eq(perksHiddenMerchant.userId, userId))
+    .orderBy(asc(perksHiddenMerchant.label));
 }
 
 export async function getSettings(userId: string) {

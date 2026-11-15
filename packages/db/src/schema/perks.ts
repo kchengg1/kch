@@ -9,6 +9,7 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -108,6 +109,22 @@ export const perksOffer = pgTable(
   (t) => [index("perks_offer_user_id_idx").on(t.userId)],
 );
 
+/** Merchants whose offers the owner never wants to see. */
+export const perksHiddenMerchant = pgTable(
+  "perks_hidden_merchant",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** Normalised merchant name used for matching (lower case, no ® or ™). */
+    merchantKey: text("merchant_key").notNull(),
+    /** The name as it was shown, for the "show again" list. */
+    label: text("label").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.merchantKey] })],
+);
+
 export const perksSettings = pgTable("perks_settings", {
   userId: text("user_id")
     .primaryKey()
@@ -134,3 +151,4 @@ export type PerksBenefit = typeof perksBenefit.$inferSelect;
 export type PerksUsage = typeof perksUsage.$inferSelect;
 export type PerksOffer = typeof perksOffer.$inferSelect;
 export type PerksSettings = typeof perksSettings.$inferSelect;
+export type PerksHiddenMerchant = typeof perksHiddenMerchant.$inferSelect;

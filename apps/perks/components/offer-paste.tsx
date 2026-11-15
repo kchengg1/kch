@@ -4,7 +4,9 @@ import { useActionState, useMemo, useState } from "react";
 import { Alert, Badge, Button, Label } from "@kch/ui";
 import type { FormState } from "@/app/dashboard/actions";
 import { formatCents } from "@/lib/money";
+import { merchantKey } from "@/lib/offer-groups";
 import { parseOffers } from "@/lib/offer-parse";
+import { offerReturn, rateLabel } from "@/lib/offer-value";
 import { formatDate } from "@/lib/periods";
 
 const field =
@@ -15,13 +17,17 @@ export function OfferPaste({
   action,
   cards,
   today,
+  hiddenKeys,
 }: {
   action: (prev: FormState, form: FormData) => Promise<FormState>;
   /** `checked` says when offers were last pasted for the card, e.g. "updated today (Nov 15)". */
   cards: { id: string; name: string; checked: string }[];
   today: string;
+  /** Merchant keys marked not interested; their offers are skipped on save. */
+  hiddenKeys: string[];
 }) {
   const [text, setText] = useState("");
+  const hidden = useMemo(() => new Set(hiddenKeys), [hiddenKeys]);
   const [cardId, setCardId] = useState(cards[0]?.id ?? "");
   const lastChecked = cards.find((c) => c.id === cardId)?.checked;
   const [removed, setRemoved] = useState<Set<number>>(new Set());
@@ -91,7 +97,14 @@ export function OfferPaste({
                 <li key={i} className="flex items-center justify-between gap-4 px-4 py-2">
                   <div className="min-w-0">
                     <p className="font-medium">
-                      {o.merchant} {o.added && <Badge variant="success">Added</Badge>}
+                      {o.merchant} {o.added && <Badge variant="success">Added</Badge>}{" "}
+                      {hidden.has(merchantKey(o.merchant)) ? (
+                        <Badge variant="secondary">Not interested, will be skipped</Badge>
+                      ) : (
+                        offerReturn(o.details) && (
+                          <Badge variant="outline">{rateLabel(offerReturn(o.details)!.rate)}</Badge>
+                        )
+                      )}
                     </p>
                     <p className="text-muted-foreground">
                       {o.details || "Added to card, deal details not on this page"}
