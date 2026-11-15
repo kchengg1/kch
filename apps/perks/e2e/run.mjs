@@ -713,6 +713,107 @@ check(
   manifest.status() === 200 && (await manifest.json()).display === "standalone",
 );
 
+/* 12. Mobile JSON API (cookie-free Bearer auth) -------------------------- */
+const unauthBoot = await fetch(`${BASE}/api/mobile/bootstrap`);
+check("mobile bootstrap rejects unauthenticated callers", unauthBoot.status === 401);
+const unauthAct = await fetch(`${BASE}/api/mobile/action`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ type: "settings.setDigest", enabled: true }),
+});
+check("mobile action rejects unauthenticated callers", unauthAct.status === 401);
+
+const mobileSignIn = async (email) => {
+  const res = await fetch(`${BASE}/api/auth/sign-in/email`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: "perks://app" },
+    body: JSON.stringify({ email, password: "supersecret123" }),
+  });
+  const headerToken = res.headers.get("set-auth-token");
+  const json = await res.json();
+  return { status: res.status, token: headerToken || json.token };
+};
+
+const ownerLogin = await mobileSignIn("owner@example.com");
+check(
+  "mobile sign-in issues a bearer token",
+  ownerLogin.status === 200 && Boolean(ownerLogin.token),
+);
+
+const mobileGet = (token) =>
+  fetch(`${BASE}/api/mobile/bootstrap`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+const mobilePost = (token, payload) =>
+  fetch(`${BASE}/api/mobile/action`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+const bootRes = await mobileGet(ownerLogin.token);
+const boot = await bootRes.json();
+check(
+  "mobile bootstrap returns the caller's cards and points",
+  bootRes.status === 200 &&
+    boot.user.email === "owner@example.com" &&
+    boot.cards.length === 4 &&
+    boot.points.balances.length === 2,
+);
+
+const addVentureRes = await mobilePost(ownerLogin.token, {
+  type: "card.add",
+  template: "capital-one-venture-x",
+  openedOn: `${year}-01-15`,
+});
+const addVenture = await addVentureRes.json();
+check(
+  "mobile action adds a template card and returns fresh bootstrap",
+  addVentureRes.status === 200 &&
+    Boolean(addVenture.cardId) &&
+    addVenture.bootstrap.cards.length === 5,
+);
+
+const pasteMobRes = await mobilePost(ownerLogin.token, {
+  type: "offers.paste",
+  cardId: addVenture.cardId,
+  text: `REI\nSpend $100 or more, get $20 back\nExpires 12/31/${year + 1}`,
+});
+const pasteMob = await pasteMobRes.json();
+check(
+  "mobile action parses and saves pasted offers",
+  pasteMobRes.status === 200 && pasteMob.bootstrap.offers.strong.some((g) => g.merchant === "REI"),
+);
+
+// Another user's bearer token cannot see or delete the owner's card.
+const eveLogin = await mobileSignIn("eve@example.com");
+const eveBoot = await (await mobileGet(eveLogin.token)).json();
+check(
+  "another mobile user only sees their own cards",
+  eveBoot.user.email === "eve@example.com" &&
+    !eveBoot.cards.some((c) => c.id === addVenture.cardId),
+);
+await mobilePost(eveLogin.token, { type: "card.delete", id: addVenture.cardId });
+check(
+  "another mobile user cannot delete the owner's card",
+  sql(`select count(*) from perks_card where id='${addVenture.cardId}'`) === "1",
+);
+
+const signOutRes = await fetch(`${BASE}/api/auth/sign-out`, {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    origin: "perks://app",
+    authorization: `Bearer ${eveLogin.token}`,
+  },
+  body: "{}",
+});
+check("mobile bearer sign-out succeeds", signOutRes.status === 200);
+check("signed-out bearer token is rejected", (await mobileGet(eveLogin.token)).status === 401);
+
 await browser.close();
 log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);
