@@ -81,6 +81,40 @@ export async function listOffers(userId: string): Promise<PerksOffer[]> {
     .orderBy(asc(perksOffer.expiresOn), asc(perksOffer.merchant));
 }
 
+/**
+ * Everyone's saved offers with the cards they are on, for the People tab.
+ * Perks is limited to a small group (ALLOWED_EMAILS), so like referral links
+ * these are visible to everyone signed in. Only fields shown on the page are
+ * returned: no emails, card dates or spending.
+ */
+export async function listEveryonesOffers() {
+  const [people, offers, cards] = await Promise.all([
+    db.select({ id: user.id, name: user.name }).from(user),
+    db
+      .select({
+        id: perksOffer.id,
+        userId: perksOffer.userId,
+        cardId: perksOffer.cardId,
+        merchant: perksOffer.merchant,
+        details: perksOffer.details,
+        valueCents: perksOffer.valueCents,
+        expiresOn: perksOffer.expiresOn,
+        status: perksOffer.status,
+      })
+      .from(perksOffer)
+      .orderBy(asc(perksOffer.expiresOn), asc(perksOffer.merchant)),
+    db
+      .select({
+        id: perksCard.id,
+        name: perksCard.name,
+        issuer: perksCard.issuer,
+        templateKey: perksCard.templateKey,
+      })
+      .from(perksCard),
+  ]);
+  return { people, offers, cards };
+}
+
 export async function listPoints(userId: string) {
   return db
     .select()

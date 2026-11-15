@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Coins, CreditCard, Gift, LayoutDashboard, Settings, Tag } from "lucide-react";
+import { Coins, CreditCard, Gift, LayoutDashboard, Settings, Tag, Users } from "lucide-react";
 import { cn } from "@kch/ui";
 
 const TABS = [
@@ -10,6 +10,8 @@ const TABS = [
   // Catch up is about recording card usage, so it belongs with Cards.
   { href: "/dashboard/cards", label: "Cards", icon: CreditCard, also: ["/dashboard/catch-up"] },
   { href: "/dashboard/offers", label: "Offers", icon: Tag, also: [] },
+  // Other people's offers, read-only.
+  { href: "/dashboard/people", label: "People", icon: Users, also: [] },
   { href: "/dashboard/points", label: "Points", icon: Coins, also: [] },
   { href: "/dashboard/bonuses", label: "Bonuses", icon: Gift, also: [] },
   { href: "/dashboard/settings", label: "Settings", icon: Settings, also: [] },
@@ -59,7 +61,7 @@ export function MobileTabBar() {
       aria-label="Sections"
       className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden"
     >
-      <ul className="grid grid-cols-6">
+      <ul className="grid grid-cols-7">
         {TABS.map((tab) => {
           const active = isActive(pathname, tab);
           const Icon = tab.icon;
