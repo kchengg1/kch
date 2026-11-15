@@ -53,6 +53,25 @@ describe("parseStatementCsv", () => {
     ]);
   });
 
+  it("reads Capital One's separate Debit and Credit columns", () => {
+    const capitalOne = `Transaction Date,Posted Date,Card No.,Description,Category,Debit,Credit
+2026-11-08,2026-11-09,0000,STREAMING SERVICE,Entertainment,2.99,
+2026-11-01,2026-11-02,0000,CAPITAL ONE AUTOPAY PYMT,Payment/Credit,,4488.65
+2026-09-04,2026-09-07,0000,PET STORE,Merchandise,,13.00
+2026-08-02,2026-08-03,0000,CAPITAL ONE MOBILE PYMT,Payment/Credit,,1160.27
+2026-02-20,2026-02-21,0000,APP STORE,Internet,,20.13
+2026-01-21,2026-01-23,0000,"CONVENIENCE STORE CO.,LTD",Other Services,6.83,
+2026-01-14,2026-01-15,0000,CAPITAL ONE TRAVEL CREDIT,Payment/Credit,,300.00`;
+    const { credits, charges, error } = parseStatementCsv(capitalOne);
+    expect(error).toBeUndefined();
+    expect(charges).toBe(2);
+    expect(credits).toEqual([
+      { date: "2026-01-14", description: "CAPITAL ONE TRAVEL CREDIT", amountCents: 30000 },
+      { date: "2026-02-20", description: "APP STORE", amountCents: 2013 },
+      { date: "2026-09-04", description: "PET STORE", amountCents: 1300 },
+    ]);
+  });
+
   it("accepts tab-separated text and parenthesised negatives", () => {
     const text =
       "Date\tDescription\tAmount\n01/03/2026\tSTARBUCKS\t5.00\n01/04/2026\tSTARBUCKS\t6.00\n01/05/2026\tDELL CREDIT\t(150.00)";

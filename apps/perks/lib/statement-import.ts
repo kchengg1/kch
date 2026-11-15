@@ -39,8 +39,8 @@ export function parseStatementCsv(text: string): StatementParse {
     const cells = r.map((c) => c.toLowerCase());
     return (
       cells.some((c) => c.includes("date")) &&
-      cells.includes("amount") &&
-      cells.some((c) => c.includes("description"))
+      cells.some((c) => c.includes("description")) &&
+      (cells.includes("amount") || (cells.includes("debit") && cells.includes("credit")))
     );
   });
   if (headerIndex < 0) {
@@ -48,26 +48,37 @@ export function parseStatementCsv(text: string): StatementParse {
       credits: [],
       charges: 0,
       error:
-        "This doesn't look like a transactions file. It needs Date, Description and Amount columns.",
+        "This doesn't look like a transactions file. It needs Date and Description columns, plus either Amount or Debit and Credit.",
     };
   }
   const header = rows[headerIndex]!.map((c) => c.toLowerCase());
-  const dateCol = Math.max(
-    header.indexOf("transaction date"),
-    header.indexOf("date"),
+  const firstOf = (...names: string[]) =>
+    names.map((n) => header.indexOf(n)).find((i) => i >= 0) ?? -1;
+  const dateCol = [
+    firstOf("transaction date", "date"),
     header.findIndex((c) => c.includes("date")),
-  );
-  const descCol =
-    header.indexOf("description") >= 0
-      ? header.indexOf("description")
-      : header.findIndex((c) => c.includes("description"));
+  ].find((i) => i >= 0)!;
+  const descCol = [firstOf("description"), header.findIndex((c) => c.includes("description"))].find(
+    (i) => i >= 0,
+  )!;
   const amountCol = header.indexOf("amount");
+  // Capital One and some banks split money into Debit and Credit columns instead of a signed Amount.
+  const debitCol = amountCol < 0 ? header.indexOf("debit") : -1;
+  const creditCol = amountCol < 0 ? header.indexOf("credit") : -1;
+  const readAmount = (row: string[]): number | null => {
+    if (amountCol >= 0) return cents(row[amountCol] ?? "");
+    const debit = (row[debitCol] ?? "").trim();
+    const credit = (row[creditCol] ?? "").trim();
+    if (debit) return cents(debit) === null ? null : Math.abs(cents(debit)!);
+    if (credit) return cents(credit) === null ? null : -Math.abs(cents(credit)!);
+    return null;
+  };
   const typeCol = header.indexOf("type");
 
   const parsed: { date: string; description: string; amount: number; type: string }[] = [];
   for (const row of rows.slice(headerIndex + 1)) {
     const date = parseSheetDate(row[dateCol] ?? "");
-    const amount = cents(row[amountCol] ?? "");
+    const amount = readAmount(row);
     const description = (row[descCol] ?? "").replace(/\s+/g, " ").trim();
     if (!date || amount === null || amount === 0 || !description) continue;
     parsed.push({
@@ -81,7 +92,8 @@ export function parseStatementCsv(text: string): StatementParse {
   if (purchases.length === 0)
     return { credits: [], charges: 0, error: "No transactions found below the header." };
 
-  const chargeSign = detectChargeSign(purchases);
+  // With Debit and Credit columns the direction is explicit: debits (stored positive) are charges.
+  const chargeSign = debitCol >= 0 ? 1 : detectChargeSign(purchases);
   const credits = purchases
     .filter((r) => Math.sign(r.amount) !== chargeSign)
     .map((r) => ({ date: r.date, description: r.description, amountCents: Math.abs(r.amount) }))

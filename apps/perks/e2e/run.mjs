@@ -231,11 +231,27 @@ check(
   "statement Resy credit recorded for this half",
   sql(`select used_cents from perks_usage where benefit_id='${resy}'`) === "5000",
 );
+check("form clears after saving", !(await bodyText()).includes("credits found"));
+await page.setInputFiles("#stmt-file", {
+  name: "activity.csv",
+  mimeType: "text/csv",
+  buffer: Buffer.from(csv),
+});
+check(
+  "the old success message is gone once a new file is chosen",
+  !(await bodyText()).includes("Skipped 1"),
+);
 await page.click('button:has-text("Save 3 matched credits")');
 await page.waitForSelector("text=already recorded");
 check(
   "re-uploading the same file changes nothing",
   sql(`select count(*) from perks_usage where benefit_id in ('${dining}','${resy}')`) === "2",
+);
+
+await page.goto(`${BASE}/dashboard`);
+check(
+  "Overview keeps a Catch up link after credits are logged",
+  (await page.locator('a[href="/dashboard/catch-up"]').count()) === 1,
 );
 
 /* 6c. Navigation shows where you are ------------------------------------- */

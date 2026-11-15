@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 import { Alert, Button, Label } from "@kch/ui";
 import type { FormState } from "@/app/dashboard/actions";
 import { formatCents } from "@/lib/money";
@@ -23,7 +23,20 @@ export function StatementImport({
   const [cardId, setCardId] = useState(cards[0]?.id ?? "");
   const [file, setFile] = useState<{ name: string; parse: StatementParse } | null>(null);
   const [choices, setChoices] = useState<Record<number, string>>({});
-  const [state, formAction, pending] = useActionState(action, undefined);
+  // The last save's result, shown until the next file or card is chosen.
+  const [notice, setNotice] = useState<FormState>(undefined);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [, formAction, pending] = useActionState(async (prev: FormState, form: FormData) => {
+    const result = await action(prev, form);
+    setNotice(result);
+    if (result?.message) {
+      // Saved: clear the file so the next card starts from an empty form.
+      setFile(null);
+      setChoices({});
+      if (fileInput.current) fileInput.current.value = "";
+    }
+    return result;
+  }, undefined);
   const card = cards.find((c) => c.id === cardId);
 
   // A fresh suggestion per credit whenever the file or card changes; manual picks override it.
@@ -41,6 +54,7 @@ export function StatementImport({
 
   async function onFile(f: File | undefined) {
     setChoices({});
+    setNotice(undefined);
     setFile(f ? { name: f.name, parse: parseStatementCsv(await f.text()) } : null);
   }
 
@@ -56,6 +70,7 @@ export function StatementImport({
             onChange={(e) => {
               setCardId(e.target.value);
               setChoices({});
+              setNotice(undefined);
             }}
             className={`${field} h-10`}
           >
@@ -70,6 +85,7 @@ export function StatementImport({
           <Label htmlFor="stmt-file">Transactions file (.csv)</Label>
           <input
             id="stmt-file"
+            ref={fileInput}
             type="file"
             accept=".csv,.txt,text/csv"
             onChange={(e) => onFile(e.target.files?.[0])}
@@ -125,13 +141,15 @@ export function StatementImport({
           </ul>
         </div>
       )}
-      {state?.error && <Alert variant="error">{state.error}</Alert>}
-      {state?.message && <Alert variant="success">{state.message}</Alert>}
-      <Button type="submit" disabled={pending || matched.length === 0}>
-        {pending
-          ? "Saving…"
-          : `Save ${matched.length} matched credit${matched.length === 1 ? "" : "s"}`}
-      </Button>
+      {notice?.error && <Alert variant="error">{notice.error}</Alert>}
+      {notice?.message && <Alert variant="success">{notice.message}</Alert>}
+      {file && (
+        <Button type="submit" disabled={pending || matched.length === 0}>
+          {pending
+            ? "Saving…"
+            : `Save ${matched.length} matched credit${matched.length === 1 ? "" : "s"}`}
+        </Button>
+      )}
     </form>
   );
 }
