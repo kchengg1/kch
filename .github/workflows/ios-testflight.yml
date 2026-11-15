@@ -1,0 +1,86 @@
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        type: choice
+        options:
+          - production
+          - preview
+        default: production
+      auto_submit:
+        description: "Submit production build to TestFlight automatically"
+        type: boolean
+        default: true
+      api_url:
+        description: "Override EXPO_PUBLIC_API_URL (optional)"
+        type: string
+        required: false
+  push:
+    tags:
+      - "ios-v*"
+
+jobs:
+  eas-ios:
+    name: Build iOS (${{ inputs.profile || 'production' }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url || vars.EXPO_PUBLIC_API_URL || secrets.EXPO_PUBLIC_API_URL }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify Perks iOS checks
+        run: |
+          pnpm --filter @kch/perks-ios lint
+          pnpm --filter @kch/perks-ios typecheck
+          pnpm --filter @kch/perks-ios test
+
+      - name: Check EXPO_TOKEN secret
+        run: |
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "::error::Missing EXPO_TOKEN repository secret. Create an Expo access token at https://expo.dev/settings/access-tokens and add it as EXPO_TOKEN in GitHub Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      - name: Setup Expo and EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Sync EXPO_PUBLIC_API_URL to EAS environment (if set)
+        if: env.EXPO_PUBLIC_API_URL != ''
+        working-directory: apps/perks-ios
+        run: |
+          PROFILE="${{ inputs.profile || 'production' }}"
+          eas env:set --environment "$PROFILE" --name EXPO_PUBLIC_API_URL --value "$EXPO_PUBLIC_API_URL" --visibility plaintext --type string --non-interactive
+
+      - name: Trigger EAS iOS build
+        working-directory: apps/perks-ios
+        run: |
+          PROFILE="${{ inputs.profile || 'production' }}"
+          EXTRA_FLAGS=""
+          if [ "$PROFILE" = "production" ] && [ "${{ inputs.auto_submit != false }}" = "true" ]; then
+            EXTRA_FLAGS="--auto-submit"
+          elif [ "$PROFILE" = "preview" ]; then
+            EXTRA_FLAGS="--refresh-ad-hoc-provisioning-profile"
+          fi
+          eas build --platform ios --profile "$PROFILE" $EXTRA_FLAGS --non-interactive --no-wait
