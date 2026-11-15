@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Card, CardDescription, CardTitle } from "@kch/ui";
+import { Badge, Card, CardDescription, CardTitle } from "@kch/ui";
 import { StatementImport } from "@/components/statement-import";
+import { onStatement } from "@/lib/catalog";
 import { UsageChips } from "@/components/usage-chips";
 import { formatCents } from "@/lib/money";
 import { loadPortfolio, today as getToday } from "@/lib/perks";
@@ -28,6 +29,10 @@ export default async function CatchUpPage() {
         !(b.endsOn && b.endsOn < today),
     );
   const withCredits = open.filter((c) => credits(c.id).length > 0);
+  // Credits applied in an app or at checkout never reach a statement, so the import must not offer them.
+  const statementCredits = (card: (typeof open)[number]) =>
+    credits(card.id).filter((b) => onStatement(card.templateKey, b.name));
+  const importable = withCredits.filter((c) => statementCredits(c).length > 0);
 
   return (
     <div className="space-y-8">
@@ -48,15 +53,15 @@ export default async function CatchUpPage() {
           same file again is safe.
         </CardDescription>
         <div className="mt-4">
-          {withCredits.length === 0 ? (
+          {importable.length === 0 ? (
             <p className="text-sm text-muted-foreground">Add cards with credits first.</p>
           ) : (
             <StatementImport
               action={saveStatementCreditsAction}
-              cards={withCredits.map((c) => ({
+              cards={importable.map((c) => ({
                 id: c.id,
                 name: c.name,
-                benefits: credits(c.id).map((b) => ({ id: b.id, name: b.name })),
+                benefits: statementCredits(c).map((b) => ({ id: b.id, name: b.name })),
               }))}
             />
           )}
@@ -66,9 +71,10 @@ export default async function CatchUpPage() {
       <section className="max-w-4xl">
         <h2 className="text-lg font-semibold">2. Tap the rest</h2>
         <p className="text-sm text-muted-foreground">
-          Uber Cash, Lyft and DoorDash credits are spent inside those apps and never show on a
-          statement. Tap the periods you used, or &ldquo;Mark earlier periods used&rdquo; if you
-          used every one.
+          Credits taken off inside an app or at checkout never appear on a statement: Uber Cash,
+          Lyft, DoorDash, the Capital One Travel credit, anniversary miles and free night
+          certificates. They are labelled &ldquo;Applied in app&rdquo; below. Tap the periods you
+          used, or &ldquo;Mark earlier periods used&rdquo; if you used every one.
         </p>
         <div className="mt-4 space-y-4">
           {withCredits.map((card) => (
@@ -85,6 +91,11 @@ export default async function CatchUpPage() {
                           {formatCents(b.amountCents)} {b.name}
                         </span>
                         <span className="text-muted-foreground"> · {CADENCE_LABEL[b.cadence]}</span>
+                        {!onStatement(card.templateKey, b.name) && (
+                          <Badge variant="outline" className="ml-2">
+                            Applied in app
+                          </Badge>
+                        )}
                       </p>
                       <UsageChips
                         benefitId={b.id}

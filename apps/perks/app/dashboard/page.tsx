@@ -67,28 +67,21 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold">Hi {user.name.split(" ")[0] || "there"}</h1>
-        <p className="text-muted-foreground">
-          {todo.length === 0
-            ? "Every tracked credit is used for its current period."
-            : `${formatCents(sum(thisMonth))} in credits expires this month.`}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Hi {user.name.split(" ")[0] || "there"}</h1>
+          <p className="text-muted-foreground">
+            {todo.length === 0
+              ? "Every tracked credit is used for its current period."
+              : `${formatCents(sum(thisMonth))} in credits expires this month.`}
+          </p>
+        </div>
+        <Link href="/dashboard/catch-up">
+          <Button variant="outline">
+            {captured === 0 ? `Catch up on ${today.slice(0, 4)}` : "Import or catch up"}
+          </Button>
+        </Link>
       </div>
-
-      {captured === 0 && (
-        <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-base">Already used some credits this year?</CardTitle>
-            <CardDescription className="mt-1">
-              Import them from a statement download, or tap them off, so your totals are right.
-            </CardDescription>
-          </div>
-          <Link href="/dashboard/catch-up">
-            <Button variant="outline">Catch up on {today.slice(0, 4)}</Button>
-          </Link>
-        </Card>
-      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat

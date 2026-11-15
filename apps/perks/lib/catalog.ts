@@ -15,6 +15,11 @@ export type TemplateBenefit = {
   amount?: number;
   notes?: string;
   enroll?: boolean;
+  /**
+   * Applied inside an app or at checkout (Uber Cash, Lyft, Capital One Travel)
+   * rather than as a statement line, so a statement import can never find it.
+   */
+  inApp?: boolean;
   /** Last day of a limited-time benefit. */
   endsOn?: string;
 };
@@ -169,6 +174,7 @@ export const CATALOG: CardTemplate[] = [
       },
       {
         name: "Uber Cash",
+        inApp: true,
         cadence: "monthly",
         amount: 15,
         notes:
@@ -288,6 +294,7 @@ export const CATALOG: CardTemplate[] = [
       },
       {
         name: "Uber Cash",
+        inApp: true,
         cadence: "monthly",
         amount: 10,
         notes:
@@ -359,6 +366,7 @@ export const CATALOG: CardTemplate[] = [
       },
       {
         name: "DoorDash credit",
+        inApp: true,
         cadence: "monthly",
         amount: 15,
         notes:
@@ -367,6 +375,7 @@ export const CATALOG: CardTemplate[] = [
       },
       {
         name: "Lyft credit",
+        inApp: true,
         cadence: "monthly",
         amount: 10,
         notes: "In-app credit when this card is your Lyft payment method.",
@@ -380,6 +389,7 @@ export const CATALOG: CardTemplate[] = [
       },
       {
         name: "Apple TV+ and Apple Music",
+        inApp: true,
         cadence: "annual",
         amount: 250,
         notes:
@@ -411,12 +421,14 @@ export const CATALOG: CardTemplate[] = [
     benefits: [
       {
         name: "Travel credit",
+        inApp: true,
         cadence: "anniversary",
         amount: 300,
         notes: "Bookings through Capital One Business Travel.",
       },
       {
         name: "Anniversary miles",
+        inApp: true,
         cadence: "anniversary",
         amount: 100,
         notes: "10,000 miles post each account anniversary.",
@@ -434,12 +446,15 @@ export const CATALOG: CardTemplate[] = [
     benefits: [
       {
         name: "Travel credit",
+        inApp: true,
         cadence: "anniversary",
         amount: 300,
-        notes: "Bookings made through Capital One Travel. Resets on the account anniversary.",
+        notes:
+          "Taken off the price at checkout on Capital One Travel, so it never shows as a statement credit. Resets on the account anniversary.",
       },
       {
         name: "Anniversary miles",
+        inApp: true,
         cadence: "anniversary",
         amount: 100,
         notes: "10,000 miles post automatically each anniversary. Mark this once they land.",
@@ -505,12 +520,14 @@ export const CATALOG: CardTemplate[] = [
     benefits: [
       {
         name: "Free night certificate (Category 1–4)",
+        inApp: true,
         cadence: "anniversary",
         amount: 250,
         notes: "Issued after each anniversary and valid for 12 months. Book it before it expires.",
       },
       {
         name: "Second free night after $15,000 spend",
+        inApp: true,
         cadence: "annual",
         amount: 250,
         notes: "Earned by spending $15,000 in a calendar year.",
@@ -545,6 +562,16 @@ export function getTemplate(key: string | null | undefined): CardTemplate | unde
 }
 
 /** Best template for a free-form card name, e.g. "Amex Business PRG". */
+/**
+ * Whether a card's benefit can appear as a line on a statement. Looks the
+ * benefit up by name in the card's template; renamed or custom benefits are
+ * assumed to be statement credits.
+ */
+export function onStatement(templateKey: string | null | undefined, benefitName: string): boolean {
+  const benefit = getTemplate(templateKey)?.benefits.find((b) => b.name === benefitName);
+  return !benefit?.inApp;
+}
+
 export function matchTemplate(name: string): CardTemplate | undefined {
   return CATALOG.find((t) => t.match.test(name));
 }
