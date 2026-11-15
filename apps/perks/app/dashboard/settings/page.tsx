@@ -1,18 +1,32 @@
 import type { Metadata } from "next";
 import { Badge, Button, Card, CardDescription, CardTitle } from "@kch/ui";
 import { ActionForm } from "@/components/action-form";
+import { PushToggle } from "@/components/push-toggle";
+import { vapidPublicKey } from "@/lib/push";
 import { getSettings } from "@/lib/perks";
 import { requireSession } from "@/lib/session";
-import { sendDigestNowAction, setDigestAction } from "../actions";
+import { sendDigestNowAction, setDigestAction, setShareRankingsAction } from "../actions";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const { user } = await requireSession();
-  const settings = await getSettings(user.id);
+  const [settings, publicKey] = await Promise.all([getSettings(user.id), vapidPublicKey()]);
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-2xl font-bold">Settings</h1>
+
+      <Card>
+        <CardTitle>Phone notifications</CardTitle>
+        <CardDescription className="mt-1">
+          The same reminders as the email digest, as a notification on your phone. Turn it on once
+          on each phone or computer. On Android this works in Chrome; on iPhone, add Perks to your
+          home screen first. Turning off the email digest below turns these off too.
+        </CardDescription>
+        <div className="mt-4">
+          <PushToggle publicKey={publicKey} />
+        </div>
+      </Card>
 
       <Card>
         <CardTitle className="flex items-center gap-2">
@@ -38,6 +52,25 @@ export default async function SettingsPage() {
             className="flex flex-col gap-3"
           />
         </div>
+      </Card>
+
+      <Card>
+        <CardTitle className="flex items-center gap-2">
+          Group rankings
+          <Badge variant={settings.shareRankings ? "success" : "secondary"}>
+            {settings.shareRankings ? "Sharing" : "Hidden"}
+          </Badge>
+        </CardTitle>
+        <CardDescription className="mt-1">
+          When others in the group hold the same card, each card page ranks you by how much of its
+          credits you&rsquo;ve used this year. Only those totals are shown, never your individual
+          credits, offers or points.
+        </CardDescription>
+        <form action={setShareRankingsAction.bind(null, !settings.shareRankings)} className="mt-4">
+          <Button type="submit" variant="outline">
+            {settings.shareRankings ? "Stop sharing my totals" : "Share my totals"}
+          </Button>
+        </form>
       </Card>
 
       <Card>

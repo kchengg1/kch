@@ -34,7 +34,12 @@ export async function GET(request: Request) {
   for (const owner of owners) {
     const s = settings.get(owner.id);
     if (s && (!s.digestEnabled || (!force && s.lastDigestOn === now))) continue;
-    if (!(await sendDigest(owner, now))) continue;
+    // One person's failure must not stop everyone else's reminders.
+    const delivered = await sendDigest(owner, now).catch((err) => {
+      console.error("[cron] digest failed for", owner.id, err);
+      return false;
+    });
+    if (!delivered) continue;
     sent++;
     await db
       .insert(perksSettings)

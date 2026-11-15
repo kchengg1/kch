@@ -1,6 +1,7 @@
 import "server-only";
 import {
   and,
+  inArray,
   asc,
   db,
   eq,
@@ -8,6 +9,9 @@ import {
   perksCard,
   perksHiddenMerchant,
   perksPoints,
+  perksReferral,
+  perksSpendTarget,
+  user,
   perksRedemption,
   perksOffer,
   perksSettings,
@@ -18,7 +22,9 @@ import {
   type PerksUsage,
 } from "@kch/db";
 import { getTemplate } from "./catalog";
+import { SPEND_TARGETS } from "./spend-targets";
 import { todayIn } from "./periods";
+import { summarizeCards } from "./summary";
 
 /** Today's date where the owner lives; credits reset on the bank's calendar, not UTC. */
 export function today(): string {
@@ -91,6 +97,53 @@ export async function listRedemptions(userId: string) {
     .orderBy(asc(perksRedemption.redeemedOn));
 }
 
+/**
+ * Every referral link in the app, with the first name of whoever shared it.
+ * Perks is limited to a small group (ALLOWED_EMAILS), so links are shared
+ * with everyone signed in.
+ */
+export async function listReferrals() {
+  const rows = await db
+    .select({
+      id: perksReferral.id,
+      userId: perksReferral.userId,
+      templateKey: perksReferral.templateKey,
+      cardName: perksReferral.cardName,
+      url: perksReferral.url,
+      reward: perksReferral.reward,
+      name: user.name,
+    })
+    .from(perksReferral)
+    .innerJoin(user, eq(user.id, perksReferral.userId))
+    .orderBy(asc(perksReferral.cardName));
+  return rows.map((r) => ({ ...r, firstName: r.name.split(" ")[0] || r.name }));
+}
+
+/** Adds the catalog's spend goals to open cards that don't have them yet. */
+export async function ensureSpendTargets(userId: string, cards: PerksCard[]) {
+  const rows = cards.flatMap((c) =>
+    c.closed || !c.templateKey
+      ? []
+      : (SPEND_TARGETS[c.templateKey] ?? []).map((t) => ({
+          id: crypto.randomUUID(),
+          cardId: c.id,
+          userId,
+          name: t.name,
+          reward: t.reward,
+          targetCents: t.targetDollars * 100,
+        })),
+  );
+  if (rows.length) await db.insert(perksSpendTarget).values(rows).onConflictDoNothing();
+}
+
+export async function listSpendTargets(userId: string) {
+  return db
+    .select()
+    .from(perksSpendTarget)
+    .where(eq(perksSpendTarget.userId, userId))
+    .orderBy(asc(perksSpendTarget.name));
+}
+
 export async function listHiddenMerchants(userId: string) {
   return db
     .select()
@@ -105,7 +158,48 @@ export async function getSettings(userId: string) {
     .from(perksSettings)
     .where(eq(perksSettings.userId, userId))
     .limit(1);
-  return row ?? { userId, digestEnabled: true, lastDigestOn: null };
+  return row ?? { userId, digestEnabled: true, lastDigestOn: null, shareRankings: true };
+}
+
+/**
+ * Everyone in the group holding the same kind of card, ranked by credits used
+ * this year. Only totals are returned, and people who switched sharing off in
+ * Settings are left out (except the viewer, who always sees their own row).
+ */
+export async function cardStandings(templateKey: string, viewerId: string, today: string) {
+  const cards = await db
+    .select()
+    .from(perksCard)
+    .where(and(eq(perksCard.templateKey, templateKey), eq(perksCard.closed, false)));
+  if (cards.length < 2) return [];
+  const userIds = [...new Set(cards.map((c) => c.userId))];
+  const [people, prefs, benefits, usage] = await Promise.all([
+    db.select({ id: user.id, name: user.name }).from(user).where(inArray(user.id, userIds)),
+    db.select().from(perksSettings).where(inArray(perksSettings.userId, userIds)),
+    db
+      .select()
+      .from(perksBenefit)
+      .where(
+        inArray(
+          perksBenefit.cardId,
+          cards.map((c) => c.id),
+        ),
+      ),
+    db.select().from(perksUsage).where(inArray(perksUsage.userId, userIds)),
+  ]);
+  const hidden = new Set(prefs.filter((p) => !p.shareRankings).map((p) => p.userId));
+  const nameOf = new Map(people.map((p) => [p.id, p.name.split(" ")[0] || p.name]));
+  return summarizeCards(cards, benefits, usage, today)
+    .filter((s) => s.card.userId === viewerId || !hidden.has(s.card.userId))
+    .map((s) => ({
+      cardId: s.card.id,
+      userId: s.card.userId,
+      firstName: nameOf.get(s.card.userId) ?? "Someone",
+      capturedCents: s.capturedCents,
+      availableCents: s.availableCents,
+      share: s.availableCents ? s.capturedCents / s.availableCents : 0,
+    }))
+    .sort((a, b) => b.capturedCents - a.capturedCents || b.share - a.share);
 }
 
 /** Copy a catalog template's benefits onto a card. */

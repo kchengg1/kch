@@ -8,10 +8,23 @@ import { msrStatus } from "@/lib/msr";
 import { cardWorth } from "@/lib/worth";
 import { groupOffers, merchantKey } from "@/lib/offer-groups";
 import { isWeakOffer } from "@/lib/offer-value";
-import { listHiddenMerchants, listOffers, loadPortfolio, today as getToday } from "@/lib/perks";
+import {
+  ensureSpendTargets,
+  listHiddenMerchants,
+  listOffers,
+  listSpendTargets,
+  loadPortfolio,
+  today as getToday,
+} from "@/lib/perks";
+import { spentThisYear } from "@/lib/spend-targets";
 import { daysBetween, formatDate } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
-import { markBonusReceivedAction, setMsrSpentAction } from "./actions";
+import {
+  markBonusReceivedAction,
+  setMsrSpentAction,
+  setSpendTargetAction,
+  setSpendTargetTrackedAction,
+} from "./actions";
 import { actionable, buildStatuses, summarizeCards } from "@/lib/summary";
 
 /** Credits ending within this window sit in the main list; the rest are tucked below. */
@@ -71,6 +84,15 @@ export default async function DashboardPage() {
       !hiddenKeys.has(merchantKey(o.merchant)) &&
       !isWeakOffer(o.details),
   );
+  await ensureSpendTargets(user.id, cards);
+  const goals = (await listSpendTargets(user.id))
+    .filter((g) => g.tracked && open.some((c) => c.id === g.cardId))
+    .map((g) => ({
+      ...g,
+      spent: spentThisYear(g, today),
+      card: open.find((c) => c.id === g.cardId)!,
+    }))
+    .sort((a, b) => b.spent / b.targetCents - a.spent / a.targetCents);
   const bonuses = open
     .map((card) => ({ card, msr: msrStatus(card, today) }))
     .filter(
@@ -105,6 +127,18 @@ export default async function DashboardPage() {
           </Button>
         </Link>
       </div>
+
+      <form action="/dashboard/pick" className="flex gap-2">
+        <Input
+          name="q"
+          placeholder="Which card? Type a store, like Whole Foods"
+          aria-label="Which card should I use? Type a store or category"
+          className="h-11"
+        />
+        <Button type="submit" className="h-11">
+          Check
+        </Button>
+      </form>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Stat
@@ -269,6 +303,64 @@ export default async function DashboardPage() {
                   <span className="shrink-0 text-sm text-muted-foreground">
                     {dueLabel(daysBetween(today, g.expiresOn!))}
                   </span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
+
+      {goals.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold">Spending goals for {today.slice(0, 4)}</h2>
+          <Card className="mt-3 py-2">
+            <ul className="divide-y">
+              {goals.map((g) => (
+                <li key={g.id} className="space-y-2 py-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="inline-flex items-center gap-2 font-medium">
+                      <CardIcon templateKey={g.card.templateKey} issuer={g.card.issuer} />
+                      {g.card.name}: {g.name}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {formatCents(g.spent)} of {formatCents(g.targetCents)}
+                    </span>
+                  </div>
+                  <Meter value={g.spent} max={g.targetCents} />
+                  <p className="text-sm text-muted-foreground">
+                    {g.spent >= g.targetCents
+                      ? "Reached: "
+                      : `${formatCents(g.targetCents - g.spent)} more for `}
+                    {g.reward}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <form
+                      action={setSpendTargetAction.bind(null, g.id)}
+                      className="flex items-center gap-2"
+                    >
+                      <Input
+                        name="spent"
+                        inputMode="decimal"
+                        aria-label={`Total spent on ${g.card.name} this year`}
+                        placeholder="Spent this year, $"
+                        className="h-8 w-36"
+                        required
+                      />
+                      <Button type="submit" size="sm" variant="outline">
+                        Update
+                      </Button>
+                    </form>
+                    <form action={setSpendTargetTrackedAction.bind(null, g.id, false)}>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="ghost"
+                        className="text-muted-foreground"
+                      >
+                        Not chasing this
+                      </Button>
+                    </form>
+                  </div>
                 </li>
               ))}
             </ul>

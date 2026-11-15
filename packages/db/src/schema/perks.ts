@@ -156,6 +156,75 @@ export const perksRedemption = pgTable(
   (t) => [index("perks_redemption_user_id_idx").on(t.userId)],
 );
 
+/** A browser or phone that asked for push notifications. */
+export const perksPushSubscription = pgTable(
+  "perks_push_subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("perks_push_subscription_user_id_idx").on(t.userId)],
+);
+
+/**
+ * The app's push signing keys (VAPID), made on first use so there is nothing
+ * to configure. A single row.
+ */
+export const perksVapid = pgTable("perks_vapid", {
+  id: integer("id").primaryKey(),
+  publicKey: text("public_key").notNull(),
+  privateKey: text("private_key").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+/** A referral link someone shares with the group. */
+export const perksReferral = pgTable(
+  "perks_referral",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** Catalog key when the card is in the catalog, for matching to bonuses. */
+    templateKey: text("template_key"),
+    cardName: text("card_name").notNull(),
+    url: text("url").notNull(),
+    /** What the referrer earns, e.g. "15,000 points". */
+    reward: text("reward").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("perks_referral_user_id_idx").on(t.userId)],
+);
+
+/** Spend toward a reward unlocked by total spend, e.g. $75,000 on Sapphire Reserve. */
+export const perksSpendTarget = pgTable(
+  "perks_spend_target",
+  {
+    id: text("id").primaryKey(),
+    cardId: text("card_id")
+      .notNull()
+      .references(() => perksCard.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    reward: text("reward").notNull().default(""),
+    targetCents: integer("target_cents").notNull(),
+    /** Spend logged for `periodKey` (a calendar year, e.g. "2026"). Older years read as 0. */
+    spentCents: integer("spent_cents").notNull().default(0),
+    periodKey: text("period_key").notNull().default(""),
+    /** False once the owner hides a goal they do not care about. */
+    tracked: boolean("tracked").notNull().default(true),
+  },
+  (t) => [uniqueIndex("perks_spend_target_card_name_idx").on(t.cardId, t.name)],
+);
+
 /** Merchants whose offers the owner never wants to see. */
 export const perksHiddenMerchant = pgTable(
   "perks_hidden_merchant",
@@ -177,6 +246,8 @@ export const perksSettings = pgTable("perks_settings", {
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
   digestEnabled: boolean("digest_enabled").notNull().default(true),
+  /** Show this person's credit totals to others holding the same card. */
+  shareRankings: boolean("share_rankings").notNull().default(true),
   lastDigestOn: date("last_digest_on", { mode: "string" }),
 });
 
@@ -201,3 +272,5 @@ export type PerksSettings = typeof perksSettings.$inferSelect;
 export type PerksHiddenMerchant = typeof perksHiddenMerchant.$inferSelect;
 export type PerksPoints = typeof perksPoints.$inferSelect;
 export type PerksRedemption = typeof perksRedemption.$inferSelect;
+export type PerksReferral = typeof perksReferral.$inferSelect;
+export type PerksSpendTarget = typeof perksSpendTarget.$inferSelect;

@@ -49,8 +49,8 @@ export type BenefitStatus = {
   deadline: string | null;
 };
 
-export type CardSummary = {
-  card: CardRow;
+export type CardSummary<C extends CardRow = CardRow> = {
+  card: C;
   /** Value of tracked credits over a full year. */
   availableCents: number;
   /** Logged this calendar year (current card year for anniversary credits). */
@@ -116,12 +116,12 @@ export function actionable(statuses: BenefitStatus[]): BenefitStatus[] {
     );
 }
 
-export function summarizeCards(
-  cards: CardRow[],
+export function summarizeCards<C extends CardRow>(
+  cards: C[],
   benefits: BenefitRow[],
   usage: UsageRow[],
   today: string,
-): CardSummary[] {
+): CardSummary<C>[] {
   const index = indexUsage(usage);
   return cards
     .filter((c) => !c.closed)

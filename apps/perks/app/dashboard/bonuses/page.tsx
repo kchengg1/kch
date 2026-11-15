@@ -4,11 +4,14 @@ import data from "@/data/signup-bonuses.json";
 import { checkEligibility, fiveTwentyFour, type BonusOffer, type Verdict } from "@/lib/eligibility";
 import { formatCents } from "@/lib/money";
 import { applicationRules } from "@/lib/rules";
-import { loadPortfolio, today as getToday } from "@/lib/perks";
+import { listReferrals, loadPortfolio, today as getToday } from "@/lib/perks";
+import { ReferralForm } from "@/components/referral-form";
+import { deleteReferralAction } from "../actions";
+import { Button } from "@kch/ui";
 import { formatDate } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Sign-up bonuses" };
+export const metadata: Metadata = { title: "Bonuses and referrals" };
 
 const ORDER: Record<Verdict["status"], number> = { eligible: 0, caution: 1, ineligible: 2 };
 const LABEL: Record<Verdict["status"], string> = {
@@ -20,7 +23,16 @@ const LABEL: Record<Verdict["status"], string> = {
 export default async function BonusesPage() {
   const { user } = await requireSession();
   const today = getToday();
-  const { cards } = await loadPortfolio(user.id);
+  const [{ cards }, referrals] = await Promise.all([loadPortfolio(user.id), listReferrals()]);
+  const mine = referrals.filter((r) => r.userId === user.id);
+  const others = referrals.filter((r) => r.userId !== user.id);
+  /** Links from others in the group for a sign-up offer's card. */
+  const referralsFor = (offer: BonusOffer) => {
+    const re = new RegExp(offer.match, "i");
+    return others.filter(
+      (r) => (offer.templateKey && r.templateKey === offer.templateKey) || re.test(r.cardName),
+    );
+  };
   const count = fiveTwentyFour(cards, today);
   const rules = applicationRules(cards, today);
   const rows = (data.offers as BonusOffer[])
@@ -118,6 +130,21 @@ export default async function BonusesPage() {
               ))}
               {offer.note && <li>{offer.note}</li>}
             </ul>
+            {referralsFor(offer).length > 0 && verdict.status !== "ineligible" && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {referralsFor(offer).map((r) => (
+                  <a
+                    key={r.id}
+                    href={r.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center rounded-full bg-success/10 px-3 py-1.5 text-sm font-medium text-success hover:bg-success/20"
+                  >
+                    Apply with {r.firstName}&rsquo;s referral
+                  </a>
+                ))}
+              </div>
+            )}
             {offer.url && (
               <a
                 href={offer.url}
@@ -131,6 +158,70 @@ export default async function BonusesPage() {
           </Card>
         ))}
       </div>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Referral links</h2>
+          <p className="text-sm text-muted-foreground">
+            Everyone signed in to Perks can see these, so a bonus stays in the group. Apply through
+            someone&rsquo;s link and they earn the referral reward too.
+          </p>
+        </div>
+        {others.length > 0 && (
+          <Card className="py-2">
+            <ul className="divide-y text-sm">
+              {others.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-4 py-3">
+                  <div className="min-w-0">
+                    <p className="font-medium">{r.cardName}</p>
+                    <p className="text-muted-foreground">
+                      {r.firstName}&rsquo;s link{r.reward ? ` · they earn ${r.reward}` : ""}
+                    </p>
+                  </div>
+                  <a
+                    href={r.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 font-medium text-primary hover:underline"
+                  >
+                    Open link
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+        {mine.length > 0 && (
+          <Card className="py-2">
+            <p className="pt-2 text-sm font-medium">Your shared links</p>
+            <ul className="divide-y text-sm">
+              {mine.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-4 py-2.5">
+                  <span className="min-w-0 truncate">
+                    {r.cardName}
+                    {r.reward && <span className="text-muted-foreground"> · {r.reward}</span>}
+                  </span>
+                  <form action={deleteReferralAction.bind(null, r.id)}>
+                    <Button type="submit" size="sm" variant="ghost">
+                      Remove
+                    </Button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+        <Card className="max-w-3xl">
+          <CardTitle className="text-base">Share a referral link</CardTitle>
+          <div className="mt-4">
+            <ReferralForm
+              myTemplateKeys={cards
+                .filter((c) => !c.closed && c.templateKey)
+                .map((c) => c.templateKey!)}
+            />
+          </div>
+        </Card>
+      </section>
 
       <p className="text-sm text-muted-foreground">
         Eligibility is an estimate from published issuer rules and your card dates. The issuer makes

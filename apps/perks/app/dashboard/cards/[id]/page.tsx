@@ -11,7 +11,7 @@ import { CATALOG, CATALOG_REVIEWED, getTemplate } from "@/lib/catalog";
 import { formatCents } from "@/lib/money";
 import { msrStatus } from "@/lib/msr";
 import { cardWorth, faceValueCents, myValueCents } from "@/lib/worth";
-import { getCard, loadPortfolio, today as getToday } from "@/lib/perks";
+import { cardStandings, getCard, loadPortfolio, today as getToday } from "@/lib/perks";
 import { CADENCE_LABEL, formatDate, isCadence, type Cadence } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
 import { indexUsage, summarizeCards } from "@/lib/summary";
@@ -45,6 +45,9 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
   const credits = benefits.filter((b) => b.cadence !== "perk");
   const perks = benefits.filter((b) => b.cadence === "perk");
   const msr = msrStatus(card, today);
+  const standings =
+    card.templateKey && !card.closed ? await cardStandings(card.templateKey, user.id, today) : [];
+  const medals = ["1st", "2nd", "3rd"];
   const worth = cardWorth(benefits, card.annualFeeCents, today);
   const worthRows = benefits.filter((b) => !(b.endsOn && b.endsOn < today));
 
@@ -95,6 +98,42 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
             {summary.capturedCents >= card.annualFeeCents
               ? `That covers the ${formatCents(card.annualFeeCents)} fee.`
               : `${formatCents(card.annualFeeCents - summary.capturedCents)} more to cover the fee.`}
+          </p>
+        </Card>
+      )}
+
+      {standings.length >= 2 && (
+        <Card className="max-w-xl">
+          <p className="text-sm text-muted-foreground">
+            How you compare on this card in {today.slice(0, 4)}
+          </p>
+          <ol className="mt-3 space-y-3">
+            {standings.map((s, i) => (
+              <li key={s.cardId}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className={s.userId === user.id ? "font-semibold" : undefined}>
+                    <span className="mr-2 inline-block w-8 text-muted-foreground">
+                      {medals[i] ?? `${i + 1}th`}
+                    </span>
+                    {s.userId === user.id ? "You" : s.firstName}
+                  </span>
+                  <span className="tabular-nums">
+                    {formatCents(s.capturedCents)}
+                    <span className="text-muted-foreground">
+                      {s.availableCents ? ` · ${Math.round(s.share * 100)}% used` : ""}
+                    </span>
+                  </span>
+                </div>
+                <Meter
+                  value={s.capturedCents}
+                  max={Math.max(...standings.map((x) => x.capturedCents), 1)}
+                  className="mt-1"
+                />
+              </li>
+            ))}
+          </ol>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Ranked by credits used. Only these totals are shared; anyone can opt out in Settings.
           </p>
         </Card>
       )}
