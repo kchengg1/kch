@@ -203,7 +203,11 @@ const csv = [
   `12/15/${year - 1},"AMEX DINING CREDIT",-10.00,""`,
 ].join("\n");
 await page.selectOption("#stmt-card", goldId);
-await page.setInputFiles("#stmt-file", { name: "activity.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+await page.setInputFiles("#stmt-file", {
+  name: "activity.csv",
+  mimeType: "text/csv",
+  buffer: Buffer.from(csv),
+});
 await page.waitForSelector("text=credits found");
 body = await bodyText();
 check(
@@ -213,11 +217,15 @@ check(
 );
 await page.click('button:has-text("Save 3 matched credits")');
 await page.waitForSelector("text=Skipped 1 from before this year");
-const dining = sql(`select id from perks_benefit where card_id='${goldId}' and name='Dining credit'`);
+const dining = sql(
+  `select id from perks_benefit where card_id='${goldId}' and name='Dining credit'`,
+);
 const resy = sql(`select id from perks_benefit where card_id='${goldId}' and name='Resy credit'`);
 check(
   "statement dining credit recorded for this month",
-  sql(`select used_cents from perks_usage where benefit_id='${dining}' and period_key='${monthKey}'`) === "1000",
+  sql(
+    `select used_cents from perks_usage where benefit_id='${dining}' and period_key='${monthKey}'`,
+  ) === "1000",
 );
 check(
   "statement Resy credit recorded for this half",
@@ -225,7 +233,10 @@ check(
 );
 await page.click('button:has-text("Save 3 matched credits")');
 await page.waitForSelector("text=already recorded");
-check("re-uploading the same file changes nothing", sql(`select count(*) from perks_usage where benefit_id in ('${dining}','${resy}')`) === "2");
+check(
+  "re-uploading the same file changes nothing",
+  sql(`select count(*) from perks_usage where benefit_id in ('${dining}','${resy}')`) === "2",
+);
 
 /* 7. Paste offers -------------------------------------------------------- */
 await page.goto(`${BASE}/dashboard/offers`);
