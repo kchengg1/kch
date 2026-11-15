@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { Badge, Button, Card, CardDescription, CardTitle } from "@kch/ui";
+import { CardIcon } from "@/components/card-icon";
 import { CreditRow, dueLabel } from "@/components/credit-row";
 import { Meter } from "@/components/meter";
 import { formatCents } from "@/lib/money";
+import { groupOffers } from "@/lib/offer-groups";
 import { listOffers, loadPortfolio, today as getToday } from "@/lib/perks";
 import { daysBetween, formatDate } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
@@ -53,7 +55,7 @@ export default async function DashboardPage() {
   const available = summaries.reduce((n, s) => n + s.availableCents, 0);
   const fees = open.reduce((n, c) => n + c.annualFeeCents, 0);
 
-  const cardName = new Map(cards.map((c) => [c.id, c.name]));
+  const cardById = new Map(cards.map((c) => [c.id, c]));
   const expiringOffers = offers.filter(
     (o) =>
       (o.status === "available" || o.status === "added") &&
@@ -147,20 +149,35 @@ export default async function DashboardPage() {
           </div>
           <Card className="mt-3 py-2">
             <ul className="divide-y">
-              {expiringOffers.map((o) => (
-                <li key={o.id} className="flex items-center justify-between gap-4 py-3">
+              {groupOffers(expiringOffers).map((g) => (
+                <li key={g.key} className="flex items-center justify-between gap-4 py-3">
                   <div className="min-w-0">
                     <p className="font-medium">
-                      {o.merchant}{" "}
-                      {o.status === "available" && <Badge variant="outline">Not added yet</Badge>}
+                      {g.merchant}{" "}
+                      {g.items.every((o) => o.status === "available") && (
+                        <Badge variant="outline">Not added yet</Badge>
+                      )}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      {o.details || "Added to card"}
-                      {o.cardId && cardName.has(o.cardId) ? ` · ${cardName.get(o.cardId)}` : ""}
+                    <p className="text-sm text-muted-foreground">{g.details || "Added to card"}</p>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      {g.items.map((o) => {
+                        const card = o.cardId ? cardById.get(o.cardId) : undefined;
+                        return card ? (
+                          <span key={o.id} className="inline-flex items-center gap-1">
+                            <CardIcon
+                              templateKey={card.templateKey}
+                              issuer={card.issuer}
+                              className="h-3 w-[19px]"
+                            />
+                            {card.name}
+                            {o.status === "added" && " ✓"}
+                          </span>
+                        ) : null;
+                      })}
                     </p>
                   </div>
                   <span className="shrink-0 text-sm text-muted-foreground">
-                    {dueLabel(daysBetween(today, o.expiresOn!))}
+                    {dueLabel(daysBetween(today, g.expiresOn!))}
                   </span>
                 </li>
               ))}
@@ -179,8 +196,9 @@ export default async function DashboardPage() {
                   <div>
                     <Link
                       href={`/dashboard/cards/${s.card.id}`}
-                      className="font-medium hover:underline"
+                      className="inline-flex items-center gap-2 font-medium hover:underline"
                     >
+                      <CardIcon templateKey={s.card.templateKey} issuer={s.card.issuer} />
                       {s.card.name}
                     </Link>
                     <p className="text-sm text-muted-foreground">
@@ -212,8 +230,11 @@ export default async function DashboardPage() {
             .map((s) => (
               <Link key={s.card.id} href={`/dashboard/cards/${s.card.id}`}>
                 <Card className="h-full transition-colors hover:bg-muted/50">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <CardTitle className="text-base">{s.card.name}</CardTitle>
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <CardIcon templateKey={s.card.templateKey} issuer={s.card.issuer} />
+                      {s.card.name}
+                    </CardTitle>
                     <span className="shrink-0 text-sm text-muted-foreground">
                       {formatCents(s.card.annualFeeCents)} fee
                     </span>

@@ -32,6 +32,8 @@ export const perksCard = pgTable(
     openedOn: date("opened_on", { mode: "string" }),
     closedOn: date("closed_on", { mode: "string" }),
     closed: boolean("closed").notNull().default(false),
+    /** Last time an offers page was pasted for this card, even if nothing new was found. */
+    offersCheckedAt: timestamp("offers_checked_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [index("perks_card_user_id_idx").on(t.userId)],

@@ -1,0 +1,1 @@
+ALTER TABLE "perks_card" ADD COLUMN "offers_checked_at" timestamp;

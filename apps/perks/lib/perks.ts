@@ -22,6 +22,11 @@ export function today(): string {
   return todayIn(process.env.PERKS_TIMEZONE || "America/New_York");
 }
 
+/** The owner's calendar date for a stored timestamp. */
+export function dateOf(at: Date): string {
+  return todayIn(process.env.PERKS_TIMEZONE || "America/New_York", at);
+}
+
 export type Portfolio = {
   cards: PerksCard[];
   benefits: PerksBenefit[];

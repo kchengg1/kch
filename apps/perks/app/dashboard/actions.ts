@@ -11,6 +11,7 @@ import {
   perksOffer,
   perksSettings,
   perksUsage,
+  inArray,
 } from "@kch/db";
 import { getTemplate } from "@/lib/catalog";
 import { sendDigest } from "@/lib/digest";
@@ -409,6 +410,12 @@ export async function saveOffersAction(_prev: FormState, form: FormData): Promis
     });
   }
   if (rows.length) await db.insert(perksOffer).values(rows);
+  // Record the paste even when every offer was already saved: the page was still checked.
+  if (card)
+    await db
+      .update(perksCard)
+      .set({ offersCheckedAt: new Date() })
+      .where(eq(perksCard.id, card.id));
   refresh();
   const skipped = parsed.length - rows.length;
   return {
@@ -425,6 +432,17 @@ export async function setOfferStatusAction(
     .update(perksOffer)
     .set({ status })
     .where(and(eq(perksOffer.id, id), eq(perksOffer.userId, user.id)));
+  refresh();
+}
+
+/** Set the status of several offers at once: one offer listed on several cards. */
+export async function setOffersStatusAction(ids: string[], status: "used" | "dismissed") {
+  const { user } = await requireSession();
+  if (ids.length === 0) return;
+  await db
+    .update(perksOffer)
+    .set({ status })
+    .where(and(inArray(perksOffer.id, ids.slice(0, 50)), eq(perksOffer.userId, user.id)));
   refresh();
 }
 

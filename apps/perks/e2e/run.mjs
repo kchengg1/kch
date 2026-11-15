@@ -317,16 +317,64 @@ await page.fill("#paste", `lululemon\nSpend $150 or more, get $30 back\nExpires 
 await page.click('button:has-text("Save 1 offer")');
 await page.waitForSelector("text=skipped 1 already saved");
 check("pasting again skips duplicates", sql(`select count(*) from perks_offer`) === "2");
+check(
+  "the paste is recorded on the card even when nothing new was found",
+  sql(
+    `select (offers_checked_at > now() - interval '5 minutes')::text from perks_card where id='${goldId}'`,
+  ) === "true",
+);
+await page.goto(`${BASE}/dashboard/offers`);
+check(
+  "Offers shows when each card was last pasted",
+  (await page.locator("li", { hasText: "Amex PRG" }).first().innerText()).includes("updated today"),
+);
+check(
+  "a card never pasted is flagged",
+  (await page.locator("li", { hasText: "Chase Sapphire Reserve" }).first().innerText()).includes(
+    "never pasted",
+  ),
+);
 await page.goto(`${BASE}/dashboard`);
 check(
   "expiring offer appears on the dashboard",
   (await bodyText()).includes("Offers expiring soon"),
 );
 await page.goto(`${BASE}/dashboard/offers`);
+// The same offer on a second card is shown once, with a chip per card.
+const csrCard = sql(`select id from perks_card where name='Chase Sapphire Reserve'`);
+await page.selectOption("#cardId", csrCard);
+await page.fill("#paste", `lululemon\nSpend $150 or more, get $30 back\nExpires in 5 days`);
+await page.click('button:has-text("Save 1 offer")');
+await page.waitForSelector("text=Saved 1 offer");
+check(
+  "same offer saved for the second card",
+  sql(`select count(*) from perks_offer where merchant='lululemon'`) === "2",
+);
+const lulu = page
+  .locator("li", { hasText: "lululemon" })
+  .filter({ has: page.locator('button:has-text("Used")') });
+check("an offer on two cards is listed once", (await lulu.count()) === 1);
+check("it shows a chip for each card", (await lulu.locator("button[aria-pressed]").count()) === 2);
+await lulu.locator('button[aria-pressed]:has-text("Chase Sapphire Reserve")').click();
+check(
+  "tapping a card chip marks the offer added on that card only",
+  await until(
+    `select status from perks_offer where merchant='lululemon' and card_id='${csrCard}'`,
+    "added",
+  ),
+);
+check(
+  "the other card is unchanged",
+  sql(`select status from perks_offer where merchant='lululemon' and card_id='${goldId}'`) ===
+    "available",
+);
 await page.locator("li", { hasText: "lululemon" }).locator('button:has-text("Used")').click();
 check(
-  "offer marked used",
-  await until(`select status from perks_offer where merchant='lululemon'`, "used"),
+  "Used applies to the offer on every card",
+  await until(
+    `select string_agg(distinct status, ',') from perks_offer where merchant='lululemon'`,
+    "used",
+  ),
 );
 
 /* 8. Sign-up bonus eligibility ------------------------------------------ */

@@ -17,10 +17,13 @@ export function OfferPaste({
   today,
 }: {
   action: (prev: FormState, form: FormData) => Promise<FormState>;
-  cards: { id: string; name: string }[];
+  /** `checked` says when offers were last pasted for the card, e.g. "updated today (Nov 15)". */
+  cards: { id: string; name: string; checked: string }[];
   today: string;
 }) {
   const [text, setText] = useState("");
+  const [cardId, setCardId] = useState(cards[0]?.id ?? "");
+  const lastChecked = cards.find((c) => c.id === cardId)?.checked;
   const [removed, setRemoved] = useState<Set<number>>(new Set());
   const [state, formAction, pending] = useActionState(async (prev: FormState, form: FormData) => {
     const result = await action(prev, form);
@@ -41,7 +44,8 @@ export function OfferPaste({
           id="cardId"
           name="cardId"
           className={`${field} h-10`}
-          defaultValue={cards[0]?.id ?? ""}
+          value={cardId}
+          onChange={(e) => setCardId(e.target.value)}
         >
           {cards.map((c) => (
             <option key={c.id} value={c.id}>
@@ -50,6 +54,9 @@ export function OfferPaste({
           ))}
           <option value="">No specific card</option>
         </select>
+        {lastChecked && (
+          <p className="text-sm text-muted-foreground">Offers for this card were {lastChecked}.</p>
+        )}
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="paste">Pasted offers page</Label>
