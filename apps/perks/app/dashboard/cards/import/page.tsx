@@ -16,15 +16,17 @@ export default function ImportPage() {
         >
           ← Cards
         </Link>
-        <h1 className="mt-1 text-2xl font-bold">Import from spreadsheet</h1>
+        <h1 className="mt-1 text-2xl font-bold">Import cards</h1>
       </div>
       <Card>
-        <CardTitle>Paste your Credit Cards tab</CardTitle>
+        <CardTitle>Paste your cards</CardTitle>
         <CardDescription className="mt-1">
-          In Google Sheets, open the Credit Cards tab, select everything (Ctrl/Cmd + A), copy, and
-          paste below. The header row has to be included. The columns read are Card Name, Approval
-          Date, Closed/PC Date, Annual Fee, Bank, Card Type and Closed. Importing again later only
-          adds cards that are new.
+          Either paste a plain list, one card per line, like &ldquo;Chase Sapphire Preferred&rdquo;
+          or &ldquo;Amex Gold, 2/2024&rdquo; with the month you opened it. Or, if you track cards in
+          a spreadsheet, copy the whole sheet with its header row; the columns read are Card Name,
+          Approval Date, Closed/PC Date, Annual Fee, Bank, Card Type and Closed. Opened dates make
+          cardmember-year credits, fee reminders and bonus eligibility accurate, and can be added
+          later on each card&rsquo;s page. Importing again only adds cards that are new.
         </CardDescription>
         <div className="mt-4">
           <SheetImport action={importSheetAction} />

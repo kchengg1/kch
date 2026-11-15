@@ -6,7 +6,7 @@ import type { Cadence } from "./periods";
  * edited, switched off or deleted. Issuers change benefits often: treat this
  * as a starting point and confirm against the card's own benefits page.
  */
-export const CATALOG_REVIEWED = "2026-11-11";
+export const CATALOG_REVIEWED = "2026-11-15";
 
 export type TemplateBenefit = {
   name: string;
@@ -536,6 +536,299 @@ export const CATALOG: CardTemplate[] = [
         name: "Discoverist status",
         cadence: "perk",
         notes: "Plus 5 tier-qualifying night credits every year.",
+      },
+    ],
+  },
+  {
+    key: "chase-sapphire-preferred",
+    name: "Chase Sapphire Preferred",
+    issuer: "Chase",
+    business: false,
+    annualFee: 95,
+    match: /sapphire pref/i,
+    benefits: [
+      {
+        name: "Chase Travel hotel credit",
+        cadence: "anniversary",
+        amount: 100,
+        notes: "Hotel stays booked through Chase Travel each account year. Applies automatically.",
+      },
+      {
+        name: "DoorDash non-restaurant coupon",
+        cadence: "monthly",
+        amount: 10,
+        notes:
+          "Up to $10 off a grocery, convenience or other non-restaurant order. Needs DashPass activated on this card.",
+        enroll: true,
+        inApp: true,
+      },
+      {
+        name: "Activate Apple TV",
+        cadence: "annual",
+        notes: "Complimentary Apple TV for 12 months, but only if activated by Dec 31, 2026.",
+        enroll: true,
+        inApp: true,
+        endsOn: "2026-12-31",
+      },
+      {
+        name: "3x dining, gas, EV charging and vacation rentals",
+        cadence: "perk",
+        notes:
+          "Plus 2x on Chase Travel and other travel. The 10% anniversary points bonus ended in October 2026.",
+      },
+    ],
+  },
+  {
+    key: "chase-aeroplan",
+    name: "Chase Air Canada Aeroplan",
+    issuer: "Chase",
+    business: false,
+    annualFee: 195,
+    match: /aeroplan/i,
+    benefits: [
+      {
+        name: "Air Canada credit",
+        cadence: "annual",
+        amount: 100,
+        notes:
+          "Reported as up to $100 a year on Air Canada purchases since the September 2026 refresh. Confirm in your Chase account.",
+      },
+      {
+        name: "Aeroplan 25K status",
+        cadence: "perk",
+        notes:
+          "Automatic while the card is open and linked to your Aeroplan account. Also 15% off eligible Air Canada awards.",
+      },
+      {
+        name: "Annual fee rises to $195",
+        cadence: "perk",
+        notes: "Was $95. Existing cardmembers pay $195 from renewals on or after Dec 1, 2026.",
+      },
+    ],
+  },
+  {
+    key: "chase-freedom-flex",
+    name: "Chase Freedom Flex",
+    issuer: "Chase",
+    business: false,
+    annualFee: 0,
+    match: /freedom flex/i,
+    benefits: [
+      {
+        name: "Activate 5% quarterly categories",
+        cadence: "quarterly",
+        notes:
+          "5% back on up to $1,500 in the quarter's categories, only after you activate in the Chase app.",
+        enroll: true,
+      },
+    ],
+  },
+  {
+    key: "chase-freedom-unlimited",
+    name: "Chase Freedom Unlimited",
+    issuer: "Chase",
+    business: false,
+    annualFee: 0,
+    match: /freedom unlimited/i,
+    benefits: [
+      {
+        name: "1.5x on everything",
+        cadence: "perk",
+        notes: "Plus 3x dining and drugstores. Points move to a Sapphire card for transfers.",
+      },
+    ],
+  },
+  {
+    key: "chase-freedom",
+    name: "Chase Freedom",
+    issuer: "Chase",
+    business: false,
+    annualFee: 0,
+    match: /freedom(?! (unlimited|flex))/i,
+    benefits: [
+      {
+        name: "Activate 5% quarterly categories",
+        cadence: "quarterly",
+        notes:
+          "The original Freedom still gets rotating 5% categories. Activate each quarter in the Chase app.",
+        enroll: true,
+      },
+    ],
+  },
+  {
+    key: "chase-ink-business-cash",
+    name: "Chase Ink Business Cash",
+    issuer: "Chase",
+    business: true,
+    annualFee: 0,
+    match: /ink.*cash/i,
+    benefits: [
+      {
+        name: "5x office supply stores, internet, cable and phone",
+        cadence: "perk",
+        notes:
+          "On the first $25,000 combined each account year; 2x gas and restaurants on the next $25,000.",
+      },
+    ],
+  },
+  {
+    key: "chase-ink-business-unlimited",
+    name: "Chase Ink Business Unlimited",
+    issuer: "Chase",
+    business: true,
+    annualFee: 0,
+    match: /ink.*unlimited/i,
+    benefits: [{ name: "1.5x on everything", cadence: "perk" }],
+  },
+  {
+    key: "amex-everyday",
+    name: "Amex EveryDay",
+    issuer: "American Express",
+    business: false,
+    annualFee: 0,
+    match: /amex every ?day(?!.*pref)/i,
+    benefits: [
+      {
+        name: "Amex Offers",
+        cadence: "perk",
+        notes:
+          "Gets most of the same Amex Offers as your other Amex cards; paste its offers page too.",
+      },
+    ],
+  },
+  {
+    key: "amex-blue-business-plus",
+    name: "Amex Blue Business Plus",
+    issuer: "American Express",
+    business: true,
+    annualFee: 0,
+    match: /blue business|bbp/i,
+    benefits: [
+      {
+        name: "2x on everything",
+        cadence: "perk",
+        notes: "On the first $50,000 a year. Earns transferable Membership Rewards.",
+      },
+    ],
+  },
+  {
+    key: "atmos-summit",
+    name: "Atmos Rewards Summit (Bank of America)",
+    issuer: "Bank of America",
+    business: false,
+    annualFee: 395,
+    match: /atmos.*summit/i,
+    benefits: [
+      {
+        name: "25,000-point companion award",
+        cadence: "anniversary",
+        notes:
+          "Arrives each card anniversary with no spend needed. Valid 12 months on awards where both tickets cost 25,000+ points.",
+        inApp: true,
+      },
+      GLOBAL_ENTRY,
+      { name: "Faster Atmos elite status", cadence: "perk" },
+    ],
+  },
+  {
+    key: "citi-aadvantage-platinum-select",
+    name: "Citi AAdvantage Platinum Select",
+    issuer: "Citibank",
+    business: false,
+    annualFee: 99,
+    match: /citi.*(aadvantage|\baa\b)(?!.*exec)/i,
+    benefits: [
+      {
+        name: "First checked bag free on American",
+        cadence: "perk",
+        notes: "Plus preferred boarding. Citi announced a refresh raising the fee to $150 in 2027.",
+      },
+    ],
+  },
+  {
+    key: "costco-citi",
+    name: "Costco Anywhere Visa (Citi)",
+    issuer: "Citibank",
+    business: false,
+    annualFee: 0,
+    match: /costco/i,
+    benefits: [
+      {
+        name: "Annual reward certificate",
+        cadence: "annual",
+        notes:
+          "Arrives with the February statement and is redeemed at Costco. Mark done once you cash it.",
+        inApp: true,
+      },
+    ],
+  },
+  {
+    key: "citi-double-cash",
+    name: "Citi Double Cash",
+    issuer: "Citibank",
+    business: false,
+    annualFee: 0,
+    match: /double cash/i,
+    benefits: [{ name: "2% back on everything", cadence: "perk" }],
+  },
+  {
+    key: "chase-marriott-boundless",
+    name: "Marriott Bonvoy Boundless",
+    issuer: "Chase",
+    business: false,
+    annualFee: 95,
+    match: /boundless/i,
+    benefits: [
+      {
+        name: "Free night award (up to 35,000 points)",
+        cadence: "anniversary",
+        notes: "Posts after each card anniversary and expires a year later. Book it before then.",
+        inApp: true,
+      },
+      {
+        name: "Airline credit",
+        cadence: "annual",
+        amount: 100,
+        notes:
+          "Reported for 2026 on purchases made directly with airlines. Needs a one-time activation; confirm it continues.",
+        enroll: true,
+      },
+      {
+        name: "Silver Elite status",
+        cadence: "perk",
+        notes:
+          "Gold Elite after $35,000 of spend in a calendar year. 1 elite night credit per $5,000 spent.",
+      },
+    ],
+  },
+  {
+    key: "chase-ihg-premier",
+    name: "IHG One Rewards Premier",
+    issuer: "Chase",
+    business: false,
+    annualFee: 99,
+    match: /ihg/i,
+    benefits: [
+      {
+        name: "Anniversary free night (up to 40,000 points)",
+        cadence: "anniversary",
+        notes:
+          "Posts after each card anniversary. Not confirmed in this review; check your IHG account.",
+        inApp: true,
+      },
+      {
+        name: "United TravelBank credit",
+        cadence: "annual",
+        amount: 50,
+        notes: "Loads into a linked United MileagePlus account's TravelBank.",
+        enroll: true,
+        inApp: true,
+      },
+      GLOBAL_ENTRY,
+      {
+        name: "Platinum Elite status and 4th award night free",
+        cadence: "perk",
+        notes: "The fourth night of an award stay is free when you redeem points.",
       },
     ],
   },

@@ -74,12 +74,7 @@ const money = (value: string) => {
 export function parseCardSheet(text: string): { cards: ImportedCard[]; error?: string } {
   const rows = parseTsv(text);
   const headerIndex = rows.findIndex((r) => r.some((c) => /^card name$/i.test(c)));
-  if (headerIndex < 0) {
-    return {
-      cards: [],
-      error: 'No "Card Name" column found. Copy the sheet including its header row.',
-    };
-  }
+  if (headerIndex < 0) return parseCardList(text);
   const header = rows[headerIndex]!.map((c) => c.toLowerCase());
   const col = (...names: string[]) => header.findIndex((h) => names.includes(h));
   const idx = {
@@ -118,5 +113,50 @@ export function parseCardSheet(text: string): { cards: ImportedCard[]; error?: s
     });
   }
   if (cards.length === 0) return { cards, error: "No card rows found below the header." };
+  return { cards };
+}
+
+/** "3/2024" or "2024-03" (month and year only) to the first of that month. */
+function parseMonthYear(value: string): string | null {
+  const us = /^(\d{1,2})\/(\d{2,4})$/.exec(value);
+  const iso = /^(\d{4})-(\d{1,2})$/.exec(value);
+  if (us) return parseSheetDate(`${us[1]}/1/${us[2]}`);
+  if (iso) return parseSheetDate(`${iso[1]}-${iso[2]}-01`);
+  return null;
+}
+
+/**
+ * A plain list of cards, one per line, as people type them in a message:
+ * "Chase Sapphire Pref" or "Chase Sapphire Pref, 3/2024". An opened date is
+ * optional after a comma or tab; bullets and numbering are ignored. Every
+ * card on such a list is taken to be open.
+ */
+export function parseCardList(text: string): { cards: ImportedCard[]; error?: string } {
+  const cards: ImportedCard[] = [];
+  for (const raw of text.replace(/\r\n?/g, "\n").split("\n")) {
+    const line = raw.replace(/^\s*(?:[-*\u2022]|\d+[.)])\s*/, "").trim();
+    if (!line) continue;
+    const parts = line.split(/\t|,\s*/).map((p) => p.trim());
+    const last = parts.length > 1 ? parts[parts.length - 1]! : "";
+    const openedOn = last ? (parseSheetDate(last) ?? parseMonthYear(last)) : null;
+    const name = (openedOn ? parts.slice(0, -1).join(", ") : line).slice(0, 120);
+    if (!name) continue;
+    const template = matchTemplate(name);
+    cards.push({
+      name,
+      issuer: template?.issuer ?? "",
+      templateKey: template?.key ?? null,
+      business: template?.business ?? /\b(business|biz)\b/i.test(name),
+      annualFeeCents: (template?.annualFee ?? 0) * 100,
+      openedOn,
+      closedOn: null,
+      closed: false,
+    });
+  }
+  if (cards.length === 0)
+    return {
+      cards,
+      error: "Paste a list of cards, one per line, or the sheet with its header row.",
+    };
   return { cards };
 }

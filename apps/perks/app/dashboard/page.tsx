@@ -32,12 +32,12 @@ export default async function DashboardPage() {
       <Card className="mx-auto max-w-xl text-center">
         <CardTitle>Add your cards to get started</CardTitle>
         <CardDescription className="mt-2">
-          Paste your card spreadsheet to bring everything in at once, or add cards one at a time.
-          Cards the tracker recognises come with their credits already filled in.
+          Paste a list of your cards, one per line, to bring everything in at once. Cards the
+          tracker recognises come with their credits already filled in.
         </CardDescription>
         <div className="mt-6 flex justify-center gap-3">
           <Link href="/dashboard/cards/import">
-            <Button>Import from spreadsheet</Button>
+            <Button>Import cards</Button>
           </Link>
           <Link href="/dashboard/cards">
             <Button variant="outline">Add a card</Button>

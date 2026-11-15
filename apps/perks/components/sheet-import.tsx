@@ -27,7 +27,7 @@ export function SheetImport({
         rows={8}
         required
         aria-label="Spreadsheet rows"
-        placeholder={"Card Name\tApproval Date\t…\nChase Sapphire Reserve\t3/1/2025\t…"}
+        placeholder={"Chase Sapphire Preferred, 3/2024\nAmex Gold\nCiti Double Cash"}
         className="w-full rounded-[var(--radius)] border bg-card p-3 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       />
       {parsed?.error && <Alert variant="error">{parsed.error}</Alert>}
