@@ -20,7 +20,7 @@ const NOISE =
   /^(add(ed)? to card|add offer|added|view (details|offer)|terms( apply| & conditions)?|details|new|offer details|shop now|activate|activated|save offer|saved|expiring soon|featured|recommended offers?|available offers?|added to card offers?|in-store|online|online only|in-store & online|\+|\d+)$/i;
 const ADDED = /^(added( to card)?|activated|saved)$/i;
 const DEAL =
-  /(spend \$|get \$|earn |\$\s?\d[\d,.]* (back|off|cash back|statement credit)|\d+(\.\d+)?% (cash )?back|\d+x\b|points? per|membership rewards|cash back)/i;
+  /(\bspend \$|\bget \$|\bearn |\$\s?\d[\d,.]* (back|off|cash back|statement credit)|\d+(\.\d+)?% (cash )?back|\d+x\b|points? per|membership rewards|cash back)/i;
 const EXPIRY =
   /(?:exp(?:ires?|\.)?|ends?|valid (?:through|until)|through)\s*(?:on\s*)?:?\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?|(\d+)\s*d(?:ays?)?\s*left|expires\s+in\s+(\d+)\s+days?|expires\s+(today|tomorrow)|(?:exp(?:ires?)?|ends?)\s+([a-z]{3,9})\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?/i;
 
@@ -73,7 +73,76 @@ export function parseOffers(text: string, today: string): ParsedOffer[] {
     .split("\n")
     .map((l) => l.replace(/\s+/g, " ").trim())
     .filter(Boolean);
+  return lines.some((l) => EXPIRY.test(l))
+    ? parseAnchored(lines, today)
+    : parseByBlocks(lines, today);
+}
 
+/** Lines that can never be a merchant name. */
+const NOT_MERCHANT = (line: string) =>
+  NOISE.test(line) || ADDED.test(line) || DEAL.test(line) || EXPIRY.test(line);
+
+/**
+ * Pages that date every offer (Amex, Chase): each offer is the deal line
+ * nearest above an expiry line, and the merchant is the nearest plain line
+ * above that deal. Page headers, footers and the ads Amex mixes into the
+ * list carry no expiry, so they are never picked up.
+ */
+function parseAnchored(lines: string[], today: string): ParsedOffer[] {
+  const expiries = lines.flatMap((l, i) => (EXPIRY.test(l) ? [i] : []));
+  const offers: ParsedOffer[] = [];
+  const seen = new Set<string>();
+  expiries.forEach((at, n) => {
+    const from = n === 0 ? 0 : expiries[n - 1]! + 1;
+    let dealAt = -1;
+    for (let i = at - 1; i >= from; i--) {
+      if (DEAL.test(lines[i]!)) {
+        dealAt = i;
+        break;
+      }
+    }
+    if (dealAt < 0) return;
+    let merchantAt = -1;
+    for (let i = dealAt - 1; i >= from; i--) {
+      if (!NOT_MERCHANT(lines[i]!)) {
+        merchantAt = i;
+        break;
+      }
+    }
+    // Some pages print the deal before the merchant.
+    if (merchantAt < 0) {
+      for (let i = dealAt + 1; i < at; i++) {
+        if (!NOT_MERCHANT(lines[i]!)) {
+          merchantAt = i;
+          break;
+        }
+      }
+    }
+    if (merchantAt < 0) return;
+    // Status labels sit beside the offer: between merchant and expiry, or just after it.
+    const next = expiries[n + 1] ?? lines.length;
+    const status = [
+      ...lines.slice(Math.min(merchantAt, dealAt), at),
+      ...lines.slice(at + 1, Math.min(at + 4, next)),
+    ];
+    const details = lines[dealAt]!.slice(0, 300);
+    const offer: ParsedOffer = {
+      merchant: lines[merchantAt]!.slice(0, 120),
+      details,
+      valueCents: rewardCents(details),
+      expiresOn: expiryFrom(lines[at]!, today),
+      added: status.some((l) => ADDED.test(l)),
+    };
+    const key = offerKey(offer);
+    if (seen.has(key)) return;
+    seen.add(key);
+    offers.push(offer);
+  });
+  return offers;
+}
+
+/** Fallback for pages without expiry dates: group lines into offers by their deal lines. */
+function parseByBlocks(lines: string[], today: string): ParsedOffer[] {
   // Split into blocks. An expiry line closes the offer it belongs to; when a
   // page lists no expiry at all, a second deal line starts the next offer.
   const blocks: string[][] = [];
