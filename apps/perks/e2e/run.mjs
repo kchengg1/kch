@@ -553,6 +553,70 @@ check(
   "nothing scrolls sideways on a phone",
   (await phone.evaluate(() => document.documentElement.scrollWidth)) <= 390,
 );
+// Swiping offers on a phone: left skips, right marks used, Undo restores.
+await phone.goto(`${BASE}/dashboard/cards/import`);
+await phone.fill('textarea[name="sheet"]', "Amex Gold Personal");
+await Promise.all([
+  phone.waitForURL("**/dashboard/cards"),
+  phone.click('button:has-text("Import 1 card")'),
+]);
+await phone.goto(`${BASE}/dashboard/offers`);
+await phone.fill(
+  "#paste",
+  "Walmart.com\nSpend $50 or more, earn $10 back\nExpires 12/31/26\nJetBlue\nSpend $200 or more, earn $40 back\nExpires 12/31/26",
+);
+await phone.click('button:has-text("Save 2 offers")');
+await phone.waitForSelector("text=Saved 2 offers");
+await phone.goto(`${BASE}/dashboard/offers`);
+const swipe = async (merchant, distance) => {
+  const rowEl = phone.locator("li[data-swipe-row]", { hasText: merchant });
+  const box = await rowEl.boundingBox();
+  const y = box.y + box.height / 2;
+  const x = box.x + box.width / 2;
+  const ev = (type, clientX) =>
+    rowEl.dispatchEvent(type, {
+      pointerType: "touch",
+      pointerId: 7,
+      isPrimary: true,
+      bubbles: true,
+      clientX,
+      clientY: y,
+    });
+  await ev("pointerdown", x);
+  for (let step = 1; step <= 6; step++) await ev("pointermove", x + (distance * step) / 6);
+  await ev("pointerup", x + distance);
+};
+const phoneUser = sql(`select id from "user" where email='phone@example.com'`);
+const status = (m) =>
+  sql(`select status from perks_offer where user_id='${phoneUser}' and merchant='${m}'`);
+await swipe("Walmart.com", -300);
+check(
+  "swiping left skips the offer",
+  await until(
+    `select status from perks_offer where user_id='${phoneUser}' and merchant='Walmart.com'`,
+    "dismissed",
+  ),
+);
+await phone.getByRole("status").getByRole("button", { name: "Undo" }).click();
+check(
+  "Undo puts it back",
+  await until(
+    `select status from perks_offer where user_id='${phoneUser}' and merchant='Walmart.com'`,
+    "available",
+  ),
+);
+await phone.waitForSelector("li[data-swipe-row]:has-text('Walmart.com')");
+await swipe("JetBlue", 300);
+check(
+  "swiping right marks it used",
+  await until(
+    `select status from perks_offer where user_id='${phoneUser}' and merchant='JetBlue'`,
+    "used",
+  ),
+);
+await swipe("Walmart.com", -40);
+await phone.waitForTimeout(500);
+check("a short swipe does nothing", status("Walmart.com") === "available");
 const manifest = await phone.request.get(`${BASE}/manifest.webmanifest`);
 check(
   "home-screen manifest is served",

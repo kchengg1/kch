@@ -3,6 +3,7 @@ import { Badge, Button, Card, CardDescription, CardTitle, cn } from "@kch/ui";
 import { CardIcon } from "@/components/card-icon";
 import { dueLabel } from "@/components/credit-row";
 import { OfferPaste } from "@/components/offer-paste";
+import { SwipeRow, SwipeUndoProvider } from "@/components/offer-swipe";
 import { formatCents } from "@/lib/money";
 import { groupOffers, merchantKey } from "@/lib/offer-groups";
 import { offerReturn, rateLabel, WEAK_RATE } from "@/lib/offer-value";
@@ -106,8 +107,10 @@ export default async function OffersPage({
     const days = g.expiresOn ? daysBetween(today, g.expiresOn) : null;
     const ids = g.items.map((o) => o.id);
     return (
-      <li
+      <SwipeRow
         key={g.key}
+        merchant={g.merchant}
+        items={g.items.map((o) => ({ id: o.id, status: o.status }))}
         className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div className="min-w-0">
@@ -192,7 +195,7 @@ export default async function OffersPage({
             </Button>
           </form>
         </div>
-      </li>
+      </SwipeRow>
     );
   };
 
@@ -237,45 +240,50 @@ export default async function OffersPage({
       )}
 
       {scored.length > 0 && (
-        <section className="space-y-3">
-          <nav
-            aria-label="Sort offers"
-            className="-mx-4 flex items-center gap-1 overflow-x-auto px-4 text-sm whitespace-nowrap sm:mx-0 sm:flex-wrap sm:px-0"
-          >
-            <span className="mr-1 text-muted-foreground">Sort by</span>
-            {(Object.keys(SORTS) as Sort[]).map((k) => (
-              <a
-                key={k}
-                href={k === "return" ? "/dashboard/offers" : `/dashboard/offers?sort=${k}`}
-                aria-current={sort === k ? "true" : undefined}
-                className={cn(
-                  "rounded-full px-3 py-1",
-                  sort === k
-                    ? "bg-primary/10 font-medium text-primary"
-                    : "text-muted-foreground hover:bg-muted",
-                )}
-              >
-                {SORTS[k]}
-              </a>
-            ))}
-          </nav>
-          {strong.length > 0 && (
-            <Card className="py-2">
-              <ul className="divide-y">{strong.map(row)}</ul>
-            </Card>
-          )}
-          {weak.length > 0 && (
-            <details>
-              <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-                {weak.length} weaker offer{weak.length === 1 ? "" : "s"}, under{" "}
-                {Math.round(WEAK_RATE * 100)}% back
-              </summary>
-              <Card className="mt-3 py-2">
-                <ul className="divide-y">{weak.map(row)}</ul>
+        <SwipeUndoProvider>
+          <section className="space-y-3">
+            <p className="text-sm text-muted-foreground sm:hidden">
+              Swipe an offer left to skip it, or right once you&rsquo;ve used it.
+            </p>
+            <nav
+              aria-label="Sort offers"
+              className="-mx-4 flex items-center gap-1 overflow-x-auto px-4 text-sm whitespace-nowrap sm:mx-0 sm:flex-wrap sm:px-0"
+            >
+              <span className="mr-1 text-muted-foreground">Sort by</span>
+              {(Object.keys(SORTS) as Sort[]).map((k) => (
+                <a
+                  key={k}
+                  href={k === "return" ? "/dashboard/offers" : `/dashboard/offers?sort=${k}`}
+                  aria-current={sort === k ? "true" : undefined}
+                  className={cn(
+                    "rounded-full px-3 py-1",
+                    sort === k
+                      ? "bg-primary/10 font-medium text-primary"
+                      : "text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {SORTS[k]}
+                </a>
+              ))}
+            </nav>
+            {strong.length > 0 && (
+              <Card className="py-2">
+                <ul className="divide-y">{strong.map(row)}</ul>
               </Card>
-            </details>
-          )}
-        </section>
+            )}
+            {weak.length > 0 && (
+              <details>
+                <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                  {weak.length} weaker offer{weak.length === 1 ? "" : "s"}, under{" "}
+                  {Math.round(WEAK_RATE * 100)}% back
+                </summary>
+                <Card className="mt-3 py-2">
+                  <ul className="divide-y">{weak.map(row)}</ul>
+                </Card>
+              </details>
+            )}
+          </section>
+        </SwipeUndoProvider>
       )}
 
       <Card className="max-w-3xl">
