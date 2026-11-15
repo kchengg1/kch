@@ -9,6 +9,8 @@ import {
   perksBenefit,
   perksCard,
   perksHiddenMerchant,
+  perksPoints,
+  perksRedemption,
   perksOffer,
   perksSettings,
   perksUsage,
@@ -18,6 +20,7 @@ import { getTemplate } from "@/lib/catalog";
 import { sendDigest } from "@/lib/digest";
 import { parseDollars } from "@/lib/money";
 import { merchantKey } from "@/lib/offer-groups";
+import { defaultCentsPerPoint, normalizeProgram, parseBalances } from "@/lib/points";
 import { offerKey, type ParsedOffer } from "@/lib/offer-parse";
 import {
   addTemplateBenefits,
@@ -25,6 +28,7 @@ import {
   getCard,
   listHiddenMerchants,
   listOffers,
+  listPoints,
   loadPortfolio,
   today,
 } from "@/lib/perks";
@@ -231,10 +235,27 @@ export async function importSheetAction(_prev: FormState, form: FormData): Promi
   if (error) return { error };
 
   const { cards: existing } = await loadPortfolio(user.id);
-  const have = new Set(existing.map((c) => `${c.name.toLowerCase()}|${c.openedOn ?? ""}`));
+  const byKey = new Map(existing.map((c) => [`${c.name.toLowerCase()}|${c.openedOn ?? ""}`, c]));
+  const have = new Set(byKey.keys());
   let added = 0;
+  let updated = 0;
   for (const card of cards) {
     const key = `${card.name.toLowerCase()}|${card.openedOn ?? ""}`;
+    const prior = byKey.get(key);
+    // A card already here still picks up sign-up bonus details it was missing.
+    if (prior && prior.msrCents === null && card.msrCents) {
+      await db
+        .update(perksCard)
+        .set({
+          msrCents: card.msrCents,
+          msrDeadline: card.msrDeadline ?? null,
+          msrSpentCents: card.msrSpentCents ?? 0,
+          bonusText: card.bonusText ?? "",
+          bonusReceivedOn: card.bonusReceivedOn ?? null,
+        })
+        .where(eq(perksCard.id, prior.id));
+      updated++;
+    }
     if (have.has(key)) continue;
     have.add(key);
     const id = crypto.randomUUID();
@@ -244,7 +265,13 @@ export async function importSheetAction(_prev: FormState, form: FormData): Promi
     added++;
   }
   refresh();
-  if (added === 0) return { message: "Every card in that sheet is already here." };
+  if (added === 0) {
+    return {
+      message: updated
+        ? `No new cards, but added sign-up bonus details to ${updated} card${updated === 1 ? "" : "s"}.`
+        : "Every card in that sheet is already here.",
+    };
+  }
   redirect("/dashboard/cards");
 }
 
@@ -519,4 +546,177 @@ export async function sendDigestNowAction(): Promise<FormState> {
       ? `Sent to ${user.email}.`
       : "No email provider is configured, so the digest was printed to the server log.",
   };
+}
+
+/* ---- Sign-up bonus ----------------------------------------------------- */
+
+export async function updateBonusAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const { user } = await requireSession();
+  const card = await getCard(text(form, "id"), user.id);
+  if (!card) return { error: "Card not found." };
+  const msrInput = text(form, "msr");
+  const msr = msrInput ? parseDollars(msrInput) : null;
+  const spent = parseDollars(text(form, "spent") || "0");
+  const deadlineInput = text(form, "deadline");
+  const deadline = deadlineInput ? parseSheetDate(deadlineInput) : null;
+  const receivedInput = text(form, "received");
+  const received = receivedInput ? parseSheetDate(receivedInput) : null;
+  if (msrInput && msr === null)
+    return { error: "Spend required should be a dollar amount, like 4000." };
+  if (spent === null) return { error: "Spent so far should be a dollar amount." };
+  if (deadlineInput && !deadline) return { error: "Deadline is not a valid date." };
+  if (receivedInput && !received) return { error: "Bonus received is not a valid date." };
+  await db
+    .update(perksCard)
+    .set({
+      msrCents: msr && msr > 0 ? msr : null,
+      msrDeadline: deadline,
+      msrSpentCents: spent,
+      bonusText: text(form, "bonus").slice(0, 80),
+      bonusReceivedOn: received,
+    })
+    .where(eq(perksCard.id, card.id));
+  refresh();
+  return { message: "Saved." };
+}
+
+/** Quick update from the Overview: the running total spent toward the bonus. */
+export async function setMsrSpentAction(cardId: string, form: FormData) {
+  const { user } = await requireSession();
+  const spent = parseDollars(text(form, "spent"));
+  if (spent === null) return;
+  await db
+    .update(perksCard)
+    .set({ msrSpentCents: spent })
+    .where(and(eq(perksCard.id, cardId), eq(perksCard.userId, user.id)));
+  refresh();
+}
+
+export async function markBonusReceivedAction(cardId: string) {
+  const { user } = await requireSession();
+  await db
+    .update(perksCard)
+    .set({ bonusReceivedOn: today() })
+    .where(and(eq(perksCard.id, cardId), eq(perksCard.userId, user.id)));
+  refresh();
+}
+
+/* ---- Worth to me ------------------------------------------------------- */
+
+/** Saves "worth to me per year" for each benefit on a card. Blank means face value. */
+export async function saveWorthAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const { user } = await requireSession();
+  const card = await getCard(text(form, "cardId"), user.id);
+  if (!card) return { error: "Card not found." };
+  const { benefits } = await loadPortfolio(user.id);
+  for (const b of benefits.filter((x) => x.cardId === card.id)) {
+    if (!form.has(`worth_${b.id}`)) continue;
+    const raw = text(form, `worth_${b.id}`);
+    const cents = raw ? parseDollars(raw) : null;
+    if (raw && cents === null) return { error: `"${raw}" for ${b.name} is not a dollar amount.` };
+    if (cents !== b.myValueCents) {
+      await db.update(perksBenefit).set({ myValueCents: cents }).where(eq(perksBenefit.id, b.id));
+    }
+  }
+  refresh();
+  return { message: "Saved." };
+}
+
+/* ---- Points ------------------------------------------------------------ */
+
+/** Cents per point as typed ("1.7") to hundredths (170). */
+function parseCpp(value: string): number | null {
+  const n = Number(value.replace(/[¢\s]/g, ""));
+  return Number.isFinite(n) && n >= 0 && n <= 1000 ? Math.round(n * 100) : null;
+}
+
+export async function savePointsAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const { user } = await requireSession();
+  const program = normalizeProgram(text(form, "program")).slice(0, 80);
+  const balance = Math.round(Number(text(form, "balance").replace(/[,\s]/g, "")));
+  const cppInput = text(form, "cpp");
+  const cpp = cppInput ? parseCpp(cppInput) : Math.round(defaultCentsPerPoint(program) * 100);
+  if (!program) return { error: "Choose a program." };
+  if (!Number.isFinite(balance) || balance < 0)
+    return { error: "Balance should be a number of points." };
+  if (cpp === null) return { error: "Value should be cents per point, like 1.7." };
+  await db
+    .insert(perksPoints)
+    .values({ id: crypto.randomUUID(), userId: user.id, program, balance, centsPerPointX100: cpp })
+    .onConflictDoUpdate({
+      target: [perksPoints.userId, perksPoints.program],
+      set: { balance, centsPerPointX100: cpp, updatedAt: new Date() },
+    });
+  refresh();
+  return { message: `Saved ${program}.` };
+}
+
+/** Paste the balances block from a sheet: each program's balance is set, values kept. */
+export async function importBalancesAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const { user } = await requireSession();
+  const rows = parseBalances(text(form, "balances"));
+  if (rows.length === 0)
+    return { error: 'Paste lines like "Amex MR, 270520", one program per line.' };
+  const existing = new Map((await listPoints(user.id)).map((p) => [p.program, p]));
+  for (const { program, balance } of rows) {
+    const cpp =
+      existing.get(program)?.centsPerPointX100 ?? Math.round(defaultCentsPerPoint(program) * 100);
+    await db
+      .insert(perksPoints)
+      .values({
+        id: crypto.randomUUID(),
+        userId: user.id,
+        program,
+        balance,
+        centsPerPointX100: cpp,
+      })
+      .onConflictDoUpdate({
+        target: [perksPoints.userId, perksPoints.program],
+        set: { balance, updatedAt: new Date() },
+      });
+  }
+  refresh();
+  return { message: `Updated ${rows.length} balance${rows.length === 1 ? "" : "s"}.` };
+}
+
+export async function deletePointsAction(id: string) {
+  const { user } = await requireSession();
+  await db.delete(perksPoints).where(and(eq(perksPoints.id, id), eq(perksPoints.userId, user.id)));
+  refresh();
+}
+
+export async function addRedemptionAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const { user } = await requireSession();
+  const program = normalizeProgram(text(form, "program")).slice(0, 80);
+  const points = Math.round(Number(text(form, "points").replace(/[,\s]/g, "")));
+  const cash = parseDollars(text(form, "cash"));
+  const fees = parseDollars(text(form, "fees") || "0");
+  const dateInput = text(form, "date");
+  const date = dateInput ? parseSheetDate(dateInput) : today();
+  if (!program) return { error: "Choose a program." };
+  if (!Number.isFinite(points) || points <= 0)
+    return { error: "Points should be a positive number." };
+  if (cash === null || cash <= 0) return { error: "Cash price should be a dollar amount." };
+  if (fees === null) return { error: "Taxes and fees should be a dollar amount." };
+  if (!date) return { error: "Date is not valid." };
+  await db.insert(perksRedemption).values({
+    id: crypto.randomUUID(),
+    userId: user.id,
+    program,
+    redeemedOn: date,
+    points,
+    feesCents: fees,
+    cashCents: cash,
+    note: text(form, "note").slice(0, 120),
+  });
+  refresh();
+  return { message: "Logged." };
+}
+
+export async function deleteRedemptionAction(id: string) {
+  const { user } = await requireSession();
+  await db
+    .delete(perksRedemption)
+    .where(and(eq(perksRedemption.id, id), eq(perksRedemption.userId, user.id)));
+  refresh();
 }

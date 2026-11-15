@@ -3,6 +3,7 @@ import { Badge, Card, CardTitle } from "@kch/ui";
 import data from "@/data/signup-bonuses.json";
 import { checkEligibility, fiveTwentyFour, type BonusOffer, type Verdict } from "@/lib/eligibility";
 import { formatCents } from "@/lib/money";
+import { applicationRules } from "@/lib/rules";
 import { loadPortfolio, today as getToday } from "@/lib/perks";
 import { formatDate } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
@@ -21,6 +22,7 @@ export default async function BonusesPage() {
   const today = getToday();
   const { cards } = await loadPortfolio(user.id);
   const count = fiveTwentyFour(cards, today);
+  const rules = applicationRules(cards, today);
   const rows = (data.offers as BonusOffer[])
     .map((offer) => ({ offer, verdict: checkEligibility(offer, cards, today) }))
     .sort(
@@ -38,6 +40,29 @@ export default async function BonusesPage() {
           at <span className="font-medium text-foreground">{count}/24</span> for Chase.
         </p>
       </div>
+
+      <section>
+        <h2 className="text-lg font-semibold">Application rules</h2>
+        <p className="text-sm text-muted-foreground">
+          Worked out from the dates your cards were opened. These are widely reported rules of
+          thumb, so treat them as a guide.
+        </p>
+        <Card className="mt-3 py-2">
+          <ul className="divide-y">
+            {rules.map((r) => (
+              <li key={r.id} className="flex items-start justify-between gap-4 py-3">
+                <div className="min-w-0">
+                  <p className="font-medium">{r.title}</p>
+                  <p className="text-sm text-muted-foreground">{r.detail}</p>
+                </div>
+                <Badge variant={r.status === "clear" ? "success" : "outline"} className="shrink-0">
+                  {r.status === "clear" ? "Clear" : `Wait until ${formatDate(r.until!, today)}`}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </section>
 
       {cards.length === 0 && (
         <Card>

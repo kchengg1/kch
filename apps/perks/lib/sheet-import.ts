@@ -13,6 +13,12 @@ export type ImportedCard = {
   openedOn: string | null;
   closedOn: string | null;
   closed: boolean;
+  /** Sign-up bonus, from the MSR, MSR Date, MSR Progress and Bonus columns when present. */
+  msrCents?: number | null;
+  msrDeadline?: string | null;
+  msrSpentCents?: number;
+  bonusText?: string;
+  bonusReceivedOn?: string | null;
 };
 
 /** Split pasted spreadsheet text into rows of cells, honouring quoted cells. */
@@ -71,6 +77,15 @@ const money = (value: string) => {
   return Number.isFinite(n) ? Math.round(n * 100) : 0;
 };
 
+/** "60000" in the Bonus column becomes "60,000 points" and "125" becomes "$125 back"; blanks and zero become "". */
+function bonusLabel(value: string): string {
+  const n = Number(value.replace(/[$,\s]/g, ""));
+  if (!value.trim() || n === 0) return "";
+  if (!Number.isFinite(n)) return value.trim().slice(0, 80);
+  // Points bonuses run to thousands; a small number is a cash bonus, like $125 back.
+  return n < 1000 ? `$${n.toLocaleString("en-US")} back` : `${n.toLocaleString("en-US")} points`;
+}
+
 export function parseCardSheet(text: string): { cards: ImportedCard[]; error?: string } {
   const rows = parseTsv(text);
   const headerIndex = rows.findIndex((r) => r.some((c) => /^card name$/i.test(c)));
@@ -85,8 +100,34 @@ export function parseCardSheet(text: string): { cards: ImportedCard[]; error?: s
     bank: col("bank"),
     type: col("card type"),
     closed: col("closed"),
+    msr: col("msr"),
+    msrDate: col("msr date"),
+    msrProgress: col("msr progress"),
+    bonus: col("bonus"),
+    bonusPost: col("bonus post date"),
   };
   const at = (row: string[], i: number) => (i >= 0 ? (row[i] ?? "") : "");
+
+  const today = new Date().toISOString().slice(0, 10);
+  /**
+   * Sign-up bonus columns. A requirement that was met and whose deadline has
+   * passed counts as received, so years-old bonuses don't show as in progress.
+   */
+  const signupBonus = (row: string[]) => {
+    const msrCents = money(at(row, idx.msr)) || null;
+    const msrDeadline = parseSheetDate(at(row, idx.msrDate));
+    const msrSpentCents = money(at(row, idx.msrProgress));
+    const posted = parseSheetDate(at(row, idx.bonusPost));
+    const metLongAgo =
+      msrCents !== null && msrSpentCents >= msrCents && msrDeadline !== null && msrDeadline < today;
+    return {
+      msrCents,
+      msrDeadline,
+      msrSpentCents,
+      bonusText: bonusLabel(at(row, idx.bonus)),
+      bonusReceivedOn: posted ?? (metLongAgo ? msrDeadline : null),
+    };
+  };
 
   const cards: ImportedCard[] = [];
   for (const row of rows.slice(headerIndex + 1)) {
@@ -110,6 +151,7 @@ export function parseCardSheet(text: string): { cards: ImportedCard[]; error?: s
       // A product change keeps the account open, so its date is not a closure.
       closedOn: closed ? closedOn : null,
       closed,
+      ...signupBonus(row),
     });
   }
   if (cards.length === 0) return { cards, error: "No card rows found below the header." };

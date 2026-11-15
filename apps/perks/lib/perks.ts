@@ -7,6 +7,8 @@ import {
   perksBenefit,
   perksCard,
   perksHiddenMerchant,
+  perksPoints,
+  perksRedemption,
   perksOffer,
   perksSettings,
   perksUsage,
@@ -71,6 +73,22 @@ export async function listOffers(userId: string): Promise<PerksOffer[]> {
     .from(perksOffer)
     .where(eq(perksOffer.userId, userId))
     .orderBy(asc(perksOffer.expiresOn), asc(perksOffer.merchant));
+}
+
+export async function listPoints(userId: string) {
+  return db
+    .select()
+    .from(perksPoints)
+    .where(eq(perksPoints.userId, userId))
+    .orderBy(asc(perksPoints.program));
+}
+
+export async function listRedemptions(userId: string) {
+  return db
+    .select()
+    .from(perksRedemption)
+    .where(eq(perksRedemption.userId, userId))
+    .orderBy(asc(perksRedemption.redeemedOn));
 }
 
 export async function listHiddenMerchants(userId: string) {

@@ -208,3 +208,32 @@ Atmos reward summit infinite card`;
     ]);
   });
 });
+
+describe("sign-up bonus columns", () => {
+  it("reads MSR, MSR Date, MSR Progress and Bonus", () => {
+    const sheet = [
+      "Card Name\tApproval Date\tBonus Post Date\tClosed/PC Date\tMSR Date\tMSR\tMSR Progress\tBonus\tAnnual Fee\tBank\tCard Type\tClosed",
+      "Chase Sapphire Reserve\t3/1/2025\t\t\t6/1/2025\t$4,000.00\t$4,000.00\t60000\t$550.00\tChase\tPersonal\tNo",
+      "Chase World of Hyatt\t4/19/2026\t\t\t7/18/2026\t\t\t60000\t$95.00\tChase\tPersonal\tNo",
+      "Discover IT\t3/1/2014\t\t\t\t\t\t0\t$0.00\tDiscover\tPersonal\tNo",
+      "Amex Amazon Business Prime\t6/23/2019\t6/23/2019\t\t\t0\t\t125\t$0.00\tAmerican Express\tBusiness\tNo",
+    ].join("\n");
+    const { cards } = parseCardSheet(sheet);
+    expect(
+      cards.map((c) => [
+        c.msrCents,
+        c.msrDeadline,
+        c.msrSpentCents,
+        c.bonusText,
+        c.bonusReceivedOn,
+      ]),
+    ).toEqual([
+      // Met long ago: counted as received on the deadline.
+      [400000, "2025-06-01", 400000, "60,000 points", "2025-06-01"],
+      [null, "2026-07-18", 0, "60,000 points", null],
+      [null, null, 0, "", null],
+      // A cash bonus, with its post date from the sheet.
+      [null, null, 0, "$125 back", "2019-06-23"],
+    ]);
+  });
+});

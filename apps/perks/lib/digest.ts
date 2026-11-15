@@ -2,6 +2,7 @@ import "server-only";
 import { sendEmail, type EmailContent } from "@kch/email";
 import { appConfig } from "@/app.config";
 import { formatCents } from "./money";
+import { msrStatus } from "./msr";
 import { groupOffers, merchantKey } from "./offer-groups";
 import { isWeakOffer } from "./offer-value";
 import { listHiddenMerchants, listOffers, loadPortfolio } from "./perks";
@@ -26,25 +27,40 @@ const escape = (s: string) =>
 const due = (days: number) => (days <= 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`);
 
 /** Pure: builds the email from what is expiring. Null when there is nothing to say. */
+/** A sign-up bonus whose spend deadline is close. */
+export type DigestSpend = {
+  cardName: string;
+  leftCents: number;
+  deadline: string;
+  bonusText: string;
+};
+
 export function buildDigest(
   credits: BenefitStatus[],
   offers: DigestOffer[],
   today: string,
+  spend: DigestSpend[] = [],
 ): EmailContent | null {
-  if (credits.length === 0 && offers.length === 0) return null;
+  if (credits.length === 0 && offers.length === 0 && spend.length === 0) return null;
   const total = credits.reduce((sum, c) => sum + c.remainingCents, 0);
   const creditLine = (c: BenefitStatus) =>
     `${c.remainingCents > 0 ? `${formatCents(c.remainingCents)} ` : ""}${c.benefit.name} (${c.card.name}), ends ${formatDate(c.deadline!, today)}, ${due(c.daysLeft!)}`;
   const offerLine = (o: DigestOffer) =>
     `${o.merchant}${o.details ? `: ${o.details}` : ""}${o.cardNames.length ? ` (${o.cardNames.join(", ")})` : ""}, expires ${formatDate(o.expiresOn, today)}, ${due(daysBetween(today, o.expiresOn))}`;
 
+  const spendLine = (s: DigestSpend) =>
+    `Spend ${formatCents(s.leftCents)} more on ${s.cardName} by ${formatDate(s.deadline, today)} (${due(daysBetween(today, s.deadline))})${s.bonusText ? ` for ${s.bonusText}` : ""}`;
+
   const subject =
-    credits.length > 0
-      ? `${formatCents(total)} in card credits to use soon`
-      : `${offers.length} card offer${offers.length === 1 ? "" : "s"} expiring soon`;
+    spend.length > 0
+      ? `${formatCents(spend[0]!.leftCents)} left to spend for your ${spend[0]!.cardName} bonus`
+      : credits.length > 0
+        ? `${formatCents(total)} in card credits to use soon`
+        : `${offers.length} card offer${offers.length === 1 ? "" : "s"} expiring soon`;
   const url = `${appConfig.url}/dashboard`;
 
   const text = [
+    spend.length ? `Sign-up bonuses:\n${spend.map((s) => `- ${spendLine(s)}`).join("\n")}` : "",
     credits.length ? `Credits to use:\n${credits.map((c) => `- ${creditLine(c)}`).join("\n")}` : "",
     offers.length ? `Offers expiring:\n${offers.map((o) => `- ${offerLine(o)}`).join("\n")}` : "",
     `Mark them off: ${url}`,
@@ -60,6 +76,7 @@ export function buildDigest(
       : "";
   const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#1c2030;max-width:560px">
 <h2 style="font-size:18px;margin:0">${escape(subject)}</h2>
+${list("Sign-up bonuses", spend.map(spendLine))}
 ${list("Credits to use", credits.map(creditLine))}
 ${list("Offers expiring", offers.map(offerLine))}
 <p style="margin-top:24px"><a href="${url}">Open ${escape(appConfig.name)}</a> to mark them off.</p>
@@ -101,7 +118,22 @@ export async function sendDigest(
       o.cardId && cardName.has(o.cardId) ? [cardName.get(o.cardId)!] : [],
     ),
   }));
-  const content = buildDigest(credits, expiring, today);
+  const spend = cards
+    .filter((c) => !c.closed)
+    .flatMap((c) => {
+      const m = msrStatus(c, today);
+      return m && m.state === "active" && m.daysLeft !== null && m.daysLeft <= DIGEST_WINDOW_DAYS
+        ? [
+            {
+              cardName: c.name,
+              leftCents: m.leftCents,
+              deadline: c.msrDeadline!,
+              bonusText: c.bonusText,
+            },
+          ]
+        : [];
+    });
+  const content = buildDigest(credits, expiring, today, spend);
   if (!content) return false;
   await sendEmail({ to: user.email, ...content });
   return true;

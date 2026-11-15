@@ -1,14 +1,17 @@
 import Link from "next/link";
-import { Badge, Button, Card, CardDescription, CardTitle } from "@kch/ui";
+import { Badge, Button, Card, CardDescription, CardTitle, Input } from "@kch/ui";
 import { CardIcon } from "@/components/card-icon";
 import { CreditRow, dueLabel } from "@/components/credit-row";
 import { Meter } from "@/components/meter";
 import { formatCents } from "@/lib/money";
+import { msrStatus } from "@/lib/msr";
+import { cardWorth } from "@/lib/worth";
 import { groupOffers, merchantKey } from "@/lib/offer-groups";
 import { isWeakOffer } from "@/lib/offer-value";
 import { listHiddenMerchants, listOffers, loadPortfolio, today as getToday } from "@/lib/perks";
 import { daysBetween, formatDate } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
+import { markBonusReceivedAction, setMsrSpentAction } from "./actions";
 import { actionable, buildStatuses, summarizeCards } from "@/lib/summary";
 
 /** Credits ending within this window sit in the main list; the rest are tucked below. */
@@ -68,6 +71,19 @@ export default async function DashboardPage() {
       !hiddenKeys.has(merchantKey(o.merchant)) &&
       !isWeakOffer(o.details),
   );
+  const bonuses = open
+    .map((card) => ({ card, msr: msrStatus(card, today) }))
+    .filter(
+      (b): b is { card: (typeof open)[number]; msr: NonNullable<ReturnType<typeof msrStatus>> } =>
+        b.msr !== null && (b.msr.state === "active" || b.msr.state === "met"),
+    )
+    .sort((a, b) => (a.msr.daysLeft ?? 9999) - (b.msr.daysLeft ?? 9999));
+  const worthOf = (cardId: string, fee: number) =>
+    cardWorth(
+      benefits.filter((b) => b.cardId === cardId),
+      fee,
+      today,
+    );
   const feesDue = summaries
     .filter((s) => s.nextFeeOn && daysBetween(today, s.nextFeeOn) <= FEE_DAYS)
     .sort((a, b) => a.nextFeeOn!.localeCompare(b.nextFeeOn!));
@@ -144,6 +160,75 @@ export default async function DashboardPage() {
         )}
       </section>
 
+      {bonuses.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold">Sign-up bonuses in progress</h2>
+          <Card className="mt-3 py-2">
+            <ul className="divide-y">
+              {bonuses.map(({ card, msr }) => (
+                <li key={card.id} className="space-y-2 py-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <Link
+                      href={`/dashboard/cards/${card.id}`}
+                      className="inline-flex items-center gap-2 font-medium hover:underline"
+                    >
+                      <CardIcon templateKey={card.templateKey} issuer={card.issuer} />
+                      {card.name}
+                    </Link>
+                    <span className="text-sm text-muted-foreground">
+                      {card.bonusText || "Bonus"}
+                      {msr.daysLeft !== null && msr.state === "active" && (
+                        <span
+                          className={
+                            msr.daysLeft <= 14 ? "font-medium text-destructive" : undefined
+                          }
+                        >
+                          {" · "}
+                          {dueLabel(msr.daysLeft)}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <Meter value={msr.spentCents} max={msr.requiredCents} />
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span className="text-muted-foreground">
+                      {formatCents(msr.spentCents)} of {formatCents(msr.requiredCents)}
+                      {msr.state === "active"
+                        ? ` · ${formatCents(msr.leftCents)} to go${msr.perDayCents ? `, about ${formatCents(msr.perDayCents)} a day` : ""}`
+                        : " · requirement met"}
+                    </span>
+                    {msr.state === "active" ? (
+                      <form
+                        action={setMsrSpentAction.bind(null, card.id)}
+                        className="flex items-center gap-2"
+                      >
+                        <Input
+                          name="spent"
+                          inputMode="decimal"
+                          aria-label={`Total spent so far on ${card.name}`}
+                          placeholder="Total spent, $"
+                          className="h-8 w-32"
+                          required
+                        />
+                        <Button type="submit" size="sm" variant="outline">
+                          Update
+                        </Button>
+                      </form>
+                    ) : (
+                      <form action={markBonusReceivedAction.bind(null, card.id)}>
+                        <Button type="submit" size="sm">
+                          Bonus posted
+                        </Button>
+                      </form>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
+
       {expiringOffers.length > 0 && (
         <section>
           <div className="flex items-baseline justify-between">
@@ -209,14 +294,20 @@ export default async function DashboardPage() {
                     <p className="text-sm text-muted-foreground">
                       {formatCents(s.card.annualFeeCents)} fee around{" "}
                       {formatDate(s.nextFeeOn!, today)} · {formatCents(s.capturedCents)} in credits
-                      used this year
+                      used this year · worth{" "}
+                      {formatCents(worthOf(s.card.id, s.card.annualFeeCents).worthCents)} a year to
+                      you
                     </p>
                   </div>
                   <Badge
-                    variant={s.capturedCents >= s.card.annualFeeCents ? "success" : "secondary"}
+                    variant={
+                      worthOf(s.card.id, s.card.annualFeeCents).netCents >= 0
+                        ? "success"
+                        : "secondary"
+                    }
                   >
-                    {s.capturedCents >= s.card.annualFeeCents
-                      ? "Paying for itself"
+                    {worthOf(s.card.id, s.card.annualFeeCents).netCents >= 0
+                      ? "Worth keeping"
                       : "Review before renewal"}
                   </Badge>
                 </li>
