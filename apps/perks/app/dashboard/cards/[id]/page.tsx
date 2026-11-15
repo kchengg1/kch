@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Badge, Button, Card, CardDescription, CardTitle, Input, Label, cn } from "@kch/ui";
 import { ActionForm } from "@/components/action-form";
@@ -249,63 +250,91 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
       )}
 
       {!card.closed && (
-        <Card className="max-w-3xl">
-          <CardTitle>Add a benefit</CardTitle>
-          <ActionForm action={addBenefitAction} submit="Add benefit" className="mt-4 space-y-4">
-            <input type="hidden" name="cardId" value={card.id} />
-            <BenefitFields prefix="new" />
-          </ActionForm>
-        </Card>
+        <details className="group max-w-3xl rounded-[calc(var(--radius)+4px)] border bg-card shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 sm:p-6">
+            <CardTitle>Add a benefit</CardTitle>
+            <ChevronDown
+              aria-hidden
+              className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-180"
+            />
+          </summary>
+          <div className="px-5 pb-5 sm:px-6 sm:pb-6">
+            <ActionForm action={addBenefitAction} submit="Add benefit" className="space-y-4">
+              <input type="hidden" name="cardId" value={card.id} />
+              <BenefitFields prefix="new" />
+            </ActionForm>
+          </div>
+        </details>
       )}
 
-      <Card className="max-w-3xl">
-        <CardTitle>Card details</CardTitle>
-        <ActionForm action={updateCardAction} submit="Save" className="mt-4 space-y-4">
-          <input type="hidden" name="id" value={card.id} />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="card-name">Name</Label>
-              <Input id="card-name" name="name" defaultValue={card.name} required />
+      {/* Open by default while the opened date is missing, since credits and fees depend on it. */}
+      <details
+        className="group max-w-3xl rounded-[calc(var(--radius)+4px)] border bg-card shadow-sm"
+        open={!card.openedOn}
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 sm:p-6">
+          <span>
+            <CardTitle>Card details</CardTitle>
+            {!card.openedOn && (
+              <CardDescription className="mt-1">
+                Add the date you opened this card so fee reminders and card-year credits are right.
+              </CardDescription>
+            )}
+          </span>
+          <ChevronDown
+            aria-hidden
+            className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+          />
+        </summary>
+        <div className="px-5 pb-5 sm:px-6 sm:pb-6">
+          <ActionForm action={updateCardAction} submit="Save" className="space-y-4">
+            <input type="hidden" name="id" value={card.id} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="card-name">Name</Label>
+                <Input id="card-name" name="name" defaultValue={card.name} required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="card-issuer">Issuer</Label>
+                <Input id="card-issuer" name="issuer" defaultValue={card.issuer} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="card-opened">Opened</Label>
+                <Input
+                  id="card-opened"
+                  name="openedOn"
+                  type="date"
+                  defaultValue={card.openedOn ?? ""}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="card-fee">Annual fee, $</Label>
+                <Input
+                  id="card-fee"
+                  name="annualFee"
+                  inputMode="decimal"
+                  defaultValue={String(card.annualFeeCents / 100)}
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="card-issuer">Issuer</Label>
-              <Input id="card-issuer" name="issuer" defaultValue={card.issuer} />
+            <div className="flex flex-wrap gap-6 text-sm">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="business" defaultChecked={card.business} /> Business
+                card
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="closed" defaultChecked={card.closed} /> Closed
+              </label>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="card-opened">Opened</Label>
-              <Input
-                id="card-opened"
-                name="openedOn"
-                type="date"
-                defaultValue={card.openedOn ?? ""}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="card-fee">Annual fee, $</Label>
-              <Input
-                id="card-fee"
-                name="annualFee"
-                inputMode="decimal"
-                defaultValue={String(card.annualFeeCents / 100)}
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-6 text-sm">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" name="business" defaultChecked={card.business} /> Business card
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" name="closed" defaultChecked={card.closed} /> Closed
-            </label>
-          </div>
-        </ActionForm>
-        <form action={deleteCardAction} className="mt-4 border-t pt-4">
-          <input type="hidden" name="id" value={card.id} />
-          <Button type="submit" variant="link" className="px-0 text-destructive">
-            Delete this card and its history
-          </Button>
-        </form>
-      </Card>
+          </ActionForm>
+          <form action={deleteCardAction} className="mt-4 border-t pt-4">
+            <input type="hidden" name="id" value={card.id} />
+            <Button type="submit" variant="link" className="px-0 text-destructive">
+              Delete this card and its history
+            </Button>
+          </form>
+        </div>
+      </details>
     </div>
   );
 }
