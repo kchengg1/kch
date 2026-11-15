@@ -87,7 +87,7 @@ export function OfferPaste({
                       {o.merchant} {o.added && <Badge variant="success">Added</Badge>}
                     </p>
                     <p className="text-muted-foreground">
-                      {o.details}
+                      {o.details || "Added to card, deal details not on this page"}
                       {o.valueCents !== null && ` · up to ${formatCents(o.valueCents)}`}
                       {` · ${o.expiresOn ? `expires ${formatDate(o.expiresOn, today)}` : "no expiry found"}`}
                     </p>

@@ -155,7 +155,7 @@ export default async function DashboardPage() {
                       {o.status === "available" && <Badge variant="outline">Not added yet</Badge>}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {o.details}
+                      {o.details || "Added to card"}
                       {o.cardId && cardName.has(o.cardId) ? ` · ${cardName.get(o.cardId)}` : ""}
                     </p>
                   </div>
