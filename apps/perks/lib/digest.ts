@@ -33,7 +33,7 @@ export function buildDigest(
   const creditLine = (c: BenefitStatus) =>
     `${c.remainingCents > 0 ? `${formatCents(c.remainingCents)} ` : ""}${c.benefit.name} (${c.card.name}), ends ${formatDate(c.deadline!, today)}, ${due(c.daysLeft!)}`;
   const offerLine = (o: DigestOffer) =>
-    `${o.merchant}: ${o.details}${o.cardName ? ` (${o.cardName})` : ""}, expires ${formatDate(o.expiresOn, today)}, ${due(daysBetween(today, o.expiresOn))}`;
+    `${o.merchant}${o.details ? `: ${o.details}` : ""}${o.cardName ? ` (${o.cardName})` : ""}, expires ${formatDate(o.expiresOn, today)}, ${due(daysBetween(today, o.expiresOn))}`;
 
   const subject =
     credits.length > 0

@@ -145,6 +145,79 @@ Give Feedback`;
     ]);
   });
 
+  it("keeps offers already added to the card, which show no deal text", () => {
+    // Amex lists added offers in a box at the top with only a name and expiry.
+    // This copy came through with Markdown links and bullets.
+    const page = `[Skip to main](https://example.com/offers#mainContent)
+Menu
+* [Customer Service](https://example.com/help)
+Amex EveryDay® Card
+* 
+* 
+Added to Card (2)
+[View All](https://example.com/offers/enrolled)
+MTA - Tap to Pay
+Expires 12/31/26
+lululemon
+Expires 1/31/27
+Saved from Offers
+$37.00
+[View Activity](https://example.com/offers/redeemed)
+Recommended Offers
+Search
+Walmart.com
+Spend $50 or more, earn $10 back
+Expires 11/22/26
+Terms apply
+View Details
+NEW
+lululemon
+Spend $150 or more, earn $30 back
+Expires 1/31/27
+Terms apply
+View Details
+Last Login: 15 Nov 2026 @ 10:01
+* [About American Express](https://example.com/company)`;
+    expect(parseOffers(page, TODAY)).toEqual([
+      {
+        merchant: "MTA - Tap to Pay",
+        details: "",
+        valueCents: null,
+        expiresOn: "2026-12-31",
+        added: true,
+      },
+      {
+        merchant: "lululemon",
+        details: "Spend $150 or more, earn $30 back",
+        valueCents: 3000,
+        expiresOn: "2027-01-31",
+        added: true,
+      },
+      {
+        merchant: "Walmart.com",
+        details: "Spend $50 or more, earn $10 back",
+        valueCents: 1000,
+        expiresOn: "2026-11-22",
+        added: false,
+      },
+    ]);
+  });
+
+  it("does not treat an empty Added to Card box as an offer", () => {
+    const page = `Added to Card
+View All
+You haven't added any offers to your Card
+Add offers and earn statement credit or points on qualifying purchases
+Saved from Offers
+Recommended Offers
+Walmart.com
+Spend $50 or more, earn $10 back
+Expires 11/22/26`;
+    expect(parseOffers(page, TODAY).map((o) => [o.merchant, o.added])).toEqual([
+      ["Walmart.com", false],
+    ]);
+  });
+
   it("reads Chase Offers with percentages and days left", () => {
     const text = `Starbucks
 10% cash back

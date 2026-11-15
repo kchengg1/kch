@@ -71,7 +71,15 @@ export function parseOffers(text: string, today: string): ParsedOffer[] {
   const lines = text
     .replace(/\r\n?/g, "\n")
     .split("\n")
-    .map((l) => l.replace(/\s+/g, " ").trim())
+    .map((l) =>
+      l
+        // Some browsers copy links as Markdown: "[View All](https://...)".
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+        // List bullets copied from the page.
+        .replace(/^\s*[*\u2022-]\s*/, "")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
     .filter(Boolean);
   return lines.some((l) => EXPIRY.test(l))
     ? parseAnchored(lines, today)
@@ -82,16 +90,36 @@ export function parseOffers(text: string, today: string): ParsedOffer[] {
 const NOT_MERCHANT = (line: string) =>
   NOISE.test(line) || ADDED.test(line) || DEAL.test(line) || EXPIRY.test(line);
 
+/** Heading of the box listing offers already added, e.g. "Added to Card (2)". */
+const ADDED_HEADING = /^added to card \(\d+\)$/i;
+/** Headings that close that box. */
+const SECTION_END =
+  /^(recommended offers|available offers|all offers|new offers|saved from offers|explore local offers)\b/i;
+
+/** Which lines sit inside the "Added to Card" box. */
+function addedSection(lines: string[]): boolean[] {
+  let inside = false;
+  return lines.map((line, i) => {
+    const heading =
+      ADDED_HEADING.test(line) ||
+      (/^added to card$/i.test(line) && /^view all\b/i.test(lines[i + 1] ?? ""));
+    if (heading) inside = true;
+    else if (SECTION_END.test(line)) inside = false;
+    return inside;
+  });
+}
+
 /**
  * Pages that date every offer (Amex, Chase): each offer is the deal line
  * nearest above an expiry line, and the merchant is the nearest plain line
  * above that deal. Page headers, footers and the ads Amex mixes into the
- * list carry no expiry, so they are never picked up.
+ * list carry no expiry, so they are never picked up. Offers in the "Added
+ * to Card" box show only a name and expiry, so there the deal is optional.
  */
 function parseAnchored(lines: string[], today: string): ParsedOffer[] {
   const expiries = lines.flatMap((l, i) => (EXPIRY.test(l) ? [i] : []));
-  const offers: ParsedOffer[] = [];
-  const seen = new Set<string>();
+  const inAdded = addedSection(lines);
+  const found: ParsedOffer[] = [];
   expiries.forEach((at, n) => {
     const from = n === 0 ? 0 : expiries[n - 1]! + 1;
     let dealAt = -1;
@@ -101,16 +129,16 @@ function parseAnchored(lines: string[], today: string): ParsedOffer[] {
         break;
       }
     }
-    if (dealAt < 0) return;
+    if (dealAt < 0 && !inAdded[at]) return;
     let merchantAt = -1;
-    for (let i = dealAt - 1; i >= from; i--) {
+    for (let i = (dealAt < 0 ? at : dealAt) - 1; i >= from; i--) {
       if (!NOT_MERCHANT(lines[i]!)) {
         merchantAt = i;
         break;
       }
     }
     // Some pages print the deal before the merchant.
-    if (merchantAt < 0) {
+    if (merchantAt < 0 && dealAt >= 0) {
       for (let i = dealAt + 1; i < at; i++) {
         if (!NOT_MERCHANT(lines[i]!)) {
           merchantAt = i;
@@ -122,23 +150,38 @@ function parseAnchored(lines: string[], today: string): ParsedOffer[] {
     // Status labels sit beside the offer: between merchant and expiry, or just after it.
     const next = expiries[n + 1] ?? lines.length;
     const status = [
-      ...lines.slice(Math.min(merchantAt, dealAt), at),
+      ...lines.slice(dealAt < 0 ? merchantAt : Math.min(merchantAt, dealAt), at),
       ...lines.slice(at + 1, Math.min(at + 4, next)),
     ];
-    const details = lines[dealAt]!.slice(0, 300);
-    const offer: ParsedOffer = {
+    const details = dealAt < 0 ? "" : lines[dealAt]!.slice(0, 300);
+    found.push({
       merchant: lines[merchantAt]!.slice(0, 120),
       details,
       valueCents: rewardCents(details),
       expiresOn: expiryFrom(lines[at]!, today),
-      added: status.some((l) => ADDED.test(l)),
-    };
-    const key = offerKey(offer);
-    if (seen.has(key)) return;
-    seen.add(key);
-    offers.push(offer);
+      added: inAdded[at]! || status.some((l) => ADDED.test(l)),
+    });
   });
-  return offers;
+
+  // The same offer can be listed twice: in the "Added to Card" box (no deal
+  // text) and in the full list. Keep one, with the deal text and added flag.
+  const byOffer = new Map<string, ParsedOffer>();
+  for (const offer of found) {
+    const key = `${offer.merchant.toLowerCase()}|${offer.expiresOn ?? ""}`;
+    const prior = byOffer.get(key);
+    if (!prior) byOffer.set(key, offer);
+    else if (!prior.details || prior.details === offer.details) {
+      byOffer.set(key, {
+        ...offer,
+        details: offer.details || prior.details,
+        added: prior.added || offer.added,
+      });
+    } else {
+      // Two different deals at one merchant: keep both.
+      byOffer.set(`${key}|${offer.details.toLowerCase()}`, offer);
+    }
+  }
+  return [...byOffer.values()];
 }
 
 /** Fallback for pages without expiry dates: group lines into offers by their deal lines. */

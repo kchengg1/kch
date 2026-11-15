@@ -59,7 +59,9 @@ export default async function OffersPage() {
                         {o.status === "added" ? "Added to card" : "Not added yet"}
                       </Badge>
                     </p>
-                    <p className="text-sm text-muted-foreground">{o.details}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {o.details || "Added to card. See your issuer's site for the deal."}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       {[
                         o.cardId && cardName.get(o.cardId),
@@ -125,7 +127,8 @@ export default async function OffersPage() {
               {past.map((o) => (
                 <li key={o.id} className="flex items-center justify-between gap-4 py-2.5">
                   <span>
-                    {o.merchant} <span className="text-muted-foreground">· {o.details}</span>
+                    {o.merchant}{" "}
+                    {o.details && <span className="text-muted-foreground">· {o.details}</span>}
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
                     <Badge variant="secondary">
