@@ -8,6 +8,7 @@ import { CardIcon } from "@/components/card-icon";
 import { Meter } from "@/components/meter";
 import { UsageChips } from "@/components/usage-chips";
 import { CATALOG, CATALOG_REVIEWED, getTemplate } from "@/lib/catalog";
+import { catalogUpdates } from "@/lib/catalog-sync";
 import { formatCents } from "@/lib/money";
 import { msrStatus } from "@/lib/msr";
 import { cardWorth, faceValueCents, myValueCents } from "@/lib/worth";
@@ -17,6 +18,7 @@ import { requireSession } from "@/lib/session";
 import { indexUsage, summarizeCards } from "@/lib/summary";
 import {
   addBenefitAction,
+  applyCatalogUpdatesAction,
   applyTemplateAction,
   deleteBenefitAction,
   deleteCardAction,
@@ -50,6 +52,8 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
   const medals = ["1st", "2nd", "3rd"];
   const worth = cardWorth(benefits, card.annualFeeCents, today);
   const worthRows = benefits.filter((b) => !(b.endsOn && b.endsOn < today));
+  const updates = catalogUpdates(card.templateKey, benefits);
+  const updateCount = updates.added.length + updates.changed.length;
 
   return (
     <div className="space-y-8">
@@ -170,6 +174,24 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
             {template &&
               ` Template last checked ${formatDate(CATALOG_REVIEWED)}; edit anything that has changed.`}
           </p>
+          {updateCount > 0 && credits.length > 0 && (
+            <form
+              action={applyCatalogUpdatesAction.bind(null, card.id)}
+              className="mt-3 flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-primary/40 bg-primary/5 px-4 py-3 text-sm"
+            >
+              <span className="min-w-0 flex-1">
+                The catalog has {updateCount} update{updateCount === 1 ? "" : "s"} for this card:{" "}
+                {[
+                  ...updates.added.map((t) => `new ${t.name}`),
+                  ...updates.changed.map((c) => `${c.benefit.name} changed`),
+                ].join(", ")}
+                .
+              </span>
+              <Button type="submit" size="sm">
+                Apply
+              </Button>
+            </form>
+          )}
           {credits.length === 0 ? (
             <Card className="mt-3">
               <CardDescription>No credits on this card yet.</CardDescription>

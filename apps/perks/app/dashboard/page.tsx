@@ -26,6 +26,7 @@ import {
   setSpendTargetTrackedAction,
 } from "./actions";
 import { actionable, buildStatuses, summarizeCards } from "@/lib/summary";
+import { expiringAtYearEnd, inYearEndWindow } from "@/lib/year-end";
 
 /** Credits ending within this window sit in the main list; the rest are tucked below. */
 const SOON_DAYS = 45;
@@ -63,7 +64,9 @@ export default async function DashboardPage() {
     );
   }
 
-  const todo = actionable(buildStatuses(cards, benefits, usage, today));
+  const statuses = buildStatuses(cards, benefits, usage, today);
+  const todo = actionable(statuses);
+  const yearEnd = inYearEndWindow(today) ? expiringAtYearEnd(statuses, today) : null;
   const soon = todo.filter((s) => (s.daysLeft ?? 0) <= SOON_DAYS);
   const later = todo.filter((s) => (s.daysLeft ?? 0) > SOON_DAYS);
   const thisMonth = todo.filter((s) => s.deadline && s.deadline.slice(0, 7) === today.slice(0, 7));
@@ -127,6 +130,26 @@ export default async function DashboardPage() {
           </Button>
         </Link>
       </div>
+
+      {yearEnd && (
+        <Link
+          href="/dashboard/year-end"
+          className="flex items-center justify-between gap-3 rounded-[var(--radius)] border border-primary/40 bg-primary/5 px-4 py-3 hover:bg-primary/10"
+        >
+          <span className="min-w-0">
+            <span className="block font-medium">Year-end checklist</span>
+            <span className="block text-sm text-muted-foreground">
+              {yearEnd.length
+                ? `${formatCents(sum(yearEnd))} in ${yearEnd.length} credit${yearEnd.length === 1 ? "" : "s"} resets by Dec 31`
+                : "Calendar-year credits are used"}
+              {` · spend caps, referral limits and when to apply`}
+            </span>
+          </span>
+          <span aria-hidden className="text-primary">
+            →
+          </span>
+        </Link>
+      )}
 
       <form action="/dashboard/pick" className="flex gap-2">
         <Input
