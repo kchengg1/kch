@@ -4,7 +4,7 @@ import { Badge, Button, Card, CardDescription, CardTitle } from "@kch/ui";
 import { CardIcon } from "@/components/card-icon";
 import { CreditRow } from "@/components/credit-row";
 import { applyCatalogUpdatesAction } from "@/app/dashboard/actions";
-import { catalogUpdates } from "@/lib/catalog-sync";
+import { catalogUpdates, updateCount } from "@/lib/catalog-sync";
 import { formatCents } from "@/lib/money";
 import {
   ensureSpendTargets,
@@ -80,7 +80,7 @@ export default async function YearEndPage() {
         benefits.filter((b) => b.cardId === card.id),
       ),
     }))
-    .filter((u) => u.added.length + u.changed.length > 0);
+    .filter((u) => updateCount(u) > 0);
 
   const hasAmex = open.some((c) => /american express/i.test(c.issuer));
   const hasChase = open.some((c) => /chase/i.test(c.issuer));
@@ -121,7 +121,7 @@ export default async function YearEndPage() {
             apply them so the checklist below is complete.
           </CardDescription>
           <ul className="mt-4 divide-y">
-            {updates.map(({ card, added, changed }) => (
+            {updates.map(({ card, added, changed, removed }) => (
               <li key={card.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:justify-between">
                 <div className="min-w-0 text-sm">
                   <p className="inline-flex items-center gap-2 font-medium">
@@ -143,12 +143,15 @@ export default async function YearEndPage() {
                         {template.endsOn && `, ends ${formatDate(template.endsOn, today)}`}
                       </li>
                     ))}
+                    {removed.map((b) => (
+                      <li key={`r-${b.id}`}>Removed: {b.name}, no longer offered</li>
+                    ))}
                   </ul>
                 </div>
                 <form action={applyCatalogUpdatesAction.bind(null, card.id)} className="shrink-0">
                   <Button type="submit" size="sm">
-                    Apply {added.length + changed.length} update
-                    {added.length + changed.length === 1 ? "" : "s"}
+                    Apply {updateCount({ added, changed, removed })} update
+                    {updateCount({ added, changed, removed }) === 1 ? "" : "s"}
                   </Button>
                 </form>
               </li>

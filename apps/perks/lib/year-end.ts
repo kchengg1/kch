@@ -111,7 +111,7 @@ export const YEAR_END_NOTES: Record<string, YearEndNote[]> = {
   "chase-sapphire-reserve": [
     {
       kind: "goal",
-      text: "$75,000 in a calendar year unlocks Southwest status, a $500 Southwest credit, IHG Diamond and $250 for The Shops.",
+      text: "$75,000 in a calendar year unlocks Southwest status, a $500 Southwest credit, IHG Diamond, Hyatt Explorist and $250 for The Shops.",
     },
     {
       kind: "info",
@@ -131,13 +131,21 @@ export const YEAR_END_NOTES: Record<string, YearEndNote[]> = {
     },
   ],
   "chase-freedom": [
-    { kind: "cap", text: "This quarter's 5% categories end December 31. Activate Q1 in January." },
+    {
+      kind: "cap",
+      text: "This quarter's 5% categories end December 31. Q1 2027 is grocery and streaming; activate in January.",
+    },
+    {
+      kind: "change",
+      text: "Chase is converting some original Freedom cards to Freedom Unlimited by November 20, 2026. Call to switch to Freedom Flex instead if you want to keep the 5% categories.",
+      until: "2026-12-31",
+    },
   ],
   "chase-freedom-flex": [
-    { kind: "cap", text: "This quarter's 5% categories end December 31. Activate Q1 in January." },
-  ],
-  "discover-it": [
-    { kind: "cap", text: "This quarter's 5% categories end December 31. Activate Q1 in January." },
+    {
+      kind: "cap",
+      text: "This quarter's 5% categories end December 31. Q1 2027 is grocery and streaming; activate in January.",
+    },
   ],
   "chase-ink-business-preferred": [
     {
@@ -165,6 +173,11 @@ export const YEAR_END_NOTES: Record<string, YearEndNote[]> = {
       kind: "info",
       text: "The free night follows your card anniversary. The $100 airline credit needs $250 of airfare in the calendar year.",
     },
+    {
+      kind: "change",
+      text: "From 2027 the fourth award night is free only after $5,000 of spend in the calendar year.",
+      until: "2027-01-31",
+    },
   ],
   "chase-marriott-boundless": [
     {
@@ -186,6 +199,21 @@ export const YEAR_END_NOTES: Record<string, YearEndNote[]> = {
       text: "The $300 travel credit renews on your account anniversary, not January 1.",
     },
     { kind: "goal", text: "$75,000 in the calendar year adds Capital One Lounge guests." },
+  ],
+  "discover-it": [
+    { kind: "cap", text: "This quarter's 5% categories end December 31. Activate Q1 in January." },
+    {
+      kind: "change",
+      text: "More Discover accounts move to the Capital One app and website on January 18, 2027.",
+      until: "2027-01-31",
+    },
+  ],
+  "amex-business-gold": [
+    {
+      kind: "change",
+      text: "From February 17, 2027, 4x on ads counts only with Meta, Google, Amazon, Microsoft, GoDaddy and Yelp, and wireless only with major carriers.",
+      until: "2027-02-28",
+    },
   ],
   "capital-one-venture-x-business": [
     {
