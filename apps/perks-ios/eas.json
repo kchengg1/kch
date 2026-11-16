@@ -17,13 +17,19 @@
     "preview": {
       "extends": "base",
       "distribution": "internal",
-      "environment": "preview"
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://kch-six.vercel.app"
+      }
     },
     "production": {
       "extends": "base",
       "distribution": "store",
       "environment": "production",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://kch-six.vercel.app"
+      }
     }
   },
   "submit": {

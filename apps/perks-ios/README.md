@@ -9,7 +9,7 @@ You do **not** need `pnpm` or Xcode installed locally. Everything installs on Gi
 ### Option A: Browser + GitHub Actions (zero local CLI)
 
 1. **App Store Connect** (`https://appstoreconnect.apple.com`):
-   - Create an App record under **My Apps → + → New App** (iOS, Bundle ID `com.kch.perks`) and copy its numeric **Apple ID** under **General → App Information** (e.g. `6501234567`).
+   - Create an App record under **My Apps → + → New App** (iOS, Bundle ID `com.kchengg1.perks`) and copy its numeric **Apple ID** under **General → App Information** (e.g. `6501234567`).
    - Under **Users and Access → Integrations → App Store Connect API**, generate a key (Admin/App Manager) and note the **Issuer ID**, **Key ID**, and download the `.p8` file.
    - Note your 10-character **Apple Team ID** at `https://developer.apple.com/account`.
 2. **Expo** (`https://expo.dev`):
@@ -23,7 +23,7 @@ You do **not** need `pnpm` or Xcode installed locally. Everything installs on Gi
      - `EXPO_ASC_ISSUER_ID` — App Store Connect Issuer ID
      - `EXPO_ASC_API_KEY` — full text contents of your `AuthKey_XXXX.p8` file
    - **Variables**:
-     - `EXPO_PUBLIC_API_URL` — your production Vercel URL (e.g. `https://your-perks-domain.vercel.app`)
+     - `EXPO_PUBLIC_API_URL` — `https://kch-six.vercel.app` (already configured by default in `eas.json`)
      - `ASC_APP_ID` — your numeric App Store Connect Apple ID (enables automatic TestFlight submission)
 4. **Run the build**:
    - Open **GitHub → Actions → iOS TestFlight → Run workflow** and click **Run workflow**.
