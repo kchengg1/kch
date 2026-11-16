@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { Button, Card, CardDescription, CardTitle, Container } from "@kch/ui";
+import { redirect } from "next/navigation";
 import { appConfig } from "@/app.config";
+import { getSession } from "@/lib/session";
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Signed-in people have nothing to do here; send them to their dashboard.
+  if (await getSession()) redirect("/dashboard");
   return (
     <>
       <section className="py-24 sm:py-32">

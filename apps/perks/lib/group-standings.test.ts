@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { groupStandings, ordinal, type GroupCard } from "./group-standings";
-import type { CardSummary } from "./summary";
+import { creditBreakdown, groupStandings, ordinal, type GroupCard } from "./group-standings";
+import { currentPeriod, periodsThisYear } from "./periods";
+import type { BenefitRow, CardSummary, UsageRow } from "./summary";
 
 const people = [
   { id: "me", name: "Kevin Cheng" },
@@ -110,6 +111,65 @@ describe("ordinal", () => {
       "13th",
       "21st",
       "22nd",
+    ]);
+  });
+});
+
+describe("creditBreakdown", () => {
+  const today = "2026-11-16";
+  const card = { id: "gold", name: "Gold", annualFeeCents: 32500, openedOn: null, closed: false };
+  const benefit = (over: Partial<BenefitRow>): BenefitRow => ({
+    id: Math.random().toString(36),
+    cardId: "gold",
+    name: "Credit",
+    cadence: "annual",
+    amountCents: 10000,
+    notes: "",
+    enrollRequired: false,
+    enrolled: true,
+    tracked: true,
+    endsOn: null,
+    sortOrder: 0,
+    ...over,
+  });
+  const months = periodsThisYear("monthly", today);
+  const dining = benefit({ name: "Dining", cadence: "monthly", amountCents: 1000 });
+  const uber = benefit({ name: "Uber Cash", cadence: "monthly", amountCents: 1000 });
+  const hotel = benefit({ name: "Hotel", cadence: "semiannual", amountCents: 5000 });
+  const airline = benefit({ name: "Airline", amountCents: 20000 });
+  const ended = benefit({ name: "Ended", endsOn: "2026-06-30", amountCents: 5000 });
+  const other = benefit({ name: "Other card", cardId: "plat" });
+  const usage: UsageRow[] = [
+    // Ten months of dining; one month logged over the credit counts only $10.
+    ...months.slice(0, 10).map((p, i) => ({
+      benefitId: dining.id,
+      periodKey: p.key,
+      usedCents: i === 0 ? 5000 : 1000,
+    })),
+    { benefitId: uber.id, periodKey: months[0]!.key, usedCents: 1000 },
+    { benefitId: ended.id, periodKey: currentPeriod("annual", today)!.key, usedCents: 5000 },
+  ];
+  const { used, unused } = creditBreakdown(
+    card,
+    [dining, uber, hotel, airline, ended, other],
+    usage,
+    today,
+  );
+
+  it("lists credits used, biggest first, capped at each credit's amount", () => {
+    expect(used.map((l) => [l.name, l.usedCents])).toEqual([
+      ["Dining", 10000],
+      ["Ended", 5000],
+      ["Uber Cash", 1000],
+    ]);
+  });
+
+  it("lists credits with the most left this year, leaving out ended ones", () => {
+    expect(unused.map((l) => [l.name, l.leftCents])).toEqual([
+      ["Airline", 20000],
+      ["Uber Cash", 11000],
+      ["Hotel", 10000],
+      ["Dining", 2000],
     ]);
   });
 });
