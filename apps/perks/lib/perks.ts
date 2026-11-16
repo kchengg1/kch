@@ -172,6 +172,12 @@ export async function listReferrals() {
   return rows.map((r) => ({ ...r, firstName: r.name.split(" ")[0] || r.name }));
 }
 
+/** Everyone else signed up to Perks. */
+export async function otherUserIds(userId: string): Promise<string[]> {
+  const rows = await db.select({ id: user.id }).from(user);
+  return rows.map((r) => r.id).filter((id) => id !== userId);
+}
+
 /** Adds the catalog's spend goals to open cards that don't have them yet. */
 export async function ensureSpendTargets(userId: string, cards: PerksCard[]) {
   const rows = cards.flatMap((c) =>
