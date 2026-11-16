@@ -12,7 +12,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <header className="sticky top-0 z-30 border-b bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur">
         <Container className="flex h-14 items-center justify-between">
           <nav aria-label="Main" className="flex items-center gap-1 text-sm">
-            <Link href="/" className="mr-4 shrink-0 font-semibold">
+            <Link href="/dashboard" className="mr-4 shrink-0 font-semibold">
               {appConfig.name}
             </Link>
             <DashboardNav />

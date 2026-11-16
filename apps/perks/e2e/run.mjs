@@ -71,6 +71,17 @@ const until = async (query, expected) => {
 /* 1. Sign up ------------------------------------------------------------ */
 await signup(page, "Sam Owner", "owner@example.com");
 check("signup lands on dashboard", page.url().endsWith("/dashboard"), page.url());
+await page.goto(`${BASE}/`);
+check(
+  "the home page sends signed-in people to the dashboard",
+  page.url().endsWith("/dashboard"),
+  page.url(),
+);
+check(
+  "the Perks logo links to the dashboard",
+  (await page.locator('header nav[aria-label="Main"] a').first().getAttribute("href")) ===
+    "/dashboard",
+);
 check("empty dashboard offers the import", (await bodyText()).includes("Import cards"));
 
 /* 2. Import the spreadsheet --------------------------------------------- */
