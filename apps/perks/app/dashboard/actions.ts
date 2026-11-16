@@ -20,6 +20,7 @@ import {
   inArray,
 } from "@kch/db";
 import { getTemplate } from "@/lib/catalog";
+import { catalogUpdates, templateRow } from "@/lib/catalog-sync";
 import { sendDigest } from "@/lib/digest";
 import { sendPush } from "@/lib/push";
 import { parseDollars } from "@/lib/money";
@@ -324,6 +325,42 @@ export async function applyTemplateAction(form: FormData) {
   if (!card || !template) return;
   await db.update(perksCard).set({ templateKey: template.key }).where(eq(perksCard.id, card.id));
   await addTemplateBenefits(card.id, user.id, template.key);
+  refresh();
+}
+
+/** Brings a card's credits in line with the current catalog: adds new ones, updates changed ones. */
+export async function applyCatalogUpdatesAction(cardId: string) {
+  const { user } = await requireSession();
+  const card = await getCard(cardId, user.id);
+  if (!card?.templateKey) return;
+  const benefits = await db
+    .select()
+    .from(perksBenefit)
+    .where(and(eq(perksBenefit.cardId, card.id), eq(perksBenefit.userId, user.id)));
+  const { added, changed } = catalogUpdates(card.templateKey, benefits);
+  const nextOrder = benefits.reduce((n, b) => Math.max(n, b.sortOrder + 1), 0);
+  if (added.length)
+    await db.insert(perksBenefit).values(
+      added.map((t, i) => ({
+        id: crypto.randomUUID(),
+        cardId: card.id,
+        userId: user.id,
+        sortOrder: nextOrder + i,
+        ...templateRow(t),
+      })),
+    );
+  for (const { benefit, template } of changed) {
+    const row = templateRow(template);
+    await db
+      .update(perksBenefit)
+      .set({
+        cadence: row.cadence,
+        amountCents: row.amountCents,
+        endsOn: row.endsOn,
+        notes: row.notes,
+      })
+      .where(and(eq(perksBenefit.id, benefit.id), eq(perksBenefit.userId, user.id)));
+  }
   refresh();
 }
 

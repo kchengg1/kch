@@ -390,6 +390,11 @@ check("application rules listed", (await bodyText()).includes("Bank of America 2
 
 /* 6e. Card picker, spending goals, notifications, referrals -------------- */
 await page.goto(`${BASE}/dashboard`);
+check(
+  "the card picker is not on the Overview",
+  !(await page.locator('form[action="/dashboard/pick"]').count()),
+);
+await page.goto(`${BASE}/dashboard/cards`);
 await page.fill('input[name="q"]', "Whole Foods");
 await Promise.all([
   page.waitForURL("**/dashboard/pick?q=*"),
@@ -431,6 +436,49 @@ check(
   "card rows say what's inside and that they open",
   (await page.locator('a[aria-label^="Chase Sapphire Reserve: see credits"]').innerText()).includes(
     "credits",
+  ),
+);
+
+/* Year-end checklist ---------------------------------------------------- */
+// Make the Gold card look like it was set up from an older catalog.
+sql(
+  `update perks_benefit set cadence='annual', amount_cents=10000 where name='Resy credit'; delete from perks_benefit where name='4x restaurants and U.S. supermarkets';`,
+);
+if (Number(today.slice(5, 7)) >= 11) {
+  await page.goto(`${BASE}/dashboard`);
+  check(
+    "overview links the year-end checklist in November and December",
+    (await page.locator('a[href="/dashboard/year-end"]').count()) === 1,
+  );
+}
+await page.goto(`${BASE}/dashboard/year-end`);
+body = await bodyText();
+check("year-end page lists credits to use", body.includes("Use before December 31"));
+check("calendar credits are on it", body.includes("The Edit hotel credit"));
+check("cardmember-year credits are kept apart", body.includes("No rush"));
+check("spend caps per card", body.includes("4x at U.S. supermarkets on up to $25,000"));
+check("referral limits reset", body.includes("Referral limits reset January 1"));
+check(
+  "suggests a December double dip on a card not held",
+  body.includes("Amex Business Platinum") && body.includes("Good in December"),
+);
+check("offers the catalog changes", body.includes("Changed: Resy credit"));
+await page
+  .locator("li", { hasText: "Changed: Resy credit" })
+  .locator('button:has-text("Apply")')
+  .click();
+check(
+  "applying catalog changes fixes the credit",
+  await until(
+    `select cadence || '/' || amount_cents from perks_benefit where name='Resy credit'`,
+    "semiannual/5000",
+  ),
+);
+check(
+  "and restores the missing one",
+  await until(
+    `select count(*) from perks_benefit where name='4x restaurants and U.S. supermarkets'`,
+    "1",
   ),
 );
 

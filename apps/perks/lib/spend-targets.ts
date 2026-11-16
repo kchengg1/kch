@@ -10,7 +10,33 @@ export const SPEND_TARGETS: Record<string, SpendTargetTemplate[]> = {
       name: "$75,000 spend perks",
       targetDollars: 75000,
       reward:
-        "Southwest A-List, $500 Southwest credit, IHG Diamond and $250 for The Shops at Chase",
+        "Southwest status, a $500 Southwest credit, IHG Diamond and $250 for The Shops at Chase",
+    },
+  ],
+  "amex-platinum": [
+    {
+      name: "Centurion Lounge guests",
+      targetDollars: 75000,
+      reward: "Two free guests per Centurion Lounge visit",
+    },
+  ],
+  "amex-business-platinum": [
+    {
+      name: "Centurion Lounge guests",
+      targetDollars: 75000,
+      reward: "Two free guests per Centurion Lounge visit",
+    },
+    {
+      name: "$250,000 spend credits",
+      targetDollars: 250000,
+      reward: "A $1,200 credit on flights booked through Amex Travel, plus the One AP credit",
+    },
+  ],
+  "capital-one-venture-x": [
+    {
+      name: "Lounge guests",
+      targetDollars: 75000,
+      reward: "Free guests in Capital One Lounges",
     },
   ],
   "chase-hyatt": [

@@ -6,7 +6,7 @@ import type { Cadence } from "./periods";
  * edited, switched off or deleted. Issuers change benefits often: treat this
  * as a starting point and confirm against the card's own benefits page.
  */
-export const CATALOG_REVIEWED = "2026-11-15";
+export const CATALOG_REVIEWED = "2026-11-16";
 
 export type TemplateBenefit = {
   name: string;
@@ -218,6 +218,13 @@ export const CATALOG: CardTemplate[] = [
         enroll: true,
       },
       {
+        name: "SoulCycle credit",
+        cadence: "annual",
+        amount: 300,
+        notes: "Toward a SoulCycle at-home bike. Resets each calendar year.",
+        enroll: true,
+      },
+      {
         name: "Walmart+ credit",
         cadence: "monthly",
         amount: 12.95,
@@ -266,6 +273,13 @@ export const CATALOG: CardTemplate[] = [
         cadence: "annual",
         amount: 300,
         notes: "U.S. purchases of ChatGPT Business. The plan has a two-seat minimum.",
+        enroll: true,
+      },
+      {
+        name: "Squarespace credit",
+        cadence: "annual",
+        amount: 150,
+        notes: "Squarespace purchases. Resets each calendar year.",
         enroll: true,
       },
       {
@@ -374,6 +388,15 @@ export const CATALOG: CardTemplate[] = [
         enroll: true,
       },
       {
+        name: "DoorDash grocery and retail promos",
+        inApp: true,
+        cadence: "monthly",
+        amount: 20,
+        notes:
+          "Two $10 promos a month on grocery, convenience and other non-restaurant orders of $20 or more. Needs DashPass activated on this card.",
+        enroll: true,
+      },
+      {
         name: "Lyft credit",
         inApp: true,
         cadence: "monthly",
@@ -407,7 +430,7 @@ export const CATALOG: CardTemplate[] = [
         name: "$75,000 spend unlocks",
         cadence: "perk",
         notes:
-          "Southwest A-List, $500 Southwest credit, IHG Diamond and $250 for The Shops at Chase after $75,000 in a calendar year.",
+          "Southwest status, a $500 Southwest credit, IHG Diamond and $250 for The Shops at Chase after $75,000 in a calendar year.",
       },
     ],
   },
@@ -588,10 +611,10 @@ export const CATALOG: CardTemplate[] = [
     benefits: [
       {
         name: "Air Canada credit",
-        cadence: "annual",
-        amount: 100,
+        cadence: "semiannual",
+        amount: 50,
         notes:
-          "Reported as up to $100 a year on Air Canada purchases since the September 2026 refresh. Confirm in your Chase account.",
+          "$50 on Air Canada purchases from January through June and another $50 from July through December.",
       },
       {
         name: "Aeroplan 25K status",
@@ -743,6 +766,18 @@ export const CATALOG: CardTemplate[] = [
         cadence: "perk",
         notes: "Plus preferred boarding. Citi announced a refresh raising the fee to $150 in 2027.",
       },
+      {
+        name: "Turo credit",
+        cadence: "annual",
+        amount: 180,
+        notes: "Up to $30 off each Turo trip, $180 a calendar year.",
+      },
+      {
+        name: "Flight discount after $20,000 spend",
+        cadence: "perk",
+        notes:
+          "A $125 American Airlines flight discount ($150 from Jan 24, 2027) after $20,000 of spend in a cardmember year, counted over 12 statements rather than the calendar year.",
+      },
     ],
   },
   {
@@ -787,11 +822,12 @@ export const CATALOG: CardTemplate[] = [
       },
       {
         name: "Airline credit",
-        cadence: "annual",
-        amount: 100,
+        cadence: "semiannual",
+        amount: 50,
         notes:
-          "Reported for 2026 on purchases made directly with airlines. Needs a one-time activation; confirm it continues.",
+          "$50 back after $250 spent directly with airlines, July to December 2026 and again January to June 2027. Activate first.",
         enroll: true,
+        endsOn: "2027-06-30",
       },
       {
         name: "Silver Elite status",
@@ -812,17 +848,31 @@ export const CATALOG: CardTemplate[] = [
       {
         name: "Anniversary free night (up to 40,000 points)",
         cadence: "anniversary",
-        notes:
-          "Posts after each card anniversary. Not confirmed in this review; check your IHG account.",
+        notes: "Posts after each card anniversary. Book it before it expires.",
         inApp: true,
       },
       {
         name: "United TravelBank credit",
-        cadence: "annual",
-        amount: 50,
-        notes: "Loads into a linked United MileagePlus account's TravelBank.",
+        cadence: "semiannual",
+        amount: 25,
+        notes:
+          "$25 lands in a linked United TravelBank around January 5 and again around July 5. Register first.",
         enroll: true,
         inApp: true,
+      },
+      {
+        name: "IHG food and beverage credit",
+        cadence: "quarterly",
+        amount: 25,
+        notes: "Food and drink charged at IHG hotels.",
+      },
+      {
+        name: "Airline credit",
+        cadence: "annual",
+        amount: 100,
+        notes:
+          "Statement credit once you spend $250 on airfare in the calendar year. Slated to end after 2027.",
+        endsOn: "2027-12-31",
       },
       GLOBAL_ENTRY,
       {
