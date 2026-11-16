@@ -151,18 +151,6 @@ export default async function DashboardPage() {
         </Link>
       )}
 
-      <form action="/dashboard/pick" className="flex gap-2">
-        <Input
-          name="q"
-          placeholder="Which card? Type a store, like Whole Foods"
-          aria-label="Which card should I use? Type a store or category"
-          className="h-11"
-        />
-        <Button type="submit" className="h-11">
-          Check
-        </Button>
-      </form>
-
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Stat
           label="Expiring this month"

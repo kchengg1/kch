@@ -7,8 +7,13 @@ import { cn } from "@kch/ui";
 
 const TABS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, also: [] as string[] },
-  // Catch up is about recording card usage, so it belongs with Cards.
-  { href: "/dashboard/cards", label: "Cards", icon: CreditCard, also: ["/dashboard/catch-up"] },
+  // Catch up records card usage and the picker chooses a card, so both belong with Cards.
+  {
+    href: "/dashboard/cards",
+    label: "Cards",
+    icon: CreditCard,
+    also: ["/dashboard/catch-up", "/dashboard/pick"],
+  },
   { href: "/dashboard/offers", label: "Offers", icon: Tag, also: [] },
   // Other people's offers, read-only.
   { href: "/dashboard/people", label: "People", icon: Users, also: [] },

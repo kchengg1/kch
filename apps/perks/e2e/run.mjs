@@ -390,6 +390,11 @@ check("application rules listed", (await bodyText()).includes("Bank of America 2
 
 /* 6e. Card picker, spending goals, notifications, referrals -------------- */
 await page.goto(`${BASE}/dashboard`);
+check(
+  "the card picker is not on the Overview",
+  !(await page.locator('form[action="/dashboard/pick"]').count()),
+);
+await page.goto(`${BASE}/dashboard/cards`);
 await page.fill('input[name="q"]', "Whole Foods");
 await Promise.all([
   page.waitForURL("**/dashboard/pick?q=*"),
