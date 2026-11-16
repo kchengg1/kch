@@ -7,7 +7,14 @@ const select =
   "flex h-10 w-full rounded-[var(--radius)] border bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50";
 
 /** Share a referral link with the group. Your own cards are listed first. */
-export function ReferralForm({ myTemplateKeys }: { myTemplateKeys: string[] }) {
+export function ReferralForm({
+  myTemplateKeys,
+  defaultKey,
+}: {
+  myTemplateKeys: string[];
+  /** Card to preselect, such as one picked from "Ready to share". */
+  defaultKey?: string;
+}) {
   const mine = CATALOG.filter((t) => myTemplateKeys.includes(t.key));
   const others = CATALOG.filter((t) => !myTemplateKeys.includes(t.key));
   return (
@@ -15,7 +22,13 @@ export function ReferralForm({ myTemplateKeys }: { myTemplateKeys: string[] }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="ref-card">Card</Label>
-          <select id="ref-card" name="card" className={select} defaultValue={mine[0]?.key ?? ""}>
+          <select
+            id="ref-card"
+            name="card"
+            className={select}
+            key={defaultKey}
+            defaultValue={defaultKey ?? mine[0]?.key ?? ""}
+          >
             {mine.length > 0 && (
               <optgroup label="Your cards">
                 {mine.map((t) => (

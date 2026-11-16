@@ -38,7 +38,13 @@ export default async function CatchUpPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Catch up on {today.slice(0, 4)}</h1>
+        <Link
+          href="/dashboard/cards"
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
+          ← Cards
+        </Link>
+        <h1 className="mt-1 text-2xl font-bold">Catch up on {today.slice(0, 4)}</h1>
         <p className="text-muted-foreground">
           Record credits you used before you started tracking, so totals and break-even are right.
         </p>

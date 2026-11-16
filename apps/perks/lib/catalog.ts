@@ -6,7 +6,19 @@ import type { Cadence } from "./periods";
  * edited, switched off or deleted. Issuers change benefits often: treat this
  * as a starting point and confirm against the card's own benefits page.
  */
-export const CATALOG_REVIEWED = "2026-11-15";
+export const CATALOG_REVIEWED = "2026-11-16";
+
+/**
+ * Benefits a card no longer has, or that were renamed. Cards set up before the
+ * change still carry them, so catalog updates offer to remove them.
+ */
+export const RETIRED: Record<string, string[]> = {
+  "amex-platinum": ["Saks Fifth Avenue credit"],
+  "chase-ihg-premier": [
+    "Anniversary free night (up to 40,000 points)",
+    "Platinum Elite status and 4th award night free",
+  ],
+};
 
 export type TemplateBenefit = {
   name: string;
@@ -56,7 +68,16 @@ export const CATALOG: CardTemplate[] = [
         name: "Hotel credit (Fine Hotels + Resorts / Hotel Collection)",
         cadence: "semiannual",
         amount: 300,
-        notes: "Prepaid bookings through Amex Travel. The Hotel Collection needs a 2-night stay.",
+        notes:
+          "Prepaid Fine Hotels + Resorts, Hotel Collection or Airbnb Luxe bookings through Amex Travel. From Jan 1, 2027 every booking needs a 2-night stay.",
+      },
+      {
+        name: "Airbnb Experiences credit",
+        cadence: "annual",
+        amount: 250,
+        notes:
+          "Airbnb Experiences booked after a prepaid Airbnb Luxe stay through Amex Travel. New in late 2026; confirm the reset date in your Amex benefits tab.",
+        enroll: true,
       },
       {
         name: "Dell Technologies credit",
@@ -85,7 +106,8 @@ export const CATALOG: CardTemplate[] = [
         name: "Wireless credit",
         cadence: "monthly",
         amount: 10,
-        notes: "Paid directly to a U.S. wireless provider. Put the phone bill on this card.",
+        notes:
+          "Paid directly to a U.S. wireless provider. From Feb 17, 2027 only Verizon, AT&T, T-Mobile, Frontier, Comcast, Charter, Spectrum Mobile, UScellular, Optimum, Ultra Mobile and Mint Mobile count.",
         enroll: true,
       },
       {
@@ -131,6 +153,12 @@ export const CATALOG: CardTemplate[] = [
         enroll: true,
       },
       {
+        name: "ZO Clubhouse and Studio membership",
+        cadence: "perk",
+        notes:
+          "Lounge and coworking spaces in NYC, Boston, DC, Chicago, SF and LA, plus up to $500 a calendar year toward ZO event space or a Dining Club membership.",
+      },
+      {
         name: "35% points rebate on Pay with Points",
         cadence: "perk",
         notes:
@@ -155,7 +183,16 @@ export const CATALOG: CardTemplate[] = [
         name: "Hotel credit (Fine Hotels + Resorts / Hotel Collection)",
         cadence: "semiannual",
         amount: 300,
-        notes: "Prepaid bookings through Amex Travel. The Hotel Collection needs a 2-night stay.",
+        notes:
+          "Prepaid Fine Hotels + Resorts, Hotel Collection or Airbnb Luxe bookings through Amex Travel. From Jan 1, 2027 every booking needs a 2-night stay.",
+      },
+      {
+        name: "Airbnb Experiences credit",
+        cadence: "annual",
+        amount: 250,
+        notes:
+          "Airbnb Experiences booked after a prepaid Airbnb Luxe stay through Amex Travel. New in late 2026; confirm the reset date in your Amex benefits tab.",
+        enroll: true,
       },
       {
         name: "Resy dining credit",
@@ -169,7 +206,7 @@ export const CATALOG: CardTemplate[] = [
         cadence: "monthly",
         amount: 25,
         notes:
-          "Disney+, Hulu, ESPN+, Peacock, NYT, WSJ, Paramount+, YouTube Premium and YouTube TV.",
+          "Disney+, Hulu, ESPN+, Peacock, NYT, WSJ, Paramount+, YouTube Premium and YouTube TV. Bundles, add-ons and third-party billing don't count since Aug 2026.",
         enroll: true,
       },
       {
@@ -188,17 +225,11 @@ export const CATALOG: CardTemplate[] = [
         enroll: true,
       },
       {
-        name: "Saks Fifth Avenue credit",
-        cadence: "semiannual",
-        amount: 50,
-        notes: "In store or at saks.com. No minimum spend.",
-        enroll: true,
-      },
-      {
         name: "Airline fee credit",
         cadence: "annual",
         amount: 200,
-        notes: "Incidental fees on the one airline you select each January.",
+        notes:
+          "Incidental fees on the one airline you select each January. United TravelBank no longer triggers it (Feb 2026).",
         enroll: true,
       },
       { name: "CLEAR Plus credit", cadence: "annual", amount: 209 },
@@ -218,6 +249,13 @@ export const CATALOG: CardTemplate[] = [
         enroll: true,
       },
       {
+        name: "SoulCycle credit",
+        cadence: "annual",
+        amount: 300,
+        notes: "Toward a SoulCycle at-home bike. Resets each calendar year.",
+        enroll: true,
+      },
+      {
         name: "Walmart+ credit",
         cadence: "monthly",
         amount: 12.95,
@@ -228,7 +266,13 @@ export const CATALOG: CardTemplate[] = [
         name: "Lounge access",
         cadence: "perk",
         notes:
-          "Centurion Lounges, Delta Sky Club when flying Delta (limited visits), Priority Pass.",
+          "Centurion Lounges, Delta Sky Club when flying Delta (limited visits), Priority Pass. Two free Centurion guests after $75,000 in a calendar year.",
+      },
+      {
+        name: "Venue Collection: 10% back at stadiums",
+        cadence: "perk",
+        notes:
+          "10% back on food and drink at participating stadiums and arenas, up to $250 a calendar year. Moves to the Benefits tab on Jan 6, 2027.",
       },
       {
         name: "Hotel status",
@@ -269,10 +313,17 @@ export const CATALOG: CardTemplate[] = [
         enroll: true,
       },
       {
+        name: "Squarespace credit",
+        cadence: "annual",
+        amount: 150,
+        notes: "Squarespace purchases. Resets each calendar year.",
+        enroll: true,
+      },
+      {
         name: "4x in your top two categories",
         cadence: "perk",
         notes:
-          "On the first $150,000 a year across the two eligible categories you spend most in each month.",
+          "On the first $150,000 a year across the two eligible categories you spend most in each month. From Feb 17, 2027 ads count only with Meta, Google, Amazon, Microsoft, GoDaddy and Yelp, and wireless only with major carriers.",
       },
     ],
   },
@@ -374,6 +425,15 @@ export const CATALOG: CardTemplate[] = [
         enroll: true,
       },
       {
+        name: "DoorDash grocery and retail promos",
+        inApp: true,
+        cadence: "monthly",
+        amount: 20,
+        notes:
+          "Two $10 promos a month on grocery, convenience and other non-restaurant orders of $20 or more. Needs DashPass activated on this card.",
+        enroll: true,
+      },
+      {
         name: "Lyft credit",
         inApp: true,
         cadence: "monthly",
@@ -407,7 +467,7 @@ export const CATALOG: CardTemplate[] = [
         name: "$75,000 spend unlocks",
         cadence: "perk",
         notes:
-          "Southwest A-List, $500 Southwest credit, IHG Diamond and $250 for The Shops at Chase after $75,000 in a calendar year.",
+          "Southwest status, a $500 Southwest credit, IHG Diamond, Hyatt Explorist and $250 for The Shops at Chase after $75,000 in a calendar year.",
       },
     ],
   },
@@ -479,6 +539,12 @@ export const CATALOG: CardTemplate[] = [
         name: "3x travel, shipping, internet, cable, phone and online ads",
         cadence: "perk",
         notes: "On the first $150,000 in combined purchases each account year.",
+      },
+      {
+        name: "Hyatt transfers at 4:3",
+        cadence: "perk",
+        notes:
+          "Since Oct 1, 2026, points move to Hyatt at 4:3. Move them to a Sapphire Reserve first to transfer 1:1.",
       },
       {
         name: "Cell phone protection",
@@ -570,11 +636,18 @@ export const CATALOG: CardTemplate[] = [
         inApp: true,
         endsOn: "2026-12-31",
       },
+      GLOBAL_ENTRY,
       {
         name: "3x dining, gas, EV charging and vacation rentals",
         cadence: "perk",
         notes:
-          "Plus 2x on Chase Travel and other travel. The 10% anniversary points bonus ended in October 2026.",
+          "Plus 5x on Chase Travel and 2x on other travel. The 10% anniversary points bonus ended in October 2026.",
+      },
+      {
+        name: "Hyatt transfers at 4:3",
+        cadence: "perk",
+        notes:
+          "Since Oct 1, 2026, points move to Hyatt at 4:3. Move them to a Sapphire Reserve first to transfer 1:1.",
       },
     ],
   },
@@ -588,16 +661,23 @@ export const CATALOG: CardTemplate[] = [
     benefits: [
       {
         name: "Air Canada credit",
-        cadence: "annual",
-        amount: 100,
+        cadence: "semiannual",
+        amount: 50,
         notes:
-          "Reported as up to $100 a year on Air Canada purchases since the September 2026 refresh. Confirm in your Chase account.",
+          "$50 on Air Canada purchases from January through June and another $50 from July through December.",
       },
       {
         name: "Aeroplan 25K status",
         cadence: "perk",
         notes:
           "Automatic while the card is open and linked to your Aeroplan account. Also 15% off eligible Air Canada awards.",
+      },
+      { ...GLOBAL_ENTRY, name: "Global Entry / TSA PreCheck / NEXUS fee credit" },
+      {
+        name: "Free checked bag on Air Canada",
+        cadence: "perk",
+        notes:
+          "For you and up to 8 companions. Points can also pay the annual fee at 2¢ each through Pay Yourself Back.",
       },
       {
         name: "Annual fee rises to $195",
@@ -726,7 +806,24 @@ export const CATALOG: CardTemplate[] = [
           "Arrives each card anniversary with no spend needed. Valid 12 months on awards where both tickets cost 25,000+ points.",
         inApp: true,
       },
+      {
+        name: "Alaska Lounge passes",
+        cadence: "quarterly",
+        notes: "Two lounge passes and two Wi-Fi passes each calendar quarter, 8 of each a year.",
+        inApp: true,
+      },
       GLOBAL_ENTRY,
+      {
+        name: "Global 100K companion award after $60,000",
+        cadence: "perk",
+        notes: "Earned by spending $60,000 in a card anniversary year.",
+      },
+      {
+        name: "Free checked bag and preferred boarding",
+        cadence: "perk",
+        notes:
+          "For you and up to six guests on the same Alaska or Hawaiian reservation paid with this card.",
+      },
       { name: "Faster Atmos elite status", cadence: "perk" },
     ],
   },
@@ -742,6 +839,24 @@ export const CATALOG: CardTemplate[] = [
         name: "First checked bag free on American",
         cadence: "perk",
         notes: "Plus preferred boarding. Citi announced a refresh raising the fee to $150 in 2027.",
+      },
+      {
+        name: "Turo credit",
+        cadence: "annual",
+        amount: 180,
+        notes: "Up to $30 off each Turo trip, $180 a calendar year.",
+      },
+      {
+        name: "Flight discount after $20,000 spend",
+        cadence: "perk",
+        notes:
+          "A $125 American Airlines flight discount ($150 from Jan 24, 2027) after $20,000 of spend in a cardmember year, counted over 12 statements rather than the calendar year.",
+      },
+      {
+        name: "Changes on Jan 24, 2027",
+        cadence: "perk",
+        notes:
+          "Annual fee rises to $150. Adds up to $100 a calendar year in inflight credits, a Walmart+ membership, a Global Entry / TSA PreCheck credit and trip protections.",
       },
     ],
   },
@@ -787,11 +902,12 @@ export const CATALOG: CardTemplate[] = [
       },
       {
         name: "Airline credit",
-        cadence: "annual",
-        amount: 100,
+        cadence: "semiannual",
+        amount: 50,
         notes:
-          "Reported for 2026 on purchases made directly with airlines. Needs a one-time activation; confirm it continues.",
+          "$50 back after $250 spent directly with airlines, July to December 2026 and again January to June 2027. Activate first.",
         enroll: true,
+        endsOn: "2027-06-30",
       },
       {
         name: "Silver Elite status",
@@ -806,29 +922,45 @@ export const CATALOG: CardTemplate[] = [
     name: "IHG One Rewards Premier",
     issuer: "Chase",
     business: false,
-    annualFee: 99,
+    annualFee: 150,
     match: /ihg/i,
     benefits: [
       {
-        name: "Anniversary free night (up to 40,000 points)",
+        name: "Anniversary free night (up to 50,000 points)",
         cadence: "anniversary",
-        notes:
-          "Posts after each card anniversary. Not confirmed in this review; check your IHG account.",
+        notes: "Posts after each card anniversary. Book it before it expires.",
         inApp: true,
       },
       {
         name: "United TravelBank credit",
-        cadence: "annual",
-        amount: 50,
-        notes: "Loads into a linked United MileagePlus account's TravelBank.",
+        cadence: "semiannual",
+        amount: 25,
+        notes:
+          "$25 lands in a linked United TravelBank around January 5 and again around July 5. Register first.",
         enroll: true,
         inApp: true,
       },
+      {
+        name: "IHG food and beverage credit",
+        cadence: "quarterly",
+        amount: 25,
+        notes:
+          "One $25 voucher per quarter for food and drink at IHG hotels. Only works during an active stay.",
+      },
+      {
+        name: "Airline credit",
+        cadence: "annual",
+        amount: 100,
+        notes:
+          "Statement credit once you spend $250 on airfare in the calendar year. Slated to end after 2027.",
+        endsOn: "2027-12-31",
+      },
       GLOBAL_ENTRY,
       {
-        name: "Platinum Elite status and 4th award night free",
+        name: "Gold Elite status and 4th award night free",
         cadence: "perk",
-        notes: "The fourth night of an award stay is free when you redeem points.",
+        notes:
+          "Status dropped from Platinum to Gold in October 2026. 15 elite night credits each January. From 2027 the fourth award night is free only after $5,000 of spend in the calendar year.",
       },
     ],
   },
@@ -845,6 +977,12 @@ export const CATALOG: CardTemplate[] = [
         cadence: "quarterly",
         notes: "5% back on up to $1,500 in the quarter's categories, only after you activate.",
         enroll: true,
+      },
+      {
+        name: "5% on Capital One Travel",
+        cadence: "perk",
+        notes:
+          "Hotels, vacation rentals and rental cars booked on Capital One Travel. Discover accounts are moving to the Capital One app in rounds through January 2027.",
       },
     ],
   },

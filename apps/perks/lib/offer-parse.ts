@@ -68,7 +68,7 @@ function rewardCents(details: string): number | null {
 }
 
 export function parseOffers(text: string, today: string): ParsedOffer[] {
-  const lines = text
+  const cleaned = text
     .replace(/\r\n?/g, "\n")
     .split("\n")
     .map((l) =>
@@ -81,9 +81,55 @@ export function parseOffers(text: string, today: string): ParsedOffer[] {
         .trim(),
     )
     .filter(Boolean);
+  const lines = unglue(cleaned);
   return lines.some((l) => EXPIRY.test(l))
     ? parseAnchored(lines, today)
     : parseByBlocks(lines, today);
+}
+
+/** A Chase deal on its own: "10% cash back", "Up to 5% back", "$20 cash back". */
+const BARE_DEAL = /^(?:up to )?(?:\$\s?[\d,]+(?:\.\d{1,2})?|\d+(?:\.\d+)?%) (?:cash )?back$/i;
+
+/**
+ * Chase copies each offer tile as one run-together line: badge, merchant,
+ * deal and status, e.g. "NewHyatt Essentials10% cash backExpiring soon".
+ * Returns [merchant, deal, ...status], or null when the line is not glued.
+ * The merchant must butt right up against the deal (no space), which keeps
+ * ordinary deal sentences like "Spend $50, get $10 back" whole.
+ */
+function splitGlued(line: string): string[] | null {
+  const tail = /expiring soon$/i.exec(line);
+  const body = tail ? line.slice(0, tail.index) : line;
+  if (!/back$/i.test(body)) return null;
+  for (let i = 1; i < body.length; i++) {
+    const merchant = body.slice(0, i);
+    const deal = body.slice(i);
+    if (/\s$/.test(merchant) || !BARE_DEAL.test(deal)) continue;
+    // "Studio 5410% back" is Studio 54 at 10%, not Studio at 5410%.
+    const pct = /(\d+(?:\.\d+)?)%/.exec(deal);
+    if (pct && Number(pct[1]) > 100) continue;
+    if (DEAL.test(merchant) || NOISE.test(merchant)) return null;
+    return tail ? [merchant, deal, "Expiring soon"] : [merchant, deal];
+  }
+  return null;
+}
+
+/** Splits glued Chase tiles into separate merchant and deal lines. */
+function unglue(lines: string[]): string[] {
+  const split = lines.map(splitGlued);
+  const merchants = split.flatMap((s) => (s ? [s[0]!] : []));
+  // Chase prefixes unseen offers with a "New" badge that copies as part of
+  // the name ("NewLyft", "NeweBay"). Strip it when most tiles carry it, so a
+  // real "New Balance" tile ("NewNew Balance") still keeps its name.
+  const badged = merchants.filter((m) => /^New\S/.test(m)).length;
+  const stripNew = merchants.length > 0 && badged * 2 >= merchants.length;
+  return lines.flatMap((line, i) => {
+    const parts = split[i];
+    if (!parts) return [line];
+    const [merchant, ...rest] = parts;
+    const name = stripNew && /^New\S/.test(merchant!) ? merchant!.slice(3) : merchant!;
+    return [name, ...rest];
+  });
 }
 
 /** Lines that can never be a merchant name. */
@@ -230,14 +276,29 @@ function parseByBlocks(lines: string[], today: string): ParsedOffer[] {
   for (const block of blocks) {
     const expiryLine = block.find((l) => EXPIRY.test(l));
     const deals = block.filter((l) => DEAL.test(l) && l !== expiryLine);
-    const names = block.filter((l) => !DEAL.test(l) && l !== expiryLine && !NOISE.test(l));
-    if (deals.length === 0 || names.length === 0) continue;
+    const isName = (l: string) =>
+      !DEAL.test(l) && l !== expiryLine && !NOISE.test(l) && !ADDED.test(l);
+    if (deals.length === 0) continue;
+    // The merchant is the name closest above the deal. The first block also
+    // holds the page header and filter menu ("Skip to main content", "Added
+    // to card"), so its first line is not the merchant.
+    const dealAt = block.findIndex((l) => DEAL.test(l) && l !== expiryLine);
+    let merchantAt = -1;
+    for (let i = dealAt - 1; i >= 0; i--) {
+      if (isName(block[i]!)) {
+        merchantAt = i;
+        break;
+      }
+    }
+    // Some pages print the deal before the merchant.
+    if (merchantAt < 0) merchantAt = block.findIndex((l, i) => i > dealAt && isName(l));
+    if (merchantAt < 0) continue;
     const offer: ParsedOffer = {
-      merchant: names[0]!.slice(0, 120),
+      merchant: block[merchantAt]!.slice(0, 120),
       details: deals.join(" ").slice(0, 300),
       valueCents: rewardCents(deals.join(" ")),
       expiresOn: expiryLine ? expiryFrom(expiryLine, today) : null,
-      added: block.some((l) => ADDED.test(l)),
+      added: block.slice(Math.min(merchantAt, dealAt)).some((l) => ADDED.test(l)),
     };
     const key = offerKey(offer);
     if (seen.has(key)) continue;

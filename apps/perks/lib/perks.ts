@@ -117,6 +117,23 @@ export async function listEveryonesOffers() {
   return { people, offers, cards };
 }
 
+/**
+ * Every open card in the group with its credits and usage, and who switched
+ * "Group rankings" off, for the People tab's leaderboard and card status.
+ */
+export async function loadGroupCards() {
+  const [cards, benefits, usage, prefs] = await Promise.all([
+    db.select().from(perksCard).where(eq(perksCard.closed, false)).orderBy(asc(perksCard.name)),
+    db.select().from(perksBenefit),
+    db.select().from(perksUsage),
+    db
+      .select({ userId: perksSettings.userId, shareRankings: perksSettings.shareRankings })
+      .from(perksSettings),
+  ]);
+  const hidden = new Set(prefs.filter((p) => !p.shareRankings).map((p) => p.userId));
+  return { cards, benefits, usage, hidden };
+}
+
 export async function listPoints(userId: string) {
   return db
     .select()
@@ -153,6 +170,12 @@ export async function listReferrals() {
     .innerJoin(user, eq(user.id, perksReferral.userId))
     .orderBy(asc(perksReferral.cardName));
   return rows.map((r) => ({ ...r, firstName: r.name.split(" ")[0] || r.name }));
+}
+
+/** Everyone else signed up to Perks. */
+export async function otherUserIds(userId: string): Promise<string[]> {
+  const rows = await db.select({ id: user.id }).from(user);
+  return rows.map((r) => r.id).filter((id) => id !== userId);
 }
 
 /** Adds the catalog's spend goals to open cards that don't have them yet. */

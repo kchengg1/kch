@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge, Button, Card, Input, cn } from "@kch/ui";
 import { CardIcon } from "@/components/card-icon";
+import { CardsNav } from "@/components/dashboard-nav";
 import { CATEGORIES, EARN_REVIEWED, classify, rankCards } from "@/lib/earn";
 import { merchantKey } from "@/lib/offer-groups";
 import { listOffers, listPoints, loadPortfolio, today as getToday } from "@/lib/perks";
@@ -52,12 +53,15 @@ export default async function PickPage({
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Which card should I use?</h1>
-        <p className="text-muted-foreground">
-          Type a store or pick a category. Cards are ranked by points earned times your own point
-          values.
-        </p>
+      <div className="space-y-4">
+        <CardsNav />
+        <div>
+          <h1 className="text-2xl font-bold">Which card should I use?</h1>
+          <p className="text-muted-foreground">
+            Type a store or pick a category. Cards are ranked by points earned times your own point
+            values.
+          </p>
+        </div>
       </div>
 
       <form action="/dashboard/pick" className="flex gap-2">

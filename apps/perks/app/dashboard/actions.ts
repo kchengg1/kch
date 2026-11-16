@@ -20,6 +20,7 @@ import {
   inArray,
 } from "@kch/db";
 import { getTemplate } from "@/lib/catalog";
+import { catalogUpdates, templateRow } from "@/lib/catalog-sync";
 import { sendDigest } from "@/lib/digest";
 import { sendPush } from "@/lib/push";
 import { parseDollars } from "@/lib/money";
@@ -35,6 +36,7 @@ import {
   listPoints,
   loadPortfolio,
   today,
+  otherUserIds,
 } from "@/lib/perks";
 import { currentPeriod, isCadence, periodsThisYear } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
@@ -324,6 +326,52 @@ export async function applyTemplateAction(form: FormData) {
   if (!card || !template) return;
   await db.update(perksCard).set({ templateKey: template.key }).where(eq(perksCard.id, card.id));
   await addTemplateBenefits(card.id, user.id, template.key);
+  refresh();
+}
+
+/** Brings a card's credits in line with the current catalog: adds new ones, updates changed ones. */
+export async function applyCatalogUpdatesAction(cardId: string) {
+  const { user } = await requireSession();
+  const card = await getCard(cardId, user.id);
+  if (!card?.templateKey) return;
+  const benefits = await db
+    .select()
+    .from(perksBenefit)
+    .where(and(eq(perksBenefit.cardId, card.id), eq(perksBenefit.userId, user.id)));
+  const { added, changed, removed } = catalogUpdates(card.templateKey, benefits);
+  if (removed.length)
+    await db.delete(perksBenefit).where(
+      and(
+        eq(perksBenefit.userId, user.id),
+        inArray(
+          perksBenefit.id,
+          removed.map((b) => b.id),
+        ),
+      ),
+    );
+  const nextOrder = benefits.reduce((n, b) => Math.max(n, b.sortOrder + 1), 0);
+  if (added.length)
+    await db.insert(perksBenefit).values(
+      added.map((t, i) => ({
+        id: crypto.randomUUID(),
+        cardId: card.id,
+        userId: user.id,
+        sortOrder: nextOrder + i,
+        ...templateRow(t),
+      })),
+    );
+  for (const { benefit, template } of changed) {
+    const row = templateRow(template);
+    await db
+      .update(perksBenefit)
+      .set({
+        cadence: row.cadence,
+        amountCents: row.amountCents,
+        endsOn: row.endsOn,
+        notes: row.notes,
+      })
+      .where(and(eq(perksBenefit.id, benefit.id), eq(perksBenefit.userId, user.id)));
+  }
   refresh();
 }
 
@@ -804,8 +852,23 @@ export async function addReferralAction(_prev: FormState, form: FormData): Promi
     url: url.slice(0, 500),
     reward: text(form, "reward").slice(0, 80),
   });
+  // Let the group know a new link is up, so it gets used.
+  const first = user.name.split(" ")[0] || "Someone";
+  const others = await otherUserIds(user.id);
+  await Promise.allSettled(
+    others.map((id) =>
+      sendPush(id, {
+        title: `${first} shared a ${cardName} referral link`,
+        body: "Applying for this card? Use their link so the bonus stays in the group.",
+        url: "/dashboard/bonuses#referrals",
+        tag: "referral",
+      }),
+    ),
+  );
   refresh();
-  return { message: `Shared your ${cardName} link.` };
+  return {
+    message: `Shared your ${cardName} link.${others.length ? " Everyone with notifications on was told." : ""}`,
+  };
 }
 
 export async function deleteReferralAction(id: string) {

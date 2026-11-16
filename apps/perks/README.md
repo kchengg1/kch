@@ -3,14 +3,15 @@
 A personal credit card benefit tracker. It keeps every statement credit, saved
 offer and sign-up bonus in one place and shows what is about to expire.
 
-| Page     | What it does                                                                       |
-| -------- | ---------------------------------------------------------------------------------- |
-| Overview | Unused credits sorted by deadline, expiring offers, upcoming annual fees           |
-| Cards    | Your cards, a usage grid per credit, and a one-paste import from a spreadsheet     |
-| Offers   | Paste an Amex Offers or Chase Offers page; offers are parsed and tracked to expiry |
-| People   | Read-only view of everyone else's live offers, flagging ones not in your offers    |
-| Bonuses  | Current sign-up offers checked against 5/24 and the cards you have had             |
-| Settings | Email digest on or off                                                             |
+| Page     | What it does                                                                                                               |
+| -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Overview | Unused credits sorted by deadline, expiring offers, upcoming annual fees                                                   |
+| Cards    | Your cards, a usage grid per credit, a one-paste import, and the "Which card?" search                                      |
+| Offers   | Paste an Amex Offers or Chase Offers page; offers are parsed and tracked to expiry                                         |
+| People   | Group leaderboard, everyone's cards and credits used, and their live offers                                                |
+| Year-end | Opens from the Overview in Nov–Dec: credits that reset Dec 31, spend caps, referral limits, when to apply, catalog updates |
+| Bonuses  | Current sign-up offers checked against 5/24 and the cards you have had                                                     |
+| Settings | Email digest on or off                                                                                                     |
 
 ## Run it
 

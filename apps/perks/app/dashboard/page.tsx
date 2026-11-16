@@ -12,6 +12,7 @@ import {
   ensureSpendTargets,
   listHiddenMerchants,
   listOffers,
+  listReferrals,
   listSpendTargets,
   loadPortfolio,
   today as getToday,
@@ -26,6 +27,8 @@ import {
   setSpendTargetTrackedAction,
 } from "./actions";
 import { actionable, buildStatuses, summarizeCards } from "@/lib/summary";
+import { expiringAtYearEnd, inYearEndWindow } from "@/lib/year-end";
+import { shareableCards } from "@/lib/referrals";
 
 /** Credits ending within this window sit in the main list; the rest are tucked below. */
 const SOON_DAYS = 45;
@@ -35,11 +38,15 @@ const FEE_DAYS = 60;
 export default async function DashboardPage() {
   const { user } = await requireSession();
   const today = getToday();
-  const [{ cards, benefits, usage }, offers, hidden] = await Promise.all([
+  const [{ cards, benefits, usage }, offers, hidden, referrals] = await Promise.all([
     loadPortfolio(user.id),
     listOffers(user.id),
     listHiddenMerchants(user.id),
+    listReferrals(),
   ]);
+  const shareable = shareableCards(cards, referrals, user.id);
+  const sharedAny = referrals.some((r) => r.userId === user.id);
+  const friendLinks = referrals.filter((r) => r.userId !== user.id).length;
   const hiddenKeys = new Set(hidden.map((h) => h.merchantKey));
   const open = cards.filter((c) => !c.closed);
 
@@ -63,7 +70,9 @@ export default async function DashboardPage() {
     );
   }
 
-  const todo = actionable(buildStatuses(cards, benefits, usage, today));
+  const statuses = buildStatuses(cards, benefits, usage, today);
+  const todo = actionable(statuses);
+  const yearEnd = inYearEndWindow(today) ? expiringAtYearEnd(statuses, today) : null;
   const soon = todo.filter((s) => (s.daysLeft ?? 0) <= SOON_DAYS);
   const later = todo.filter((s) => (s.daysLeft ?? 0) > SOON_DAYS);
   const thisMonth = todo.filter((s) => s.deadline && s.deadline.slice(0, 7) === today.slice(0, 7));
@@ -128,17 +137,45 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <form action="/dashboard/pick" className="flex gap-2">
-        <Input
-          name="q"
-          placeholder="Which card? Type a store, like Whole Foods"
-          aria-label="Which card should I use? Type a store or category"
-          className="h-11"
-        />
-        <Button type="submit" className="h-11">
-          Check
-        </Button>
-      </form>
+      {yearEnd && (
+        <Link
+          href="/dashboard/year-end"
+          className="flex items-center justify-between gap-3 rounded-[var(--radius)] border border-primary/40 bg-primary/5 px-4 py-3 hover:bg-primary/10"
+        >
+          <span className="min-w-0">
+            <span className="block font-medium">Year-end checklist</span>
+            <span className="block text-sm text-muted-foreground">
+              {yearEnd.length
+                ? `${formatCents(sum(yearEnd))} in ${yearEnd.length} credit${yearEnd.length === 1 ? "" : "s"} resets by Dec 31`
+                : "Calendar-year credits are used"}
+              {` · spend caps, referral limits and when to apply`}
+            </span>
+          </span>
+          <span aria-hidden className="text-primary">
+            →
+          </span>
+        </Link>
+      )}
+
+      {!sharedAny && shareable.length > 0 && (
+        <Link
+          href="/dashboard/bonuses#referrals"
+          className="flex items-center justify-between gap-3 rounded-[var(--radius)] border px-4 py-3 hover:bg-muted"
+        >
+          <span className="min-w-0">
+            <span className="block font-medium">Share your referral links</span>
+            <span className="block text-sm text-muted-foreground">
+              Friends who apply through your link get the bonus and you earn one too.{" "}
+              {friendLinks > 0
+                ? `${friendLinks} link${friendLinks === 1 ? " is" : "s are"} already shared in the group.`
+                : `You have ${shareable.length} card${shareable.length === 1 ? "" : "s"} to share.`}
+            </span>
+          </span>
+          <span aria-hidden className="text-primary">
+            →
+          </span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Stat
