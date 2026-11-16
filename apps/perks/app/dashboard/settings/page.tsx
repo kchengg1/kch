@@ -64,8 +64,9 @@ export default async function SettingsPage() {
         </CardTitle>
         <CardDescription className="mt-1">
           The People tab and card pages rank you by how much of your cards&rsquo; credits
-          you&rsquo;ve used this year. Only those totals are shown, never your individual credits or
-          points. Offers you paste are visible to the group on the People tab either way.
+          you&rsquo;ve used this year, and others can tap your cards to see which credits
+          you&rsquo;ve used and which are left. Your points are never shown. Offers you paste are
+          visible to the group on the People tab either way.
         </CardDescription>
         <form action={setShareRankingsAction.bind(null, !settings.shareRankings)} className="mt-4">
           <Button type="submit" variant="outline">

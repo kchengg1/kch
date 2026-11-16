@@ -3,7 +3,13 @@ import { Badge, Card, cn } from "@kch/ui";
 import { CardIcon } from "@/components/card-icon";
 import { dueLabel } from "@/components/credit-row";
 import { Meter } from "@/components/meter";
-import { groupStandings, ordinal, type CardStatus } from "@/lib/group-standings";
+import {
+  creditBreakdown,
+  groupStandings,
+  ordinal,
+  type CardStatus,
+  type CreditLine,
+} from "@/lib/group-standings";
 import { formatCents } from "@/lib/money";
 import { merchantKey } from "@/lib/offer-groups";
 import { rateLabel, WEAK_RATE } from "@/lib/offer-value";
@@ -63,6 +69,14 @@ export default async function PeoplePage({
     }))
     .sort((a, b) => a.firstName.localeCompare(b.firstName));
   const person = others.find((x) => x.id === p) ?? others[0];
+  // Credit-by-credit detail, only for cards whose owner shares group rankings.
+  const groupCardById = new Map(group.cards.map((c) => [c.id, c]));
+  const credits = new Map(
+    (person?.cards ?? []).flatMap((c) => {
+      const card = groupCardById.get(c.cardId);
+      return card ? [[c.cardId, creditBreakdown(card, group.benefits, group.usage, today)]] : [];
+    }),
+  );
 
   return (
     <div className="space-y-6">
@@ -158,7 +172,12 @@ export default async function PeoplePage({
           <section className="space-y-3">
             <h2 className="font-semibold">{person.firstName}&rsquo;s cards</h2>
             {person.cards ? (
-              <CardList cards={person.cards} year={year} />
+              <>
+                <p className="text-sm text-muted-foreground sm:hidden">
+                  Tap a card to see its credits.
+                </p>
+                <CardList cards={person.cards} credits={credits} year={year} />
+              </>
             ) : (
               <p className="text-sm text-muted-foreground">
                 {person.sharing
@@ -271,45 +290,142 @@ export default async function PeoplePage({
   );
 }
 
-/** One row per open card: credits used this year and place among others holding it. */
-function CardList({ cards, year }: { cards: CardStatus[]; year: string }) {
+/** Credits shown per list before "Show all". */
+const TOP = 3;
+
+/**
+ * One row per open card: credits used this year and place among others holding
+ * it. Tapping a card opens its top credits used and still to use.
+ */
+function CardList({
+  cards,
+  credits,
+  year,
+}: {
+  cards: CardStatus[];
+  credits: Map<string, { used: CreditLine[]; unused: CreditLine[] }>;
+  year: string;
+}) {
   return (
     <Card className="py-2">
       <ul className="divide-y">
-        {cards.map((c) => (
-          <li key={c.cardId} className="py-3">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="inline-flex min-w-0 items-center gap-2">
-                <CardIcon templateKey={c.templateKey} issuer={c.issuer} />
-                <span className="truncate font-medium">{c.name}</span>
-                {c.place && (
-                  <Badge
-                    variant={placeVariant(c.place.rank)}
-                    title={`Ranked by credits used in ${year} among ${c.place.of} people with this card`}
-                  >
-                    {ordinal(c.place.rank)} of {c.place.of}
-                  </Badge>
-                )}
-              </span>
-              <span className="shrink-0 tabular-nums">
-                {c.availableCents > 0 ? (
-                  <>
-                    {formatCents(c.capturedCents)}
-                    <span className="text-muted-foreground">
-                      {` of ${formatCents(c.availableCents)} · ${Math.round(c.share * 100)}%`}
+        {cards.map((c) => {
+          const detail = credits.get(c.cardId);
+          const hasDetail = detail && (detail.used.length > 0 || detail.unused.length > 0);
+          const row = (
+            <>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  <CardIcon templateKey={c.templateKey} issuer={c.issuer} />
+                  <span className="truncate font-medium">{c.name}</span>
+                  {c.place && (
+                    <Badge
+                      variant={placeVariant(c.place.rank)}
+                      title={`Ranked by credits used in ${year} among ${c.place.of} people with this card`}
+                    >
+                      {ordinal(c.place.rank)} of {c.place.of}
+                    </Badge>
+                  )}
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {c.availableCents > 0 ? (
+                    <>
+                      {formatCents(c.capturedCents)}
+                      <span className="text-muted-foreground">
+                        {` of ${formatCents(c.availableCents)} · ${Math.round(c.share * 100)}%`}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">No tracked credits</span>
+                  )}
+                </span>
+              </div>
+              {c.availableCents > 0 && (
+                <Meter value={c.capturedCents} max={c.availableCents} className="mt-2" />
+              )}
+            </>
+          );
+          return (
+            <li key={c.cardId} className="py-3">
+              {hasDetail ? (
+                <details className="group">
+                  <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                    {row}
+                    <span className="mt-1 block text-xs text-muted-foreground group-open:hidden">
+                      Show credits ▾
                     </span>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">No tracked credits</span>
-                )}
-              </span>
-            </div>
-            {c.availableCents > 0 && (
-              <Meter value={c.capturedCents} max={c.availableCents} className="mt-2" />
-            )}
-          </li>
-        ))}
+                  </summary>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                    <CreditColumn
+                      title={`Used most in ${year}`}
+                      empty="Nothing logged yet this year."
+                      lines={detail.used}
+                      amount={(l) => formatCents(l.usedCents)}
+                      sub={(l) => (l.availableCents ? `of ${formatCents(l.availableCents)}` : "")}
+                    />
+                    <CreditColumn
+                      title={`Still to use in ${year}`}
+                      empty="Every credit used."
+                      lines={detail.unused}
+                      amount={(l) => formatCents(l.leftCents)}
+                      sub={(l) =>
+                        l.usedCents ? `${formatCents(l.usedCents)} used` : "none used yet"
+                      }
+                    />
+                  </div>
+                </details>
+              ) : (
+                row
+              )}
+            </li>
+          );
+        })}
       </ul>
     </Card>
+  );
+}
+
+/** Top credits in one list, the rest behind "Show all". */
+function CreditColumn({
+  title,
+  empty,
+  lines,
+  amount,
+  sub,
+}: {
+  title: string;
+  empty: string;
+  lines: CreditLine[];
+  amount: (l: CreditLine) => string;
+  sub: (l: CreditLine) => string;
+}) {
+  const item = (l: CreditLine) => (
+    <li key={l.benefitId} className="flex items-baseline justify-between gap-3 py-1">
+      <span className="min-w-0 truncate">{l.name}</span>
+      <span className="shrink-0 tabular-nums">
+        {amount(l)} <span className="text-xs text-muted-foreground">{sub(l)}</span>
+      </span>
+    </li>
+  );
+  const rest = lines.slice(TOP);
+  return (
+    <div className="rounded-lg bg-muted/50 p-3 text-sm">
+      <p className="mb-1 text-xs font-medium text-muted-foreground">{title}</p>
+      {lines.length === 0 ? (
+        <p className="text-muted-foreground">{empty}</p>
+      ) : (
+        <>
+          <ul>{lines.slice(0, TOP).map(item)}</ul>
+          {rest.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                Show all {lines.length}
+              </summary>
+              <ul>{rest.map(item)}</ul>
+            </details>
+          )}
+        </>
+      )}
+    </div>
   );
 }
