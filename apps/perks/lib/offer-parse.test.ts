@@ -245,6 +245,74 @@ Add offer`;
     ]);
   });
 
+  it("reads a real Chase Offers page where each tile copies as one line", () => {
+    // Shape of chase.com's offers page as copied with Cmd+A (trimmed). Each
+    // tile is "New" + merchant + deal glued together, and the filter menu
+    // includes an "Added to card" option.
+    const page = `[Skip to main content](https://secure.chase.com/web/auth/dashboard)
+Open an account
+Sign out
+[Skip primary navigation](https://secure.chase.com/web/auth/dashboard)
+Accounts
+Pay & transfer
+Benefits & travel
+Back
+Chase Offers
+All
+Shopping
+Travel
+Food & drink
+All deals
+Offer status
+Added to card
+Not added
+Ways to shop
+Online
+In-store
+Brand
+A-F
+0-9
+136 results
+Sort by
+Recommended
+[NewHyatt Essentials10% cash back](https://secure.chase.com/#)
+[NewSunocoUp to 5% back](https://secure.chase.com/#)
+[NewYouTube Channel Memberships100% cash backExpiring soon](https://secure.chase.com/#)
+[NewLululemon10% back](https://secure.chase.com/#)
+[NewParamount+$4 cash back](https://secure.chase.com/#)
+[NewMyEyeDr.15% cash back](https://secure.chase.com/#)
+[NewFubo: Live TV + Sports40% cash back](https://secure.chase.com/#)
+[NeweBay5% cash back](https://secure.chase.com/#)
+[NewiRobot10% cash back](https://secure.chase.com/#)
+[NewNew Balance10% cash back](https://secure.chase.com/#)
+[NewTonal$250 cash back](https://secure.chase.com/#)`;
+    const offers = parseOffers(page, TODAY);
+    expect(offers.map((o) => [o.merchant, o.details, o.valueCents, o.added])).toEqual([
+      ["Hyatt Essentials", "10% cash back", null, false],
+      ["Sunoco", "Up to 5% back", null, false],
+      ["YouTube Channel Memberships", "100% cash back", null, false],
+      ["Lululemon", "10% back", null, false],
+      ["Paramount+", "$4 cash back", 400, false],
+      ["MyEyeDr.", "15% cash back", null, false],
+      ["Fubo: Live TV + Sports", "40% cash back", null, false],
+      ["eBay", "5% cash back", null, false],
+      ["iRobot", "10% cash back", null, false],
+      ["New Balance", "10% cash back", null, false],
+      ["Tonal", "$250 cash back", 25000, false],
+    ]);
+    expect(offers.some((o) => /skip to main/i.test(o.merchant))).toBe(false);
+  });
+
+  it("keeps deal sentences whole and splits a merchant ending in digits correctly", () => {
+    expect(parseOffers("Studio 5410% cash back", TODAY)[0]).toMatchObject({
+      merchant: "Studio 54",
+      details: "10% cash back",
+    });
+    expect(
+      parseOffers("Nike\nSpend $100 or more, get $20 back\nAdd to Card", TODAY)[0],
+    ).toMatchObject({ merchant: "Nike", details: "Spend $100 or more, get $20 back" });
+  });
+
   it("handles the deal listed before the merchant", () => {
     const text = `Spend $80 or more, get $15 back
 Wine.com
