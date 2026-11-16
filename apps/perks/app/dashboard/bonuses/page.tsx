@@ -7,6 +7,7 @@ import { checkEligibility, fiveTwentyFour, type BonusOffer, type Verdict } from 
 import { formatCents } from "@/lib/money";
 import { applicationRules } from "@/lib/rules";
 import { listReferrals, loadPortfolio, today as getToday } from "@/lib/perks";
+import { CardsNav } from "@/components/dashboard-nav";
 import { ReferralForm } from "@/components/referral-form";
 import { deleteReferralAction } from "../actions";
 import { Button } from "@kch/ui";
@@ -53,12 +54,15 @@ export default async function BonusesPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Bonuses and referrals</h1>
-        <p className="text-muted-foreground">
-          Notable offers as of {formatDate(data.asOf)}, checked against your card history. You are
-          at <span className="font-medium text-foreground">{count}/24</span> for Chase.
-        </p>
+      <div className="space-y-4">
+        <CardsNav />
+        <div>
+          <h1 className="text-2xl font-bold">Bonuses and referrals</h1>
+          <p className="text-muted-foreground">
+            Notable offers as of {formatDate(data.asOf)}, checked against your card history. You are
+            at <span className="font-medium text-foreground">{count}/24</span> for Chase.
+          </p>
+        </div>
       </div>
 
       <section id="referrals" className="scroll-mt-20 space-y-3">

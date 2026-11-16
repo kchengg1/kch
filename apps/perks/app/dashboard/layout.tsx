@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Container } from "@kch/ui";
 import { appConfig } from "@/app.config";
-import { DashboardNav, MobileTabBar } from "@/components/dashboard-nav";
+import { DashboardNav, MobileTabBar, SettingsLink } from "@/components/dashboard-nav";
 import { SignOutButton } from "@/components/sign-out-button";
 import { requireSession } from "@/lib/session";
 
@@ -17,9 +17,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </Link>
             <DashboardNav />
           </nav>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="hidden text-muted-foreground sm:inline">{user.email}</span>
-            <SignOutButton />
+          <div className="flex items-center gap-2 text-sm">
+            <span className="hidden text-muted-foreground md:inline">{user.email}</span>
+            <SettingsLink />
+            <SignOutButton className="hidden sm:inline-flex" />
           </div>
         </Container>
       </header>
