@@ -8,7 +8,7 @@ import { CardIcon } from "@/components/card-icon";
 import { Meter } from "@/components/meter";
 import { UsageChips } from "@/components/usage-chips";
 import { CATALOG, CATALOG_REVIEWED, getTemplate } from "@/lib/catalog";
-import { catalogUpdates } from "@/lib/catalog-sync";
+import { catalogUpdates, updateCount as countUpdates } from "@/lib/catalog-sync";
 import { formatCents } from "@/lib/money";
 import { msrStatus } from "@/lib/msr";
 import { cardWorth, faceValueCents, myValueCents } from "@/lib/worth";
@@ -63,7 +63,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
   const worth = cardWorth(benefits, card.annualFeeCents, today);
   const worthRows = benefits.filter((b) => !(b.endsOn && b.endsOn < today));
   const updates = catalogUpdates(card.templateKey, benefits);
-  const updateCount = updates.added.length + updates.changed.length;
+  const updateCount = countUpdates(updates);
 
   return (
     <div className="space-y-8">
@@ -221,6 +221,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
                 {[
                   ...updates.added.map((t) => `new ${t.name}`),
                   ...updates.changed.map((c) => `${c.benefit.name} changed`),
+                  ...updates.removed.map((b) => `${b.name} removed`),
                 ].join(", ")}
                 .
               </span>

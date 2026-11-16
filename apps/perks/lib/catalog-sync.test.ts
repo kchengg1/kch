@@ -10,7 +10,20 @@ describe("catalogUpdates", () => {
     expect(catalogUpdates("chase-ihg-premier", rowsFor("chase-ihg-premier"))).toEqual({
       added: [],
       changed: [],
+      removed: [],
     });
+  });
+
+  it("offers to remove credits the card no longer has", () => {
+    const rows = [
+      ...rowsFor("amex-platinum"),
+      {
+        id: "saks",
+        ...templateRow({ name: "Saks Fifth Avenue credit", cadence: "semiannual", amount: 50 }),
+      },
+    ];
+    const { added, changed, removed } = catalogUpdates("amex-platinum", rows);
+    expect([added, changed, removed.map((b) => b.id)]).toEqual([[], [], ["saks"]]);
   });
 
   it("finds new and changed credits on an older card", () => {
@@ -41,6 +54,6 @@ describe("catalogUpdates", () => {
   });
 
   it("does nothing for cards without a template", () => {
-    expect(catalogUpdates(null, [])).toEqual({ added: [], changed: [] });
+    expect(catalogUpdates(null, [])).toEqual({ added: [], changed: [], removed: [] });
   });
 });

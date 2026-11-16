@@ -338,7 +338,17 @@ export async function applyCatalogUpdatesAction(cardId: string) {
     .select()
     .from(perksBenefit)
     .where(and(eq(perksBenefit.cardId, card.id), eq(perksBenefit.userId, user.id)));
-  const { added, changed } = catalogUpdates(card.templateKey, benefits);
+  const { added, changed, removed } = catalogUpdates(card.templateKey, benefits);
+  if (removed.length)
+    await db.delete(perksBenefit).where(
+      and(
+        eq(perksBenefit.userId, user.id),
+        inArray(
+          perksBenefit.id,
+          removed.map((b) => b.id),
+        ),
+      ),
+    );
   const nextOrder = benefits.reduce((n, b) => Math.max(n, b.sortOrder + 1), 0);
   if (added.length)
     await db.insert(perksBenefit).values(

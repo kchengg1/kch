@@ -10,7 +10,7 @@ export const SPEND_TARGETS: Record<string, SpendTargetTemplate[]> = {
       name: "$75,000 spend perks",
       targetDollars: 75000,
       reward:
-        "Southwest status, a $500 Southwest credit, IHG Diamond and $250 for The Shops at Chase",
+        "Southwest status, a $500 Southwest credit, IHG Diamond, Hyatt Explorist and $250 for The Shops at Chase",
     },
   ],
   "amex-platinum": [
