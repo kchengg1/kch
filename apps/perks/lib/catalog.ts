@@ -388,6 +388,15 @@ export const CATALOG: CardTemplate[] = [
         enroll: true,
       },
       {
+        name: "DoorDash grocery and retail promos",
+        inApp: true,
+        cadence: "monthly",
+        amount: 20,
+        notes:
+          "Two $10 promos a month on grocery, convenience and other non-restaurant orders of $20 or more. Needs DashPass activated on this card.",
+        enroll: true,
+      },
+      {
         name: "Lyft credit",
         inApp: true,
         cadence: "monthly",
