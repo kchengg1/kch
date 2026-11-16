@@ -489,8 +489,27 @@ check(
   sql(`select count(*) from perks_vapid`) === "1",
 );
 
+await page.goto(`${BASE}/dashboard`);
+check(
+  "the Overview invites sharing referral links",
+  (await page.locator('a[href="/dashboard/bonuses#referrals"]').count()) === 1,
+);
 await page.goto(`${BASE}/dashboard/bonuses`);
-await page.selectOption("#ref-card", "chase-sapphire-reserve");
+body = await bodyText();
+check(
+  "Bonuses explains referrals up front",
+  body.includes("Share yours") &&
+    body.indexOf("Referral links") < body.indexOf("Application rules"),
+);
+await page.goto(`${BASE}/dashboard/cards/${csrId}`);
+await Promise.all([
+  page.waitForURL("**/dashboard/bonuses?share=*"),
+  page.click('a:has-text("Share my link")'),
+]);
+check(
+  "Share my link preselects the card",
+  (await page.inputValue("#ref-card")) === "chase-sapphire-reserve",
+);
 await page.fill("#ref-url", "https://www.referyourchasecard.com/19/EXAMPLE");
 await page.fill("#ref-reward", "10,000 points");
 await page.click('button:has-text("Share link")');
@@ -499,6 +518,13 @@ check(
   "a referral link is saved",
   sql(`select card_name from perks_referral`) === "Chase Sapphire Reserve",
 );
+await page.goto(`${BASE}/dashboard`);
+check(
+  "the invite goes away once a link is shared",
+  (await page.locator('a[href="/dashboard/bonuses#referrals"]').count()) === 0,
+);
+await page.goto(`${BASE}/dashboard/cards/${csrId}`);
+check("the card page says the link is shared", (await bodyText()).includes("Your link is shared"));
 
 /* 7. Paste offers -------------------------------------------------------- */
 await page.goto(`${BASE}/dashboard/offers`);

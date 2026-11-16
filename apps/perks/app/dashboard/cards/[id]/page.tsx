@@ -12,7 +12,14 @@ import { catalogUpdates } from "@/lib/catalog-sync";
 import { formatCents } from "@/lib/money";
 import { msrStatus } from "@/lib/msr";
 import { cardWorth, faceValueCents, myValueCents } from "@/lib/worth";
-import { cardStandings, getCard, loadPortfolio, today as getToday } from "@/lib/perks";
+import {
+  cardStandings,
+  getCard,
+  listReferrals,
+  loadPortfolio,
+  today as getToday,
+} from "@/lib/perks";
+import { friendsLinksFor } from "@/lib/referrals";
 import { CADENCE_LABEL, formatDate, isCadence, type Cadence } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
 import { indexUsage, summarizeCards } from "@/lib/summary";
@@ -50,6 +57,9 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
   const standings =
     card.templateKey && !card.closed ? await cardStandings(card.templateKey, user.id, today) : [];
   const medals = ["1st", "2nd", "3rd"];
+  const referrals = card.templateKey && !card.closed ? await listReferrals() : [];
+  const myLink = referrals.find((r) => r.userId === user.id && r.templateKey === card.templateKey);
+  const friendsLinks = friendsLinksFor(referrals, card.templateKey, user.id);
   const worth = cardWorth(benefits, card.annualFeeCents, today);
   const worthRows = benefits.filter((b) => !(b.endsOn && b.endsOn < today));
   const updates = catalogUpdates(card.templateKey, benefits);
@@ -103,6 +113,33 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
               ? `That covers the ${formatCents(card.annualFeeCents)} fee.`
               : `${formatCents(card.annualFeeCents - summary.capturedCents)} more to cover the fee.`}
           </p>
+        </Card>
+      )}
+
+      {card.templateKey && !card.closed && (
+        <Card className="flex max-w-xl flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="font-medium">Referral link</p>
+            <p className="text-muted-foreground">
+              {myLink
+                ? "Your link is shared with the group. Friends who apply through it earn you the referral bonus."
+                : "Share your link for this card. Friends who apply through it get the bonus and you earn one too."}
+              {friendsLinks.length > 0 &&
+                ` ${friendsLinks.map((r) => r.firstName).join(" and ")} shared one too.`}
+            </p>
+          </div>
+          <Link
+            href={
+              myLink
+                ? "/dashboard/bonuses#referrals"
+                : (`/dashboard/bonuses?share=${encodeURIComponent(card.templateKey)}#share` as never)
+            }
+            className="shrink-0"
+          >
+            <Button size="sm" variant={myLink ? "outline" : "default"}>
+              {myLink ? "See links" : "Share my link"}
+            </Button>
+          </Link>
         </Card>
       )}
 

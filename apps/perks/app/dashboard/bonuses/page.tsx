@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import { Badge, Card, CardTitle } from "@kch/ui";
+import { Badge, Card, CardTitle, cn } from "@kch/ui";
+import { CardIcon } from "@/components/card-icon";
+import { shareableCards } from "@/lib/referrals";
 import data from "@/data/signup-bonuses.json";
 import { checkEligibility, fiveTwentyFour, type BonusOffer, type Verdict } from "@/lib/eligibility";
 import { formatCents } from "@/lib/money";
@@ -20,12 +22,18 @@ const LABEL: Record<Verdict["status"], string> = {
   ineligible: "Not eligible",
 };
 
-export default async function BonusesPage() {
+export default async function BonusesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ share?: string }>;
+}) {
   const { user } = await requireSession();
+  const { share } = await searchParams;
   const today = getToday();
   const [{ cards }, referrals] = await Promise.all([loadPortfolio(user.id), listReferrals()]);
   const mine = referrals.filter((r) => r.userId === user.id);
   const others = referrals.filter((r) => r.userId !== user.id);
+  const shareable = shareableCards(cards, referrals, user.id);
   /** Links from others in the group for a sign-up offer's card. */
   const referralsFor = (offer: BonusOffer) => {
     const re = new RegExp(offer.match, "i");
@@ -46,12 +54,128 @@ export default async function BonusesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Sign-up bonuses</h1>
+        <h1 className="text-2xl font-bold">Bonuses and referrals</h1>
         <p className="text-muted-foreground">
           Notable offers as of {formatDate(data.asOf)}, checked against your card history. You are
           at <span className="font-medium text-foreground">{count}/24</span> for Chase.
         </p>
       </div>
+
+      <section id="referrals" className="scroll-mt-20 space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Referral links</h2>
+          <p className="text-sm text-muted-foreground">
+            Shared with everyone in Perks, so sign-up bonuses stay in the group.
+          </p>
+        </div>
+        <Card className="grid gap-4 text-sm sm:grid-cols-3">
+          <div>
+            <p className="font-medium">1. Share yours</p>
+            <p className="text-muted-foreground">
+              Add the referral link for each card you have. Find it in the issuer&rsquo;s app under
+              &ldquo;Refer a friend&rdquo;.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium">2. Use theirs</p>
+            <p className="text-muted-foreground">
+              Before applying for a card, check here. Applying through a friend&rsquo;s link gets
+              you the same bonus and earns them one too.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium">3. Everyone earns</p>
+            <p className="text-muted-foreground">
+              Referral bonuses are often 10,000 to 40,000 points. Amex pays for up to 5 a year and
+              Chase caps them at 50,000 to 200,000 points; both reset January 1.
+            </p>
+          </div>
+        </Card>
+        {shareable.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">
+              Ready to share: {shareable.length} card{shareable.length === 1 ? "" : "s"} you have
+              without a link yet
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {shareable.map((c) => (
+                <a
+                  key={c.id}
+                  href={`/dashboard/bonuses?share=${encodeURIComponent(c.templateKey!)}#share`}
+                  className={cn(
+                    "inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-1 text-sm hover:bg-muted",
+                    share === c.templateKey && "border-primary bg-primary/10 text-primary",
+                  )}
+                >
+                  <CardIcon
+                    templateKey={c.templateKey}
+                    issuer={c.issuer}
+                    className="h-3 w-[19px]"
+                  />
+                  {c.name}
+                  <span className="text-primary">Share</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+        {others.length > 0 && (
+          <Card className="py-2">
+            <p className="pt-2 text-sm font-medium">Friends&rsquo; links</p>
+            <ul className="divide-y text-sm">
+              {others.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-4 py-3">
+                  <div className="min-w-0">
+                    <p className="font-medium">{r.cardName}</p>
+                    <p className="text-muted-foreground">
+                      {r.firstName}&rsquo;s link{r.reward ? ` · they earn ${r.reward}` : ""}
+                    </p>
+                  </div>
+                  <a
+                    href={r.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 font-medium text-primary hover:underline"
+                  >
+                    Open link
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+        {mine.length > 0 && (
+          <Card className="py-2">
+            <p className="pt-2 text-sm font-medium">Your shared links</p>
+            <ul className="divide-y text-sm">
+              {mine.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-4 py-2.5">
+                  <span className="min-w-0 truncate">
+                    {r.cardName}
+                    {r.reward && <span className="text-muted-foreground"> · {r.reward}</span>}
+                  </span>
+                  <form action={deleteReferralAction.bind(null, r.id)}>
+                    <Button type="submit" size="sm" variant="ghost">
+                      Remove
+                    </Button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+        <Card id="share" className="max-w-3xl scroll-mt-20">
+          <CardTitle className="text-base">Share a referral link</CardTitle>
+          <div className="mt-4">
+            <ReferralForm
+              myTemplateKeys={cards
+                .filter((c) => !c.closed && c.templateKey)
+                .map((c) => c.templateKey!)}
+              defaultKey={share ?? shareable[0]?.templateKey ?? undefined}
+            />
+          </div>
+        </Card>
+      </section>
 
       <section>
         <h2 className="text-lg font-semibold">Application rules</h2>
@@ -158,70 +282,6 @@ export default async function BonusesPage() {
           </Card>
         ))}
       </div>
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold">Referral links</h2>
-          <p className="text-sm text-muted-foreground">
-            Everyone signed in to Perks can see these, so a bonus stays in the group. Apply through
-            someone&rsquo;s link and they earn the referral reward too.
-          </p>
-        </div>
-        {others.length > 0 && (
-          <Card className="py-2">
-            <ul className="divide-y text-sm">
-              {others.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-4 py-3">
-                  <div className="min-w-0">
-                    <p className="font-medium">{r.cardName}</p>
-                    <p className="text-muted-foreground">
-                      {r.firstName}&rsquo;s link{r.reward ? ` · they earn ${r.reward}` : ""}
-                    </p>
-                  </div>
-                  <a
-                    href={r.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 font-medium text-primary hover:underline"
-                  >
-                    Open link
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
-        {mine.length > 0 && (
-          <Card className="py-2">
-            <p className="pt-2 text-sm font-medium">Your shared links</p>
-            <ul className="divide-y text-sm">
-              {mine.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-4 py-2.5">
-                  <span className="min-w-0 truncate">
-                    {r.cardName}
-                    {r.reward && <span className="text-muted-foreground"> · {r.reward}</span>}
-                  </span>
-                  <form action={deleteReferralAction.bind(null, r.id)}>
-                    <Button type="submit" size="sm" variant="ghost">
-                      Remove
-                    </Button>
-                  </form>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
-        <Card className="max-w-3xl">
-          <CardTitle className="text-base">Share a referral link</CardTitle>
-          <div className="mt-4">
-            <ReferralForm
-              myTemplateKeys={cards
-                .filter((c) => !c.closed && c.templateKey)
-                .map((c) => c.templateKey!)}
-            />
-          </div>
-        </Card>
-      </section>
 
       <p className="text-sm text-muted-foreground">
         Eligibility is an estimate from published issuer rules and your card dates. The issuer makes

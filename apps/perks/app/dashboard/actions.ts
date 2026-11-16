@@ -36,6 +36,7 @@ import {
   listPoints,
   loadPortfolio,
   today,
+  otherUserIds,
 } from "@/lib/perks";
 import { currentPeriod, isCadence, periodsThisYear } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
@@ -841,8 +842,23 @@ export async function addReferralAction(_prev: FormState, form: FormData): Promi
     url: url.slice(0, 500),
     reward: text(form, "reward").slice(0, 80),
   });
+  // Let the group know a new link is up, so it gets used.
+  const first = user.name.split(" ")[0] || "Someone";
+  const others = await otherUserIds(user.id);
+  await Promise.allSettled(
+    others.map((id) =>
+      sendPush(id, {
+        title: `${first} shared a ${cardName} referral link`,
+        body: "Applying for this card? Use their link so the bonus stays in the group.",
+        url: "/dashboard/bonuses#referrals",
+        tag: "referral",
+      }),
+    ),
+  );
   refresh();
-  return { message: `Shared your ${cardName} link.` };
+  return {
+    message: `Shared your ${cardName} link.${others.length ? " Everyone with notifications on was told." : ""}`,
+  };
 }
 
 export async function deleteReferralAction(id: string) {
