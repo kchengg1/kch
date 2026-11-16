@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Badge, Button, Card, CardDescription, CardTitle } from "@kch/ui";
 import { ActionForm } from "@/components/action-form";
 import { PushToggle } from "@/components/push-toggle";
+import { SignOutButton } from "@/components/sign-out-button";
 import { vapidPublicKey } from "@/lib/push";
 import { getSettings } from "@/lib/perks";
 import { requireSession } from "@/lib/session";
@@ -81,6 +82,9 @@ export default async function SettingsPage() {
           <dt className="text-muted-foreground">Email</dt>
           <dd>{user.email}</dd>
         </dl>
+        <div className="mt-4 border-t pt-4">
+          <SignOutButton variant="outline" />
+        </div>
       </Card>
     </div>
   );

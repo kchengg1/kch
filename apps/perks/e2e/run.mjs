@@ -812,12 +812,43 @@ const phone = await (
 await signup(phone, "Pat Phone", "phone@example.com");
 const tabBar = phone.getByRole("navigation", { name: "Sections" });
 check("phone shows the bottom tab bar", await tabBar.isVisible());
-for (const label of ["Overview", "Cards", "Offers", "Points", "Bonuses", "Settings"]) {
+check("phone bottom bar has 5 tabs", (await tabBar.getByRole("link").count()) === 5);
+for (const label of ["Overview", "Cards", "Offers", "Points", "People"]) {
   check(
-    `${label} is reachable on a phone`,
+    `${label} is reachable in the bottom bar`,
     await tabBar.getByRole("link", { name: label }).isVisible(),
   );
 }
+check(
+  "Sign out is tucked out of the phone header",
+  !(await phone.locator("header").getByRole("button", { name: "Sign out" }).isVisible()),
+);
+const settingsGear = phone.locator("header").getByRole("link", { name: "Settings" });
+check("Settings gear is in the phone header", await settingsGear.isVisible());
+await Promise.all([phone.waitForURL("**/dashboard/settings"), settingsGear.click()]);
+check(
+  "Sign out is inside Settings on a phone",
+  await phone.locator("main").getByRole("button", { name: "Sign out" }).isVisible(),
+);
+await Promise.all([
+  phone.waitForURL("**/dashboard/cards"),
+  tabBar.getByRole("link", { name: "Cards" }).click(),
+]);
+const cardViews = phone.getByRole("navigation", { name: "Card views" });
+for (const label of ["My cards", "Which card?", "Bonuses & rules"]) {
+  check(
+    `Cards switcher shows ${label}`,
+    await cardViews.getByRole("link", { name: label }).isVisible(),
+  );
+}
+await Promise.all([
+  phone.waitForURL("**/dashboard/bonuses"),
+  cardViews.getByRole("link", { name: "Bonuses & rules" }).click(),
+]);
+check(
+  "Bonuses keeps the Cards tab active",
+  (await tabBar.getByRole("link", { name: "Cards" }).getAttribute("aria-current")) === "page",
+);
 check(
   "nothing scrolls sideways on a phone",
   (await phone.evaluate(() => document.documentElement.scrollWidth)) <= 390,

@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { Badge, Button, Card, CardDescription, CardTitle, Input, Label } from "@kch/ui";
 import { ActionForm } from "@/components/action-form";
 import { CardIcon } from "@/components/card-icon";
+import { CardsNav } from "@/components/dashboard-nav";
 import { Meter } from "@/components/meter";
 import { CATALOG } from "@/lib/catalog";
 import { formatCents } from "@/lib/money";
@@ -48,20 +49,23 @@ export default async function CardsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Cards</h1>
-          <p className="text-sm text-muted-foreground">
-            Tap a card to see and tick off its credits.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/dashboard/catch-up">
-            <Button variant="outline">Catch up on credits used</Button>
-          </Link>
-          <Link href="/dashboard/cards/import">
-            <Button variant="outline">Import cards</Button>
-          </Link>
+      <div className="space-y-4">
+        <CardsNav />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Cards</h1>
+            <p className="text-sm text-muted-foreground">
+              Tap a card to see and tick off its credits.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/dashboard/catch-up">
+              <Button variant="outline">Catch up on credits used</Button>
+            </Link>
+            <Link href="/dashboard/cards/import">
+              <Button variant="outline">Import cards</Button>
+            </Link>
+          </div>
         </div>
       </div>
 
