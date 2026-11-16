@@ -278,12 +278,14 @@ function CardList({ cards, year }: { cards: CardStatus[]; year: string }) {
       <ul className="divide-y">
         {cards.map((c) => (
           <li key={c.cardId} className="py-3">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="inline-flex min-w-0 items-center gap-2">
+            {/* Phones: name and place on one line, amounts below. Wider screens: one row. */}
+            <div className="flex flex-col gap-0.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <span className="flex min-w-0 items-center gap-2">
                 <CardIcon templateKey={c.templateKey} issuer={c.issuer} />
-                <span className="truncate font-medium">{c.name}</span>
+                <span className="min-w-0 truncate font-medium">{c.name}</span>
                 {c.place && (
                   <Badge
+                    className="shrink-0 whitespace-nowrap"
                     variant={placeVariant(c.place.rank)}
                     title={`Ranked by credits used in ${year} among ${c.place.of} people with this card`}
                   >
@@ -291,7 +293,7 @@ function CardList({ cards, year }: { cards: CardStatus[]; year: string }) {
                   </Badge>
                 )}
               </span>
-              <span className="shrink-0 tabular-nums">
+              <span className="pl-10 tabular-nums sm:shrink-0 sm:pl-0">
                 {c.availableCents > 0 ? (
                   <>
                     {formatCents(c.capturedCents)}
