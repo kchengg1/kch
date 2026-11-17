@@ -221,7 +221,12 @@ export type MobileBootstrapInput = {
   hiddenMerchants: MobileHiddenMerchantInput[];
   points: MobilePointsInput[];
   redemptions: MobileRedemptionInput[];
-  settings: { digestEnabled: boolean; lastDigestOn: string | null; shareRankings?: boolean };
+  settings: {
+    digestEnabled: boolean;
+    lastDigestOn: string | null;
+    shareRankings?: boolean;
+    lastActiveAt?: string | null;
+  };
   spendTargets?: MobileSpendTargetInput[];
   referrals?: MobileReferralInput[];
   groupOffers?: MobileGroupOffersInput;
@@ -870,6 +875,7 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
       digestEnabled: settings.digestEnabled,
       lastDigestOn: settings.lastDigestOn,
       shareRankings,
+      lastActiveAt: settings.lastActiveAt ?? null,
     },
   };
 }

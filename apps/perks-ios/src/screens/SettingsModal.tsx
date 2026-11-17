@@ -3,6 +3,7 @@ import { Modal, Platform, ScrollView, StyleSheet, Switch, Text, View } from "rea
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, COLORS, SectionCard } from "../components/ui";
 import { formatDate } from "../lib/format";
+import { formatLastActive } from "../lib/last-active";
 import type { MobileActionPayload, MobileActionResponse, MobileBootstrap } from "../types";
 
 export function SettingsModal({
@@ -126,6 +127,10 @@ export function SettingsModal({
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Email</Text>
               <Text style={styles.kvValue}>{data.user.email}</Text>
+            </View>
+            <View style={styles.kvRow}>
+              <Text style={styles.kvLabel}>Last active</Text>
+              <Text style={styles.kvValue}>{formatLastActive(data.settings.lastActiveAt)}</Text>
             </View>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Server</Text>
