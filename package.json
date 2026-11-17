@@ -18,6 +18,9 @@
     "db:migrate": "pnpm --filter @kch/db migrate",
     "db:push": "pnpm --filter @kch/db push",
     "db:studio": "pnpm --filter @kch/db studio",
+    "ios:preview": "pnpm --filter @kch/perks-ios build:preview",
+    "ios:testflight": "pnpm --filter @kch/perks-ios build:testflight",
+    "ios:ota": "pnpm --filter @kch/perks-ios update:production",
     "new-app": "node scripts/new-app.mjs"
   },
   "devDependencies": {

@@ -2,27 +2,48 @@
 
 Native iOS companion app for `apps/perks`, built with Expo (React Native + TypeScript). Each account signs in with its own credentials stored in the iOS Keychain (`expo-secure-store`) and talks to the Perks server's `/api/mobile/bootstrap` and `/api/mobile/action` JSON endpoints.
 
-## Running locally (Expo Go or iOS Simulator)
+## Shipping to TestFlight (No `pnpm` or Xcode required)
 
-1. Copy `.env.example` to `.env` inside `apps/perks-ios` and set `EXPO_PUBLIC_API_URL` to your deployed Perks URL (or `http://<your-lan-ip>:3100` when testing against a local `apps/perks` dev server on a phone). You can also change the server URL directly on the Sign-in screen under **Server connection**.
-2. Start Expo from the repository root:
-   ```bash
-   pnpm --filter @kch/perks-ios dev
-   ```
-3. Scan the QR code with the **Expo Go** iOS app, or press `i` on macOS to open in the iOS Simulator.
+You do **not** need `pnpm` or Xcode installed locally. Everything installs on GitHub Actions and Expo's cloud macOS build servers (`apps/perks-ios/eas.json` pins Node `22.14.0` and `pnpm@10.33.0` remotely).
 
-## Building for TestFlight / internal distribution (EAS)
+### Option A: Browser + GitHub Actions (zero local CLI)
 
-`eas.json` defines `development`, `preview` (ad-hoc internal install), and `production` (App Store Connect / TestFlight) profiles:
+1. **App Store Connect** (`https://appstoreconnect.apple.com`):
+   - Create an App record under **My Apps → + → New App** (iOS, Bundle ID `com.kchengg1.perks`) and copy its numeric **Apple ID** under **General → App Information** (e.g. `6501234567`).
+   - Under **Users and Access → Integrations → App Store Connect API**, generate a key (Admin/App Manager) and note the **Issuer ID**, **Key ID**, and download the `.p8` file.
+   - Note your 10-character **Apple Team ID** at `https://developer.apple.com/account`.
+2. **Expo** (`https://expo.dev`):
+   - Create an access token at `https://expo.dev/settings/access-tokens`.
+   - Under your project's **Credentials → iOS**, upload or generate your **iOS Distribution Certificate** once in the web UI (EAS requires an existing Distribution Certificate before running non-interactive CI builds).
+3. **GitHub Secrets & Variables** (`Settings → Secrets and variables → Actions`):
+   - **Secrets**:
+     - `EXPO_TOKEN` — your Expo access token
+     - `EXPO_APPLE_TEAM_ID` — your 10-character Apple Team ID
+     - `EXPO_ASC_KEY_ID` — App Store Connect API Key ID
+     - `EXPO_ASC_ISSUER_ID` — App Store Connect Issuer ID
+     - `EXPO_ASC_API_KEY` — full text contents of your `AuthKey_XXXX.p8` file
+   - **Variables**:
+     - `EXPO_PUBLIC_API_URL` — `https://kch-six.vercel.app` (already configured by default in `eas.json`)
+     - `ASC_APP_ID` — your numeric App Store Connect Apple ID (enables automatic TestFlight submission)
+4. **Run the build**:
+   - Open **GitHub → Actions → iOS TestFlight → Run workflow** and click **Run workflow**.
+
+---
+
+### Option B: One `npx` command (or GitHub Codespaces) — easiest first-time Apple setup
+
+If you have Node.js (`npx`) — or open a browser terminal via **GitHub → Code → Codespaces → Create codespace** — run `eas-cli` directly inside `apps/perks-ios` with **no `pnpm` required**. It logs into Apple interactively once to generate your Distribution Certificate, Provisioning Profile, and App Store Connect setup automatically:
 
 ```bash
 cd apps/perks-ios
-npx eas-cli build --platform ios --profile preview
-# or for TestFlight:
-npx eas-cli build --platform ios --profile production --auto-submit
+npx --yes eas-cli@latest build --platform ios --profile production --auto-submit
 ```
 
-Set `EXPO_PUBLIC_API_URL` in EAS Environment Variables so cloud builds connect to your production Vercel deployment out of the box.
+## Running locally in Expo Go
+
+```bash
+pnpm --filter @kch/perks-ios dev
+```
 
 ## Checks
 

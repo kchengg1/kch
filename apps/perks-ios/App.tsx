@@ -20,20 +20,52 @@ import {
   setStoredToken,
 } from "./src/lib/storage";
 import { AuthScreen } from "./src/screens/AuthScreen";
-import { BonusesScreen } from "./src/screens/BonusesScreen";
 import { CardDetailModal } from "./src/screens/CardDetailModal";
 import { CardsScreen } from "./src/screens/CardsScreen";
 import { CatchUpModal } from "./src/screens/CatchUpModal";
 import { OffersScreen } from "./src/screens/OffersScreen";
 import { OverviewScreen } from "./src/screens/OverviewScreen";
+import { PeopleScreen } from "./src/screens/PeopleScreen";
 import { PointsScreen } from "./src/screens/PointsScreen";
 import { SettingsModal } from "./src/screens/SettingsModal";
+import { YearEndModal } from "./src/screens/YearEndModal";
 import type {
+  CardsSubTabKey,
   MobileActionPayload,
   MobileActionResponse,
   MobileBootstrap,
   TabKey,
 } from "./src/types";
+
+const INITIAL_MOUNTED_TABS: Record<TabKey, boolean> = {
+  overview: true,
+  cards: false,
+  offers: false,
+  points: false,
+  people: false,
+};
+
+function TabPane({
+  active,
+  mounted,
+  children,
+}: {
+  active: boolean;
+  mounted: boolean;
+  children: React.ReactNode;
+}) {
+  if (!mounted && !active) return null;
+  return (
+    <View
+      style={active ? styles.tabPaneActive : styles.tabPaneHidden}
+      pointerEvents={active ? "auto" : "none"}
+      accessibilityElementsHidden={!active}
+      importantForAccessibility={active ? "auto" : "no-hide-descendants"}
+    >
+      {children}
+    </View>
+  );
+}
 
 function PerksShell() {
   const insets = useSafeAreaInsets();
@@ -47,14 +79,71 @@ function PerksShell() {
   const [banner, setBanner] = useState<{ text: string; tone: "info" | "error" } | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [cardsSubTab, setCardsSubTab] = useState<CardsSubTabKey>("cards");
+  const [shareTemplateKey, setShareTemplateKey] = useState<string | null>(null);
+  const [mountedTabs, setMountedTabs] = useState<Record<TabKey, boolean>>(INITIAL_MOUNTED_TABS);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [catchUpOpen, setCatchUpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [yearEndOpen, setYearEndOpen] = useState(false);
 
   const tokenRef = useRef<string | null>(null);
   const serverRef = useRef<string>(serverUrl);
   tokenRef.current = token;
   serverRef.current = serverUrl;
+
+  const handleTabChange = useCallback((nextTab: TabKey) => {
+    setActiveTab(nextTab);
+    setMountedTabs((prev) => (prev[nextTab] ? prev : { ...prev, [nextTab]: true }));
+  }, []);
+
+  const handleCardsSubTabChange = useCallback((nextSubTab: CardsSubTabKey) => {
+    setCardsSubTab(nextSubTab);
+    if (nextSubTab !== "bonuses") {
+      setShareTemplateKey(null);
+    }
+  }, []);
+
+  const handleOpenReferrals = useCallback(
+    (templateKey?: string) => {
+      setShareTemplateKey(templateKey ?? null);
+      setCardsSubTab("bonuses");
+      handleTabChange("cards");
+    },
+    [handleTabChange],
+  );
+
+  const handleOpenCard = useCallback((cardId: string) => {
+    setSelectedCardId(cardId);
+  }, []);
+
+  const handleCloseCard = useCallback(() => {
+    setSelectedCardId(null);
+  }, []);
+
+  const handleOpenCatchUp = useCallback(() => {
+    setCatchUpOpen(true);
+  }, []);
+
+  const handleCloseCatchUp = useCallback(() => {
+    setCatchUpOpen(false);
+  }, []);
+
+  const handleOpenSettings = useCallback(() => {
+    setSettingsOpen(true);
+  }, []);
+
+  const handleCloseSettings = useCallback(() => {
+    setSettingsOpen(false);
+  }, []);
+
+  const handleOpenYearEnd = useCallback(() => {
+    setYearEndOpen(true);
+  }, []);
+
+  const handleCloseYearEnd = useCallback(() => {
+    setYearEndOpen(false);
+  }, []);
 
   const loadSnapshot = useCallback(async (baseUrl: string, authToken: string) => {
     const snap = await fetchBootstrap({ baseUrl, token: authToken });
@@ -100,11 +189,30 @@ function PerksShell() {
     return () => sub.remove();
   }, [loadSnapshot]);
 
-  async function handleRefresh() {
-    if (!token) return;
+  // Pre-mount remaining tabs in staggered idle slices after Overview paints so first taps are instant.
+  const hasBootstrap = bootstrap !== null;
+  useEffect(() => {
+    if (!hasBootstrap) return;
+    const queue: TabKey[] = ["cards", "offers", "points", "people"];
+    const timers = queue.map((tab, idx) =>
+      setTimeout(
+        () => {
+          setMountedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
+        },
+        120 * (idx + 1),
+      ),
+    );
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+    };
+  }, [hasBootstrap]);
+
+  const handleRefresh = useCallback(async () => {
+    const activeToken = tokenRef.current;
+    if (!activeToken) return;
     setRefreshing(true);
     try {
-      await loadSnapshot(serverUrl, token);
+      await loadSnapshot(serverRef.current, activeToken);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         await setStoredToken(null);
@@ -119,76 +227,94 @@ function PerksShell() {
     } finally {
       setRefreshing(false);
     }
-  }
+  }, [loadSnapshot]);
 
-  async function handleRunRawAction(
-    payload: MobileActionPayload,
-    key: string,
-  ): Promise<MobileActionResponse> {
-    if (!token) {
-      throw new Error("Not signed in.");
-    }
-    setBusyKey(key);
-    setBanner(null);
-    try {
-      const res = await postMobileAction({ baseUrl: serverUrl, token, payload });
-      if (res.bootstrap) {
-        setBootstrap(res.bootstrap);
+  const triggerRefresh = useCallback(() => {
+    void handleRefresh();
+  }, [handleRefresh]);
+
+  const handleRunRawAction = useCallback(
+    async (payload: MobileActionPayload, key: string): Promise<MobileActionResponse> => {
+      const activeToken = tokenRef.current;
+      if (!activeToken) {
+        throw new Error("Not signed in.");
       }
-      if (res.message) {
-        setBanner({ text: res.message, tone: "info" });
-      }
-      successHaptic();
-      return res;
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        await setStoredToken(null);
-        setToken(null);
-        setBootstrap(null);
-      } else {
-        setBanner({
-          text: err instanceof Error ? err.message : "Could not save change.",
-          tone: "error",
+      setBusyKey(key);
+      setBanner(null);
+      try {
+        const res = await postMobileAction({
+          baseUrl: serverRef.current,
+          token: activeToken,
+          payload,
         });
+        if (res.bootstrap) {
+          setBootstrap(res.bootstrap);
+        }
+        if (res.message) {
+          setBanner({ text: res.message, tone: "info" });
+        }
+        successHaptic();
+        return res;
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          await setStoredToken(null);
+          setToken(null);
+          setBootstrap(null);
+        } else {
+          setBanner({
+            text: err instanceof Error ? err.message : "Could not save change.",
+            tone: "error",
+          });
+        }
+        throw err;
+      } finally {
+        setBusyKey(null);
       }
-      throw err;
-    } finally {
-      setBusyKey(null);
-    }
-  }
+    },
+    [],
+  );
 
-  async function handleAction(payload: MobileActionPayload, key: string): Promise<void> {
-    try {
-      await handleRunRawAction(payload, key);
-    } catch {
-      // Error surfaced via banner
-    }
-  }
+  const handleAction = useCallback(
+    async (payload: MobileActionPayload, key: string): Promise<void> => {
+      try {
+        await handleRunRawAction(payload, key);
+      } catch {
+        // Error surfaced via banner
+      }
+    },
+    [handleRunRawAction],
+  );
 
-  async function handleActionReturningCardId(
-    payload: MobileActionPayload,
-    key: string,
-  ): Promise<string | undefined> {
-    try {
-      const res = await handleRunRawAction(payload, key);
-      return res.cardId;
-    } catch {
-      return undefined;
-    }
-  }
+  const handleActionReturningCardId = useCallback(
+    async (payload: MobileActionPayload, key: string): Promise<string | undefined> => {
+      try {
+        const res = await handleRunRawAction(payload, key);
+        return res.cardId;
+      } catch {
+        return undefined;
+      }
+    },
+    [handleRunRawAction],
+  );
 
-  async function handleSignOut() {
-    const activeToken = token;
+  const handleSignOut = useCallback(async () => {
+    const activeToken = tokenRef.current;
+    const activeServerUrl = serverRef.current;
     setSettingsOpen(false);
     setSelectedCardId(null);
     setCatchUpOpen(false);
+    setYearEndOpen(false);
+    setActiveTab("overview");
+    setCardsSubTab("cards");
+    setShareTemplateKey(null);
+    setMountedTabs(INITIAL_MOUNTED_TABS);
     await setStoredToken(null);
     setToken(null);
     setBootstrap(null);
     if (activeToken) {
-      await signOutSession({ baseUrl: serverUrl, token: activeToken });
+      await signOutSession({ baseUrl: activeServerUrl, token: activeToken });
     }
-  }
+  }, []);
 
   if (initializing) {
     return (
@@ -245,7 +371,7 @@ function PerksShell() {
             <Text style={styles.errorHeading}>Could not connect to Perks</Text>
             <Text style={styles.errorDetail}>{bootError}</Text>
             <View style={styles.retryRow}>
-              <Button label="Retry" onPress={() => void handleRefresh()} loading={refreshing} />
+              <Button label="Retry" onPress={triggerRefresh} loading={refreshing} />
               <Button label="Sign out" variant="secondary" onPress={() => void handleSignOut()} />
             </View>
           </>
@@ -280,78 +406,99 @@ function PerksShell() {
       ) : null}
 
       <View style={styles.flex}>
-        {activeTab === "overview" ? (
+        <TabPane active={activeTab === "overview"} mounted={mountedTabs.overview}>
           <OverviewScreen
             data={bootstrap}
             refreshing={refreshing}
             busyKey={busyKey}
-            onRefresh={() => void handleRefresh()}
+            onRefresh={triggerRefresh}
             onAction={handleAction}
-            onOpenCard={(cardId) => setSelectedCardId(cardId)}
-            onOpenCatchUp={() => setCatchUpOpen(true)}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onNavigateTab={setActiveTab}
+            onOpenCard={handleOpenCard}
+            onOpenCatchUp={handleOpenCatchUp}
+            onOpenSettings={handleOpenSettings}
+            onOpenYearEnd={handleOpenYearEnd}
+            onOpenReferrals={handleOpenReferrals}
+            onNavigateTab={handleTabChange}
           />
-        ) : null}
+        </TabPane>
 
-        {activeTab === "cards" ? (
+        <TabPane active={activeTab === "cards"} mounted={mountedTabs.cards}>
           <CardsScreen
             data={bootstrap}
             refreshing={refreshing}
             busyKey={busyKey}
-            onRefresh={() => void handleRefresh()}
+            subTab={cardsSubTab}
+            onSubTabChange={handleCardsSubTabChange}
+            shareTemplateKey={shareTemplateKey}
+            onRefresh={triggerRefresh}
             onAction={handleActionReturningCardId}
-            onOpenCard={(cardId) => setSelectedCardId(cardId)}
-            onOpenCatchUp={() => setCatchUpOpen(true)}
+            onVoidAction={handleAction}
+            onOpenCard={handleOpenCard}
+            onOpenCatchUp={handleOpenCatchUp}
+            onNavigateTab={handleTabChange}
           />
-        ) : null}
+        </TabPane>
 
-        {activeTab === "offers" ? (
+        <TabPane active={activeTab === "offers"} mounted={mountedTabs.offers}>
           <OffersScreen
             data={bootstrap}
             refreshing={refreshing}
             busyKey={busyKey}
-            onRefresh={() => void handleRefresh()}
+            onRefresh={triggerRefresh}
             onAction={handleAction}
           />
-        ) : null}
+        </TabPane>
 
-        {activeTab === "points" ? (
+        <TabPane active={activeTab === "points"} mounted={mountedTabs.points}>
           <PointsScreen
             data={bootstrap}
             refreshing={refreshing}
             busyKey={busyKey}
-            onRefresh={() => void handleRefresh()}
+            onRefresh={triggerRefresh}
             onAction={handleAction}
           />
-        ) : null}
+        </TabPane>
 
-        {activeTab === "bonuses" ? (
-          <BonusesScreen
-            data={bootstrap}
-            refreshing={refreshing}
-            onRefresh={() => void handleRefresh()}
-          />
-        ) : null}
+        <TabPane active={activeTab === "people"} mounted={mountedTabs.people}>
+          <PeopleScreen data={bootstrap} refreshing={refreshing} onRefresh={triggerRefresh} />
+        </TabPane>
       </View>
 
-      <TabBar active={activeTab} onChange={setActiveTab} bottomInset={insets.bottom} />
+      <TabBar active={activeTab} onChange={handleTabChange} bottomInset={insets.bottom} />
 
       <CardDetailModal
         card={selectedCard}
         today={bootstrap.today}
         catalog={bootstrap.catalog}
+        referrals={bootstrap.referrals}
         busyKey={busyKey}
-        onClose={() => setSelectedCardId(null)}
+        onClose={handleCloseCard}
         onAction={handleAction}
+        onOpenReferrals={handleOpenReferrals}
       />
 
       <CatchUpModal
         visible={catchUpOpen}
         data={bootstrap}
         busyKey={busyKey}
-        onClose={() => setCatchUpOpen(false)}
+        onClose={handleCloseCatchUp}
         onRunRawAction={handleRunRawAction}
+      />
+
+      <YearEndModal
+        visible={yearEndOpen}
+        data={bootstrap}
+        busyKey={busyKey}
+        onClose={handleCloseYearEnd}
+        onAction={handleAction}
+        onOpenCard={(id) => {
+          setYearEndOpen(false);
+          setSelectedCardId(id);
+        }}
+        onOpenReferrals={() => {
+          setYearEndOpen(false);
+          handleOpenReferrals();
+        }}
       />
 
       <SettingsModal
@@ -359,7 +506,7 @@ function PerksShell() {
         data={bootstrap}
         serverUrl={serverUrl}
         busyKey={busyKey}
-        onClose={() => setSettingsOpen(false)}
+        onClose={handleCloseSettings}
         onRunRawAction={handleRunRawAction}
         onSignOut={handleSignOut}
       />
@@ -380,6 +527,14 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     backgroundColor: COLORS.bg,
+  },
+  tabPaneActive: {
+    flex: 1,
+    display: "flex",
+  },
+  tabPaneHidden: {
+    flex: 1,
+    display: "none",
   },
   centered: {
     flex: 1,

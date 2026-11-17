@@ -14,12 +14,13 @@ import {
   formatCents,
   formatCpp,
   formatDate,
+  formatInteger,
   formatSignedCents,
 } from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
 import type { MobileActionPayload, MobileBootstrap } from "../types";
 
-export function PointsScreen({
+export const PointsScreen = React.memo(function PointsScreen({
   data,
   refreshing,
   busyKey,
@@ -83,7 +84,7 @@ export function PointsScreen({
         <View style={styles.flexShrink}>
           <Text style={styles.title}>Points</Text>
           <Text style={[styles.subtitle, NUM_STYLE]}>
-            {data.points.totalPoints.toLocaleString("en-US")} pts · worth{" "}
+            {formatInteger(data.points.totalPoints)} pts · worth{" "}
             {formatCents(data.points.totalValueCents)}
           </Text>
         </View>
@@ -230,8 +231,7 @@ export function PointsScreen({
                     <View style={styles.flexShrink}>
                       <Text style={styles.programTitle}>{b.program}</Text>
                       <Text style={[styles.metaText, NUM_STYLE]}>
-                        {b.balance.toLocaleString("en-US")} pts at{" "}
-                        {formatCpp(b.centsPerPointX100 / 100)}
+                        {formatInteger(b.balance)} pts at {formatCpp(b.centsPerPointX100 / 100)}
                       </Text>
                     </View>
                     <Text style={[styles.valueTitle, NUM_STYLE]}>{formatCents(b.valueCents)}</Text>
@@ -436,34 +436,36 @@ export function PointsScreen({
           title="Past redemptions"
           countLabel={`${data.points.redemptions.length}`}
         >
-          {data.points.redemptions.map((r, idx) => (
-            <View key={r.id} style={[styles.redemptionRow, idx > 0 && styles.rowDivider]}>
-              <View style={styles.flexShrink}>
-                <Text style={styles.programTitle}>
-                  {r.program}
-                  {r.note ? ` · ${r.note}` : ""}
-                </Text>
-                <Text style={[styles.metaText, NUM_STYLE]}>
-                  {r.points.toLocaleString("en-US")} pts vs {formatCents(r.cashCents)} cash (
-                  {formatCpp(r.centsPerPoint)}) · {formatDate(r.redeemedOn, data.today)}
-                </Text>
+          {() =>
+            data.points.redemptions.map((r, idx) => (
+              <View key={r.id} style={[styles.redemptionRow, idx > 0 && styles.rowDivider]}>
+                <View style={styles.flexShrink}>
+                  <Text style={styles.programTitle}>
+                    {r.program}
+                    {r.note ? ` · ${r.note}` : ""}
+                  </Text>
+                  <Text style={[styles.metaText, NUM_STYLE]}>
+                    {formatInteger(r.points)} pts vs {formatCents(r.cashCents)} cash (
+                    {formatCpp(r.centsPerPoint)}) · {formatDate(r.redeemedOn, data.today)}
+                  </Text>
+                </View>
+                <Button
+                  label="Delete"
+                  size="sm"
+                  variant="ghost"
+                  loading={busyKey === `red.del:${r.id}`}
+                  onPress={() =>
+                    void onAction({ type: "redemption.delete", id: r.id }, `red.del:${r.id}`)
+                  }
+                />
               </View>
-              <Button
-                label="Delete"
-                size="sm"
-                variant="ghost"
-                loading={busyKey === `red.del:${r.id}`}
-                onPress={() =>
-                  void onAction({ type: "redemption.delete", id: r.id }, `red.del:${r.id}`)
-                }
-              />
-            </View>
-          ))}
+            ))
+          }
         </CollapsibleSection>
       ) : null}
     </ScrollView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   content: {

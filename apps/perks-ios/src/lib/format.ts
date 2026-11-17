@@ -8,8 +8,24 @@ export const CADENCE_OPTIONS: { value: Cadence; label: string }[] = [
   { value: "semiannual", label: "Semiannual" },
   { value: "annual", label: "Calendar year" },
   { value: "anniversary", label: "Card year" },
+  { value: "quadrennial", label: "Every 4 years" },
   { value: "perk", label: "Ongoing perk" },
 ];
+
+/** "1st", "2nd", "3rd", "4th", ... */
+export function ordinal(n: number): string {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+}
+
+/** Format an integer with US thousands commas without allocating Intl.NumberFormat per call. */
+export function formatInteger(value: number): string {
+  const rounded = Math.round(value);
+  const sign = rounded < 0 ? "-" : "";
+  const digits = String(Math.abs(rounded));
+  return sign + digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
 
 /** Format integer cents as "$1,234" or "$12.95". */
 export function formatCents(cents: number): string {
@@ -17,7 +33,7 @@ export function formatCents(cents: number): string {
   const abs = Math.abs(Math.round(cents));
   const whole = Math.floor(abs / 100);
   const rem = abs % 100;
-  const wholeStr = whole.toLocaleString("en-US");
+  const wholeStr = formatInteger(whole);
   const body = rem === 0 ? `$${wholeStr}` : `$${wholeStr}.${String(rem).padStart(2, "0")}`;
   return negative ? `-${body}` : body;
 }

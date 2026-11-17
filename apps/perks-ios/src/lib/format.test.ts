@@ -1,20 +1,28 @@
 import { describe, expect, it } from "vitest";
 import type { MobileOfferGroup } from "../types";
 import {
+  CADENCE_OPTIONS,
   centsToInputDollars,
   checkRedemptionClient,
   dueLabel,
   formatCents,
   formatCpp,
   formatDate,
+  formatInteger,
   formatSignedCents,
   normalizeServerUrl,
+  ordinal,
   parseDollars,
   sortOfferGroups,
 } from "./format";
 
-describe("formatCents and parseDollars", () => {
-  it("formats whole and fractional dollar amounts in integer cents", () => {
+describe("formatCents, formatInteger, and parseDollars", () => {
+  it("formats integers and whole/fractional dollar amounts without locale drift", () => {
+    expect(formatInteger(0)).toBe("0");
+    expect(formatInteger(999)).toBe("999");
+    expect(formatInteger(1000)).toBe("1,000");
+    expect(formatInteger(1270520)).toBe("1,270,520");
+    expect(formatInteger(-25000)).toBe("-25,000");
     expect(formatCents(0)).toBe("$0");
     expect(formatCents(1500)).toBe("$15");
     expect(formatCents(1295)).toBe("$12.95");
@@ -48,6 +56,18 @@ describe("date and countdown labels", () => {
     expect(dueLabel(14)).toBe("14 days left");
     expect(dueLabel(-2)).toBe("Ended");
     expect(dueLabel(null)).toBe("");
+  });
+
+  it("formats ordinals and includes quadrennial cadence", () => {
+    expect(ordinal(1)).toBe("1st");
+    expect(ordinal(2)).toBe("2nd");
+    expect(ordinal(3)).toBe("3rd");
+    expect(ordinal(4)).toBe("4th");
+    expect(ordinal(11)).toBe("11th");
+    expect(ordinal(12)).toBe("12th");
+    expect(ordinal(13)).toBe("13th");
+    expect(ordinal(21)).toBe("21st");
+    expect(CADENCE_OPTIONS.some((c) => c.value === "quadrennial")).toBe(true);
   });
 });
 

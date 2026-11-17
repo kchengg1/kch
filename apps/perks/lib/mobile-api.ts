@@ -1,9 +1,38 @@
+import type {
+  BenefitStatus,
+  BonusOffer,
+  BonusVerdict,
+  Cadence,
+  CardStyle,
+  MobileActionPayload,
+  MobileActionResponse,
+  MobileBenefit,
+  MobileBootstrap,
+  MobileCard,
+  MobileCardCatalogUpdates,
+  MobileCardStanding,
+  MobileOfferGroup,
+  MobilePeopleData,
+  MobilePersonCard,
+  MobilePersonOfferGroup,
+  MobileReferral,
+  MobileSpendTarget,
+  MobileUsageChip,
+  MobileYearEnd,
+  MsrStatus,
+  OfferStatus,
+  RedemptionCheck,
+  RuleResult,
+  StatementPreviewPayload,
+} from "@kch/perks-types";
 import bonusData from "../data/signup-bonuses.json";
-import { cardStyle, type CardStyle } from "./card-style";
-import { CATALOG, CATALOG_REVIEWED, onStatement } from "./catalog";
-import { checkEligibility, fiveTwentyFour, type BonusOffer, type Verdict } from "./eligibility";
-import { parseDollars } from "./money";
-import { msrStatus, type MsrStatus } from "./msr";
+import { cardStyle } from "./card-style";
+import { CATALOG, CATALOG_REVIEWED, getTemplate, onStatement } from "./catalog";
+import { catalogUpdates, updateCount } from "./catalog-sync";
+import { checkEligibility, fiveTwentyFour } from "./eligibility";
+import { creditBreakdown, groupStandings } from "./group-standings";
+import { formatCents, parseDollars } from "./money";
+import { msrStatus } from "./msr";
 import { groupOffers, merchantKey } from "./offer-groups";
 import { isWeakOffer, offerReturn, rateLabel, WEAK_RATE } from "./offer-value";
 import {
@@ -13,7 +42,6 @@ import {
   periodsThisYear,
   shortLabel,
   todayIn,
-  type Cadence,
 } from "./periods";
 import {
   PROGRAMS,
@@ -21,19 +49,40 @@ import {
   checkRedemption,
   defaultCentsPerPoint,
   normalizeProgram,
-  type RedemptionCheck,
 } from "./points";
-import { applicationRules, type RuleResult } from "./rules";
+import { shareableCards } from "./referrals";
+import { applicationRules } from "./rules";
+import { firstName, offersByPerson, onCardMerchantKeys } from "./shared-offers";
 import { parseSheetDate } from "./sheet-import";
-import {
-  actionable,
-  buildStatuses,
-  indexUsage,
-  summarizeCards,
-  usedIn,
-  type BenefitStatus,
-} from "./summary";
+import { spentThisYear } from "./spend-targets";
+import { actionable, buildStatuses, indexUsage, summarizeCards, usedIn } from "./summary";
 import { cardWorth, faceValueCents, myValueCents } from "./worth";
+import {
+  anniversaryUnused,
+  APPLY_LATER,
+  APPLY_NOW,
+  applyTips,
+  endsForGood,
+  expiringAtYearEnd,
+  inYearEndWindow,
+  notesFor,
+  YEAR_END_SOURCE,
+  yearEndOf,
+} from "./year-end";
+
+export type {
+  MobileActionPayload,
+  MobileActionResponse,
+  MobileBenefit,
+  MobileBootstrap,
+  MobileCard,
+  MobileOfferGroup,
+  MobileReferral,
+  MobileSpendTarget,
+  MobileUsageChip,
+  OfferStatus,
+  StatementPreviewPayload,
+};
 
 /** Credits ending within this window sit in the main list on Overview. */
 const SOON_DAYS = 45;
@@ -112,6 +161,56 @@ export type MobileRedemptionInput = {
   note: string;
 };
 
+export type MobileSpendTargetInput = {
+  id: string;
+  cardId: string;
+  name: string;
+  reward: string;
+  targetCents: number;
+  spentCents: number;
+  periodKey: string;
+  tracked: boolean;
+};
+
+export type MobileReferralInput = {
+  id: string;
+  userId: string;
+  firstName: string;
+  templateKey: string | null;
+  cardName: string;
+  url: string;
+  reward: string;
+};
+
+export type MobileGroupOffersInput = {
+  people: { id: string; name: string }[];
+  offers: (MobileOfferInput & { userId: string })[];
+  cards: {
+    id: string;
+    name: string;
+    issuer: string;
+    templateKey: string | null;
+    userId: string;
+    offersCheckedAt: Date | null;
+  }[];
+};
+
+export type MobileGroupCardsInput = {
+  cards: {
+    id: string;
+    userId: string;
+    name: string;
+    issuer: string;
+    templateKey: string | null;
+    annualFeeCents: number;
+    openedOn: string | null;
+    closed: boolean;
+  }[];
+  benefits: MobileBenefitInput[];
+  usage: MobileUsageInput[];
+  hidden: Set<string>;
+};
+
 export type MobileBootstrapInput = {
   user: { id: string; name: string; email: string };
   today: string;
@@ -122,164 +221,25 @@ export type MobileBootstrapInput = {
   hiddenMerchants: MobileHiddenMerchantInput[];
   points: MobilePointsInput[];
   redemptions: MobileRedemptionInput[];
-  settings: { digestEnabled: boolean; lastDigestOn: string | null };
+  settings: { digestEnabled: boolean; lastDigestOn: string | null; shareRankings?: boolean };
+  spendTargets?: MobileSpendTargetInput[];
+  referrals?: MobileReferralInput[];
+  groupOffers?: MobileGroupOffersInput;
+  groupCards?: MobileGroupCardsInput;
   dateOf?: (at: Date) => string;
 };
 
-export type MobileUsageChip = {
-  key: string;
-  label: string;
-  shortLabel: string;
-  start: string;
-  end: string;
-  logged: boolean;
-  usedCents: number;
-  full: boolean;
-  partial: boolean;
-  future: boolean;
-  current: boolean;
-};
-
-export type MobileBenefit = MobileBenefitInput & {
-  cadence: Cadence;
-  cadenceLabel: string;
-  expired: boolean;
-  inApp: boolean;
-  faceYearlyCents: number;
-  effectiveWorthCents: number;
-  periods: MobileUsageChip[];
-  openPastCount: number;
-};
-
-export type MobileCard = {
-  id: string;
-  name: string;
-  issuer: string;
-  templateKey: string | null;
-  style: CardStyle;
-  business: boolean;
-  annualFeeCents: number;
-  openedOn: string | null;
-  closedOn: string | null;
-  closed: boolean;
-  msrCents: number | null;
-  msrDeadline: string | null;
-  msrSpentCents: number;
-  bonusText: string;
-  bonusReceivedOn: string | null;
-  offersCheckedOn: string | null;
-  availableCents: number;
-  capturedCents: number;
-  nextFeeOn: string | null;
-  msr: MsrStatus | null;
-  worth: { advertisedCents: number; worthCents: number; netCents: number };
-  benefits: MobileBenefit[];
-};
-
-export type MobileOfferGroup = {
-  key: string;
-  merchant: string;
-  details: string;
-  valueCents: number | null;
-  maxCents: number | null;
-  rate: number | null;
-  rateLabel: string | null;
-  weak: boolean;
-  expiresOn: string | null;
-  daysLeft: number | null;
-  items: {
-    id: string;
-    cardId: string | null;
-    cardName: string;
-    cardStyle: CardStyle;
-    status: string;
-  }[];
-};
-
-export type MobileBootstrap = {
-  user: { id: string; name: string; email: string };
-  today: string;
-  catalogReviewed: string;
-  catalog: {
-    key: string;
-    name: string;
-    issuer: string;
-    business: boolean;
-    annualFeeCents: number;
-    style: CardStyle;
-  }[];
-  overview: {
-    expiringThisMonthCents: number;
-    expiringThisMonthCount: number;
-    capturedCents: number;
-    availableCents: number;
-    annualFeesCents: number;
-    soon: (BenefitStatus & { cardStyle: CardStyle })[];
-    later: (BenefitStatus & { cardStyle: CardStyle })[];
-    activeBonuses: {
-      cardId: string;
-      cardName: string;
-      cardStyle: CardStyle;
-      bonusText: string;
-      msr: MsrStatus;
-    }[];
-    expiringOffers: MobileOfferGroup[];
-    feesDue: {
-      cardId: string;
-      cardName: string;
-      cardStyle: CardStyle;
-      annualFeeCents: number;
-      nextFeeOn: string;
-      capturedCents: number;
-      worthCents: number;
-      netCents: number;
-    }[];
-  };
-  cards: MobileCard[];
-  offers: {
-    strongValueCents: number;
-    weakRateThreshold: number;
-    strong: MobileOfferGroup[];
-    weak: MobileOfferGroup[];
-    past: MobileOfferInput[];
-    hiddenMerchants: MobileHiddenMerchantInput[];
-    cardChecks: {
-      cardId: string;
-      cardName: string;
-      cardStyle: CardStyle;
-      checkedOn: string | null;
-      daysAgo: number | null;
-      stale: boolean;
-    }[];
-  };
-  points: {
-    totalPoints: number;
-    totalValueCents: number;
-    balances: (MobilePointsInput & { valueCents: number })[];
-    redemptions: (MobileRedemptionInput & {
-      centsPerPoint: number;
-      targetCentsPerPoint: number;
-      check: RedemptionCheck | null;
-    })[];
-    programs: { program: string; centsPerPoint: number }[];
-  };
-  bonuses: {
-    asOf: string;
-    fiveTwentyFour: number;
-    rules: RuleResult[];
-    offers: { offer: BonusOffer; verdict: Verdict }[];
-  };
-  settings: {
-    digestEnabled: boolean;
-    lastDigestOn: string | null;
-  };
-};
-
-const BONUS_ORDER: Record<Verdict["status"], number> = {
+const BONUS_ORDER: Record<BonusVerdict["status"], number> = {
   eligible: 0,
   caution: 1,
   ineligible: 2,
 };
+
+function formatCatalogMoney(cents: number, cadence: string): string {
+  if (cadence === "perk") return "ongoing perk";
+  const label = isCadence(cadence) ? CADENCE_LABEL[cadence].toLowerCase() : cadence;
+  return `${formatCents(cents)} ${label}`;
+}
 
 /** Shape all user state into a single serialisable snapshot for the iOS app. */
 export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstrap {
@@ -294,13 +254,53 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
     points,
     redemptions,
     settings,
+    spendTargets = [],
+    referrals = [],
+    groupOffers: groupOffersInput,
+    groupCards: groupCardsInput,
     dateOf = (at: Date) => todayIn("America/New_York", at),
   } = input;
 
+  const shareRankings = settings.shareRankings ?? true;
   const usageIndex = indexUsage(usage);
   const summaries = summarizeCards(cards, benefits, usage, today);
   const summaryById = new Map(summaries.map((s) => [s.card.id, s]));
   const cardById = new Map(cards.map((c) => [c.id, c]));
+
+  // Precompute group standings & per-template card standings if group data is present.
+  const peopleList = groupOffersInput?.people ?? [{ id: user.id, name: user.name }];
+  const personNameById = new Map(peopleList.map((p) => [p.id, firstName(p.name)]));
+  const groupSummaries = groupCardsInput
+    ? summarizeCards(groupCardsInput.cards, groupCardsInput.benefits, groupCardsInput.usage, today)
+    : [];
+  const groupHidden = groupCardsInput?.hidden ?? new Set<string>();
+  const standingsByTemplate = new Map<string, MobileCardStanding[]>();
+
+  if (groupCardsInput) {
+    const visibleGroup = groupSummaries.filter(
+      (s) => s.card.userId === user.id || !groupHidden.has(s.card.userId),
+    );
+    const byTemplate = new Map<string, typeof visibleGroup>();
+    for (const s of visibleGroup) {
+      if (!s.card.templateKey) continue;
+      byTemplate.set(s.card.templateKey, [...(byTemplate.get(s.card.templateKey) ?? []), s]);
+    }
+    for (const [templateKey, holders] of byTemplate.entries()) {
+      if (holders.length < 2) continue;
+      const ranked: MobileCardStanding[] = holders
+        .map((s) => ({
+          cardId: s.card.id,
+          userId: s.card.userId,
+          firstName: personNameById.get(s.card.userId) ?? "Someone",
+          isMe: s.card.userId === user.id,
+          capturedCents: s.capturedCents,
+          availableCents: s.availableCents,
+          share: s.availableCents ? s.capturedCents / s.availableCents : 0,
+        }))
+        .sort((a, b) => b.capturedCents - a.capturedCents || b.share - a.share);
+      standingsByTemplate.set(templateKey, ranked);
+    }
+  }
 
   const mobileCards: MobileCard[] = cards.map((card) => {
     const cardBenefits = benefits.filter((b) => b.cardId === card.id);
@@ -342,6 +342,27 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
       };
     });
 
+    const rawUpdates =
+      card.closed || cardBenefits.length === 0
+        ? { added: [], changed: [], removed: [] }
+        : catalogUpdates(card.templateKey, cardBenefits);
+    const cardCatalogUpdates: MobileCardCatalogUpdates = {
+      count: updateCount(rawUpdates),
+      added: rawUpdates.added.map((t) =>
+        t.cadence === "perk"
+          ? `New: ${t.name}`
+          : `New: ${t.name} (${formatCatalogMoney(Math.round((t.amount ?? 0) * 100), t.cadence)})`,
+      ),
+      changed: rawUpdates.changed.map(
+        ({ benefit: b, template: t }) =>
+          `Changed: ${b.name} (${formatCatalogMoney(b.amountCents, b.cadence)} → ${formatCatalogMoney(Math.round((t.amount ?? 0) * 100), t.cadence)})`,
+      ),
+      removed: rawUpdates.removed.map((b) => `Removed: ${b.name}`),
+    };
+
+    const standings =
+      !card.closed && card.templateKey ? (standingsByTemplate.get(card.templateKey) ?? []) : [];
+
     return {
       id: card.id,
       name: card.name,
@@ -364,22 +385,27 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
       nextFeeOn: summary?.nextFeeOn ?? null,
       msr: msrStatus(card, today),
       worth: cardWorth(cardBenefits, card.annualFeeCents, today),
+      catalogUpdates: cardCatalogUpdates,
+      standings,
       benefits: mappedBenefits,
     };
   });
 
   const mobileCardById = new Map(mobileCards.map((c) => [c.id, c]));
   const openCards = mobileCards.filter((c) => !c.closed);
+  const openCardById = new Map(openCards.map((c) => [c.id, c]));
 
-  // Overview calculations
-  const todo = actionable(buildStatuses(cards, benefits, usage, today)).map((s) => ({
+  // Statuses & Overview calculations
+  const rawStatuses = buildStatuses(cards, benefits, usage, today);
+  const toMobileStatus = (s: (typeof rawStatuses)[number]): BenefitStatus => ({
     ...s,
     cardStyle: cardStyle(s.card.templateKey, s.card.issuer),
-  }));
+  });
+  const todo = actionable(rawStatuses).map(toMobileStatus);
   const soon = todo.filter((s) => (s.daysLeft ?? 0) <= SOON_DAYS);
   const later = todo.filter((s) => (s.daysLeft ?? 0) > SOON_DAYS);
   const thisMonth = todo.filter((s) => s.deadline && s.deadline.slice(0, 7) === today.slice(0, 7));
-  const sumRemaining = (list: typeof todo) => list.reduce((n, s) => n + s.remainingCents, 0);
+  const sumRemaining = (list: BenefitStatus[]) => list.reduce((n, s) => n + s.remainingCents, 0);
 
   const capturedCents = summaries.reduce((n, s) => n + s.capturedCents, 0);
   const availableCents = summaries.reduce((n, s) => n + s.availableCents, 0);
@@ -397,6 +423,43 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
       cardStyle: c.style,
       bonusText: c.bonusText,
       msr: c.msr,
+    }));
+
+  // Spend targets on open cards
+  const mappedSpendTargets: MobileSpendTarget[] = spendTargets
+    .filter((g) => openCardById.has(g.cardId))
+    .map((g) => {
+      const c = openCardById.get(g.cardId)!;
+      return {
+        id: g.id,
+        cardId: g.cardId,
+        cardName: c.name,
+        cardStyle: c.style,
+        name: g.name,
+        reward: g.reward,
+        targetCents: g.targetCents,
+        spentCents: spentThisYear(g, today),
+        tracked: g.tracked,
+      };
+    });
+
+  const activeSpendTargets = mappedSpendTargets
+    .filter((g) => g.tracked)
+    .sort((a, b) => b.spentCents / b.targetCents - a.spentCents / a.targetCents);
+  const untrackedSpendTargets = mappedSpendTargets.filter((g) => !g.tracked);
+
+  const catalogUpdateCards = openCards
+    .filter((c) => c.catalogUpdates.count > 0)
+    .map((c) => ({
+      cardId: c.id,
+      cardName: c.name,
+      cardStyle: c.style,
+      count: c.catalogUpdates.count,
+      summary: [
+        ...c.catalogUpdates.added,
+        ...c.catalogUpdates.changed,
+        ...c.catalogUpdates.removed,
+      ],
     }));
 
   // Offers grouping & scoring
@@ -466,7 +529,9 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
       !hiddenKeys.has(merchantKey(o.merchant)),
   );
   const pastOffers = offers.filter(
-    (o) => !(o.status === "available" || o.status === "added") || isExpiredOffer(o),
+    (o) =>
+      o.status !== "hidden" &&
+      (!(o.status === "available" || o.status === "added") || isExpiredOffer(o)),
   );
   const scoredGroups = groupOffers(liveOffers)
     .map(toOfferGroup)
@@ -516,7 +581,11 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
       centsPerPoint: defaultCentsPerPoint(p),
     })),
   ];
-  const mappedRedemptions = [...redemptions].reverse().map((r) => {
+  const mappedRedemptions: (MobileRedemptionInput & {
+    centsPerPoint: number;
+    targetCentsPerPoint: number;
+    check: RedemptionCheck | null;
+  })[] = [...redemptions].reverse().map((r) => {
     const targetCentsPerPoint = valueByProgram.get(r.program) ?? defaultCentsPerPoint(r.program);
     const centsPerPoint = r.points > 0 ? (r.cashCents - r.feesCents) / r.points : 0;
     return {
@@ -532,14 +601,201 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
     };
   });
 
-  // Sign-up bonus eligibility & issuer rules
+  // Referrals
+  const mappedReferrals: MobileReferral[] = referrals.map((r) => {
+    const tpl = getTemplate(r.templateKey);
+    return {
+      id: r.id,
+      userId: r.userId,
+      firstName: r.firstName,
+      templateKey: r.templateKey,
+      cardName: r.cardName,
+      cardStyle: cardStyle(r.templateKey, tpl?.issuer),
+      url: r.url,
+      reward: r.reward,
+    };
+  });
+  const myReferrals = mappedReferrals.filter((r) => r.userId === user.id);
+  const otherReferrals = mappedReferrals.filter((r) => r.userId !== user.id);
+  const shareable = shareableCards(cards, referrals, user.id).map((c) => ({
+    cardId: c.id,
+    name: c.name,
+    templateKey: c.templateKey!,
+    style: cardStyle(c.templateKey, c.issuer),
+  }));
+
+  // Sign-up bonus eligibility & issuer rules + friend referral links
   const bonusRows = (bonusData.offers as BonusOffer[])
-    .map((offer) => ({ offer, verdict: checkEligibility(offer, cards, today) }))
+    .map((offer) => {
+      const re = new RegExp(offer.match, "i");
+      const friendReferrals = otherReferrals.filter(
+        (r) => (offer.templateKey && r.templateKey === offer.templateKey) || re.test(r.cardName),
+      );
+      return {
+        offer,
+        verdict: checkEligibility(offer, cards, today),
+        friendReferrals,
+      };
+    })
     .sort(
       (a, b) =>
         BONUS_ORDER[a.verdict.status] - BONUS_ORDER[b.verdict.status] ||
         (b.offer.estValue ?? 0) - (a.offer.estValue ?? 0),
     );
+
+  // People tab: group leaderboard, per-person open cards (honouring shareRankings), and shared offers
+  const peopleData: MobilePeopleData = (() => {
+    const { leaderboard, cardsByPerson } = groupStandings(
+      groupSummaries,
+      peopleList,
+      groupHidden,
+      user.id,
+    );
+    const groupCardById = new Map((groupCardsInput?.cards ?? []).map((c) => [c.id, c]));
+    const sharedOfferCardById = new Map((groupOffersInput?.cards ?? []).map((c) => [c.id, c]));
+    const sharedOffersList = groupOffersInput
+      ? offersByPerson(
+          groupOffersInput.people,
+          groupOffersInput.offers,
+          user.id,
+          today,
+          groupOffersInput.cards,
+        )
+      : [];
+    const offersOf = new Map(sharedOffersList.map((x) => [x.id, x]));
+    const mineMerchantKeys = onCardMerchantKeys(offers, today);
+
+    const others = peopleList
+      .filter((p) => p.id !== user.id && (offersOf.has(p.id) || cardsByPerson.has(p.id)))
+      .map((p) => {
+        const sharing = !groupHidden.has(p.id);
+        const rawPersonCards = cardsByPerson.get(p.id);
+        const mappedPersonCards: MobilePersonCard[] | null = rawPersonCards
+          ? rawPersonCards.map((c) => {
+              const fullCard = groupCardById.get(c.cardId);
+              const breakdown =
+                fullCard && groupCardsInput
+                  ? creditBreakdown(
+                      fullCard,
+                      groupCardsInput.benefits,
+                      groupCardsInput.usage,
+                      today,
+                    )
+                  : { used: [], unused: [] };
+              return {
+                cardId: c.cardId,
+                name: c.name,
+                issuer: c.issuer,
+                templateKey: c.templateKey,
+                style: cardStyle(c.templateKey, c.issuer),
+                annualFeeCents: c.annualFeeCents,
+                capturedCents: c.capturedCents,
+                availableCents: c.availableCents,
+                share: c.share,
+                place: c.place,
+                credits: breakdown,
+              };
+            })
+          : null;
+
+        const rawOffers = offersOf.get(p.id);
+        const mappedOffers = rawOffers
+          ? (() => {
+              const lastPastedOn = rawOffers.lastPastedAt ? dateOf(rawOffers.lastPastedAt) : null;
+              const daysAgo = lastPastedOn ? daysBetween(lastPastedOn, today) : null;
+              const groups: MobilePersonOfferGroup[] = rawOffers.groups.map((g) => {
+                const seenCardIds = new Set<string>();
+                const offerCards: { id: string; cardName: string; cardStyle: CardStyle }[] = [];
+                for (const item of g.items) {
+                  if (!item.cardId || seenCardIds.has(item.cardId)) continue;
+                  seenCardIds.add(item.cardId);
+                  const sc = sharedOfferCardById.get(item.cardId);
+                  if (sc) {
+                    offerCards.push({
+                      id: sc.id,
+                      cardName: sc.name,
+                      cardStyle: cardStyle(sc.templateKey, sc.issuer),
+                    });
+                  }
+                }
+                return {
+                  key: g.key,
+                  merchant: g.merchant,
+                  details: g.details,
+                  maxCents: g.maxCents,
+                  rate: g.rate,
+                  rateLabel: g.rate !== null ? rateLabel(g.rate) : null,
+                  weak: g.rate !== null && g.rate < WEAK_RATE,
+                  missingFromMine: !mineMerchantKeys.has(merchantKey(g.merchant)),
+                  expiresOn: g.expiresOn,
+                  daysLeft: g.expiresOn ? daysBetween(today, g.expiresOn) : null,
+                  cards: offerCards,
+                };
+              });
+              return {
+                lastPastedOn,
+                daysAgo,
+                stale: daysAgo === null || daysAgo > STALE_OFFER_DAYS,
+                groups,
+              };
+            })()
+          : null;
+
+        return {
+          id: p.id,
+          firstName: firstName(p.name),
+          sharing,
+          cards: mappedPersonCards,
+          offers: mappedOffers,
+        };
+      })
+      .sort((a, b) => a.firstName.localeCompare(b.firstName));
+
+    return {
+      leaderboard: leaderboard.map((s) => ({
+        userId: s.userId,
+        firstName: s.firstName,
+        isMe: s.userId === user.id,
+        capturedCents: s.capturedCents,
+        availableCents: s.availableCents,
+        share: s.share,
+      })),
+      others,
+    };
+  })();
+
+  // Year-end checklist
+  const yearEndRawExpiring = expiringAtYearEnd(rawStatuses, today);
+  const yearEndExpiring = yearEndRawExpiring.map(toMobileStatus);
+  const yearEndRenewing = anniversaryUnused(rawStatuses).map(toMobileStatus);
+  const heldForTips = openCards.map((c) => ({ name: c.name, templateKey: c.templateKey }));
+  const yearEnd: MobileYearEnd = {
+    inWindow: inYearEndWindow(today),
+    daysLeft: daysBetween(today, yearEndOf(today)),
+    expiringCount: yearEndExpiring.length,
+    expiringCents: sumRemaining(yearEndExpiring),
+    expiring: yearEndExpiring,
+    goneForGoodNames: yearEndRawExpiring.filter(endsForGood).map((s) => s.benefit.name),
+    renewingCount: yearEndRenewing.length,
+    renewingCents: sumRemaining(yearEndRenewing),
+    renewing: yearEndRenewing,
+    cardNotes: openCards
+      .map((c) => ({
+        cardId: c.id,
+        cardName: c.name,
+        cardStyle: c.style,
+        notes: notesFor(c.templateKey, today).map((n) => ({ kind: n.kind, text: n.text })),
+      }))
+      .filter((x) => x.notes.length > 0),
+    applyNow: applyTips(APPLY_NOW, heldForTips, today).map((t) => ({ name: t.name, text: t.text })),
+    applyLater: applyTips(APPLY_LATER, heldForTips, today).map((t) => ({
+      name: t.name,
+      text: t.text,
+    })),
+    hasAmex: openCards.some((c) => /american express/i.test(c.issuer)),
+    hasChase: openCards.some((c) => /chase/i.test(c.issuer)),
+    source: YEAR_END_SOURCE,
+  };
 
   // Keep cards ordered cleanly: open cards by annual fee desc then name, closed cards by openedOn desc
   const sortedMobileCards = [
@@ -550,6 +806,8 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
       .filter((c) => c.closed)
       .sort((a, b) => (b.openedOn ?? "").localeCompare(a.openedOn ?? "")),
   ].map((c) => mobileCardById.get(c.id)!);
+
+  const rules: RuleResult[] = applicationRules(cards, today);
 
   return {
     user,
@@ -572,6 +830,9 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
       soon,
       later,
       activeBonuses,
+      spendTargets: activeSpendTargets,
+      untrackedSpendTargets,
+      catalogUpdateCards,
       expiringOffers,
       feesDue,
     },
@@ -595,16 +856,25 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
     bonuses: {
       asOf: bonusData.asOf,
       fiveTwentyFour: fiveTwentyFour(cards, today),
-      rules: applicationRules(cards, today),
+      rules,
       offers: bonusRows,
     },
-    settings,
+    referrals: {
+      mine: myReferrals,
+      others: otherReferrals,
+      shareableCards: shareable,
+    },
+    people: peopleData,
+    yearEnd,
+    settings: {
+      digestEnabled: settings.digestEnabled,
+      lastDigestOn: settings.lastDigestOn,
+      shareRankings,
+    },
   };
 }
 
 /* ---- Action payloads & pure validation --------------------------------- */
-
-export type OfferStatus = "available" | "added" | "used" | "dismissed";
 
 export type MobileAction =
   | { type: "usage.markUsed"; benefitId: string; periodKey: string }
@@ -638,6 +908,7 @@ export type MobileAction =
     }
   | { type: "card.delete"; id: string }
   | { type: "card.applyTemplate"; id: string; templateKey: string }
+  | { type: "card.applyCatalogUpdates"; cardId: string }
   | { type: "card.importSheet"; sheet: string }
   | {
       type: "benefit.add";
@@ -698,27 +969,30 @@ export type MobileAction =
       note: string;
     }
   | { type: "redemption.delete"; id: string }
+  | {
+      type: "referral.add";
+      templateKey: string | null;
+      cardName: string;
+      url: string;
+      reward: string;
+    }
+  | { type: "referral.delete"; id: string }
+  | { type: "spendTarget.setSpent"; id: string; spentCents: number }
+  | { type: "spendTarget.setTracked"; id: string; tracked: boolean }
   | { type: "settings.setDigest"; enabled: boolean }
+  | { type: "settings.setShareRankings"; enabled: boolean }
   | { type: "settings.sendDigestNow" };
 
-export type StatementPreviewPayload = {
-  charges: number;
-  benefits: { id: string; name: string }[];
-  rows: {
-    date: string;
-    description: string;
-    amountCents: number;
-    suggestedBenefitId: string | null;
-  }[];
-};
-
-export type MobileActionResponse = {
-  ok: true;
-  message?: string;
-  cardId?: string;
-  statementPreview?: StatementPreviewPayload;
-  bootstrap?: MobileBootstrap;
-};
+/**
+ * Compile-time bidirectional contract check: fails `pnpm check` if an action
+ * type is added to `@kch/perks-types` without handling it in `mobile-api.ts`
+ * (or vice versa).
+ */
+type ExpectNever<T extends never> = T;
+export type AssertMobileActionParity = [
+  ExpectNever<Exclude<MobileActionPayload["type"], MobileAction["type"]>>,
+  ExpectNever<Exclude<MobileAction["type"], MobileActionPayload["type"]>>,
+];
 
 const OFFER_STATUSES = new Set<OfferStatus>(["available", "added", "used", "dismissed"]);
 
@@ -880,6 +1154,11 @@ export function parseMobileAction(raw: unknown): { action: MobileAction } | { er
       const templateKey = str(body.template);
       if (!id || !templateKey) return { error: "Card and template are required." };
       return { action: { type, id, templateKey } };
+    }
+    case "card.applyCatalogUpdates": {
+      const cardId = str(body.cardId);
+      if (!cardId) return { error: "Card not found." };
+      return { action: { type, cardId } };
     }
     case "card.importSheet": {
       const sheet = typeof body.sheet === "string" ? body.sheet.trim() : "";
@@ -1079,7 +1358,52 @@ export function parseMobileAction(raw: unknown): { action: MobileAction } | { er
       if (!id) return { error: "Redemption id is required." };
       return { action: { type, id } };
     }
+    case "referral.add": {
+      const choice = str(body.card);
+      const template = getTemplate(choice);
+      const cardName = (template?.name ?? str(body.cardName)).slice(0, 120);
+      const url = str(body.url);
+      if (!cardName) return { error: "Choose the card the link is for." };
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== "https:") throw new Error();
+      } catch {
+        return { error: "Paste the full referral link, starting with https://" };
+      }
+      return {
+        action: {
+          type,
+          templateKey: template?.key ?? null,
+          cardName,
+          url: url.slice(0, 500),
+          reward: str(body.reward).slice(0, 80),
+        },
+      };
+    }
+    case "referral.delete": {
+      const id = str(body.id);
+      if (!id) return { error: "Referral id is required." };
+      return { action: { type, id } };
+    }
+    case "spendTarget.setSpent": {
+      const id = str(body.id);
+      const spentCents = parseDollars(str(body.spent));
+      if (!id) return { error: "Spend goal is required." };
+      if (spentCents === null) return { error: "Enter a dollar amount." };
+      return { action: { type, id, spentCents } };
+    }
+    case "spendTarget.setTracked": {
+      const id = str(body.id);
+      if (!id || typeof body.tracked !== "boolean") {
+        return { error: "Spend goal and tracked flag are required." };
+      }
+      return { action: { type, id, tracked: body.tracked } };
+    }
     case "settings.setDigest": {
+      if (typeof body.enabled !== "boolean") return { error: "Enabled flag must be boolean." };
+      return { action: { type, enabled: body.enabled } };
+    }
+    case "settings.setShareRankings": {
       if (typeof body.enabled !== "boolean") return { error: "Enabled flag must be boolean." };
       return { action: { type, enabled: body.enabled } };
     }

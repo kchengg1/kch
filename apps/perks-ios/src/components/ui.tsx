@@ -47,7 +47,11 @@ export function CardSwatch({
 }) {
   const width = size === "md" ? 44 : 32;
   const height = size === "md" ? 28 : 20;
-  const chipColor = cardStyle.chip === "gold" ? "#e5c16c" : "#d4d8dd";
+  const chipColor = cardStyle.chip.startsWith("#")
+    ? cardStyle.chip
+    : cardStyle.chip === "gold"
+      ? "#e5c16c"
+      : "#d4d8dd";
 
   return (
     <View
@@ -213,7 +217,7 @@ export function CollapsibleSection({
   title: string;
   countLabel?: string;
   defaultOpen?: boolean;
-  children: React.ReactNode;
+  children: React.ReactNode | (() => React.ReactNode);
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -232,7 +236,11 @@ export function CollapsibleSection({
           <Text style={styles.collapsibleChevron}>{open ? "Hide" : "Show"}</Text>
         </View>
       </Pressable>
-      {open ? <View style={styles.collapsibleBody}>{children}</View> : null}
+      {open ? (
+        <View style={styles.collapsibleBody}>
+          {typeof children === "function" ? children() : children}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -277,15 +285,56 @@ export function FieldInput({
   );
 }
 
+export function SegmentedBar<K extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { key: K; label: string }[];
+  value: K;
+  onChange: (next: K) => void;
+}) {
+  return (
+    <View style={styles.segmentWrap}>
+      {options.map((opt) => {
+        const active = opt.key === value;
+        const activate = () => {
+          if (!active) {
+            tapHaptic();
+            onChange(opt.key);
+          }
+        };
+        return (
+          <Pressable
+            key={opt.key}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            onPressIn={activate}
+            onPress={activate}
+            style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+          >
+            <Text
+              style={[styles.segmentLabel, active && styles.segmentLabelActive]}
+              numberOfLines={1}
+            >
+              {opt.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 const TABS: { key: TabKey; label: string; mark: string }[] = [
   { key: "overview", label: "Overview", mark: "◎" },
   { key: "cards", label: "Cards", mark: "▭" },
   { key: "offers", label: "Offers", mark: "✦" },
   { key: "points", label: "Points", mark: "◈" },
-  { key: "bonuses", label: "Bonuses", mark: "★" },
+  { key: "people", label: "People", mark: "◉" },
 ];
 
-export function TabBar({
+export const TabBar = React.memo(function TabBar({
   active,
   onChange,
   bottomInset,
@@ -298,15 +347,19 @@ export function TabBar({
     <View style={[styles.tabBar, { paddingBottom: Math.max(bottomInset, 8) }]}>
       {TABS.map((t) => {
         const selected = t.key === active;
+        const activate = () => {
+          if (!selected) {
+            tapHaptic();
+            onChange(t.key);
+          }
+        };
         return (
           <Pressable
             key={t.key}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            onPress={() => {
-              tapHaptic();
-              onChange(t.key);
-            }}
+            onPressIn={activate}
+            onPress={activate}
             style={styles.tabItem}
           >
             <Text style={[styles.tabMark, selected && styles.tabMarkSelected]}>{t.mark}</Text>
@@ -318,7 +371,7 @@ export function TabBar({
       })}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   swatch: {
@@ -494,6 +547,32 @@ const styles = StyleSheet.create({
   fieldHint: {
     fontSize: 12,
     color: COLORS.muted,
+  },
+  segmentWrap: {
+    flexDirection: "row",
+    backgroundColor: COLORS.subtle,
+    borderRadius: 10,
+    padding: 3,
+    gap: 2,
+  },
+  segmentBtn: {
+    flex: 1,
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+  },
+  segmentBtnActive: {
+    backgroundColor: COLORS.card,
+  },
+  segmentLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.muted,
+  },
+  segmentLabelActive: {
+    color: COLORS.ink,
   },
   tabBar: {
     flexDirection: "row",

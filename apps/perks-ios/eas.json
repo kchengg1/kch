@@ -4,18 +4,47 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "base": {
+      "node": "22.14.0",
+      "pnpm": "10.33.0",
+      "env": {
+        "EAS_FALLBACK_PACKAGE_MANAGER": "pnpm"
+      }
+    },
     "development": {
+      "extends": "base",
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "environment": "development",
+      "channel": "development"
     },
     "preview": {
-      "distribution": "internal"
+      "extends": "base",
+      "distribution": "internal",
+      "environment": "preview",
+      "channel": "preview",
+      "env": {
+        "EAS_FALLBACK_PACKAGE_MANAGER": "pnpm",
+        "EXPO_PUBLIC_API_URL": "https://kch-six.vercel.app"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "extends": "base",
+      "distribution": "store",
+      "environment": "production",
+      "channel": "production",
+      "autoIncrement": true,
+      "env": {
+        "EAS_FALLBACK_PACKAGE_MANAGER": "pnpm",
+        "EXPO_PUBLIC_API_URL": "https://kch-six.vercel.app"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6835674414"
+      }
+    }
   }
 }

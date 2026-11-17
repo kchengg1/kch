@@ -1,6 +1,10 @@
 # deps
 node_modules
 .pnpm-store
+package-lock.json
+yarn.lock
+bun.lock
+bun.lockb
 
 # builds
 .next
