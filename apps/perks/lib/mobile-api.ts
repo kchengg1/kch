@@ -183,7 +183,7 @@ export type MobileReferralInput = {
 };
 
 export type MobileGroupOffersInput = {
-  people: { id: string; name: string }[];
+  people: { id: string; name: string; lastActiveAt?: Date | string | null }[];
   offers: (MobileOfferInput & { userId: string })[];
   cards: {
     id: string;
@@ -749,6 +749,7 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
         return {
           id: p.id,
           firstName: firstName(p.name),
+          lastActiveAt: p.lastActiveAt ? new Date(p.lastActiveAt).toISOString() : null,
           sharing,
           cards: mappedPersonCards,
           offers: mappedOffers,

@@ -3,6 +3,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "r
 import { Badge, CardSwatch, COLORS, Meter, NUM_STYLE, SectionCard } from "../components/ui";
 import { dueLabel, formatCents, formatDate, ordinal } from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
+import { formatLastActive } from "../lib/last-active";
 import type { MobileBootstrap, MobilePersonCard, MobilePersonOfferGroup } from "../types";
 
 const PersonCardItem = React.memo(function PersonCardItem({
@@ -270,6 +271,8 @@ export const PeopleScreen = React.memo(function PeopleScreen({
               })}
             </ScrollView>
           ) : null}
+
+          <Text style={styles.metaText}>Last active: {formatLastActive(person.lastActiveAt)}</Text>
 
           <View style={styles.sectionBlock}>
             <Text style={styles.sectionHeading}>{person.firstName}’s cards</Text>

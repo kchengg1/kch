@@ -184,7 +184,7 @@ describe("buildMobileBootstrap", () => {
         groupOffers: {
           people: [
             { id: "u1", name: "Sam Owner" },
-            { id: "u2", name: "Alex Friend" },
+            { id: "u2", name: "Alex Friend", lastActiveAt: new Date("2026-11-16T09:30:00.000Z") },
             { id: "u3", name: "Jordan Private" },
           ],
           offers: [
@@ -315,6 +315,7 @@ describe("buildMobileBootstrap", () => {
     // Alex shares cards + offers; Dell offer is flagged as missingFromMine
     const alex = snap.people.others.find((p) => p.id === "u2")!;
     expect(alex.sharing).toBe(true);
+    expect(alex.lastActiveAt).toBe("2026-11-16T09:30:00.000Z");
     expect(alex.cards?.[0]?.place).toEqual({ rank: 1, of: 2 });
     expect(alex.offers?.groups[0]).toMatchObject({
       merchant: "Dell Technologies",
@@ -324,6 +325,7 @@ describe("buildMobileBootstrap", () => {
     // Jordan has sharing: false -> cards is null (private!), but pasted offers still appear
     const jordan = snap.people.others.find((p) => p.id === "u3")!;
     expect(jordan.sharing).toBe(false);
+    expect(jordan.lastActiveAt).toBeNull();
     expect(jordan.cards).toBeNull();
     expect(jordan.offers?.groups[0]).toMatchObject({
       merchant: "lululemon",
