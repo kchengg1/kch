@@ -91,6 +91,33 @@ export function SettingsModal({
           </SectionCard>
 
           <SectionCard style={styles.cardGap}>
+            <Text style={styles.sectionTitle}>Group rankings</Text>
+            <Text style={styles.noteText}>
+              Share card credit totals and rankings on the People tab and card pages. Shared Amex
+              and Chase offers still appear either way.
+            </Text>
+
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Share my rankings</Text>
+              <Switch
+                value={data.settings.shareRankings}
+                onValueChange={(enabled) => {
+                  void onRunRawAction(
+                    { type: "settings.setShareRankings", enabled },
+                    "settings.setShareRankings",
+                  );
+                }}
+              />
+            </View>
+
+            <Text style={styles.metaText}>
+              {data.settings.shareRankings
+                ? "Currently sharing your credit progress with the group."
+                : "Hidden — your credit totals and card breakdown are private."}
+            </Text>
+          </SectionCard>
+
+          <SectionCard style={styles.cardGap}>
             <Text style={styles.sectionTitle}>Account</Text>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Name</Text>

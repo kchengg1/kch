@@ -105,7 +105,7 @@ const baseInput = (over: Partial<MobileBootstrapInput> = {}): MobileBootstrapInp
       note: "Tokyo flight",
     },
   ],
-  settings: { digestEnabled: true, lastDigestOn: null },
+  settings: { digestEnabled: true, lastDigestOn: null, shareRankings: true },
   dateOf: () => TODAY,
   ...over,
 });
@@ -159,6 +159,221 @@ describe("buildMobileBootstrap", () => {
     expect(snap.bonuses.fiveTwentyFour).toBe(1);
     expect(snap.catalog.length).toBeGreaterThan(10);
   });
+
+  it("shapes People standings, honours shareRankings privacy, and flags missing offers", () => {
+    const snap = buildMobileBootstrap(
+      baseInput({
+        groupOffers: {
+          people: [
+            { id: "u1", name: "Sam Owner" },
+            { id: "u2", name: "Alex Friend" },
+            { id: "u3", name: "Jordan Private" },
+          ],
+          offers: [
+            {
+              id: "o1",
+              userId: "u1",
+              cardId: "gold",
+              merchant: "lululemon",
+              details: "Spend $150 or more, get $30 back",
+              valueCents: 3000,
+              expiresOn: "2026-11-20",
+              status: "available",
+            },
+            {
+              id: "o-alex",
+              userId: "u2",
+              cardId: "alex-gold",
+              merchant: "Dell Technologies",
+              details: "Spend $200 or more, get $50 back",
+              valueCents: 5000,
+              expiresOn: "2026-12-10",
+              status: "available",
+            },
+            {
+              id: "o-jordan",
+              userId: "u3",
+              cardId: "jordan-plat",
+              merchant: "lululemon",
+              details: "Spend $100, get $20 back",
+              valueCents: 2000,
+              expiresOn: "2026-12-05",
+              status: "available",
+            },
+          ],
+          cards: [
+            {
+              id: "gold",
+              name: "Amex Gold",
+              issuer: "American Express",
+              templateKey: "amex-gold",
+              userId: "u1",
+              offersCheckedAt: new Date("2026-11-15T15:00:00Z"),
+            },
+            {
+              id: "alex-gold",
+              name: "Amex Gold",
+              issuer: "American Express",
+              templateKey: "amex-gold",
+              userId: "u2",
+              offersCheckedAt: new Date("2026-11-14T15:00:00Z"),
+            },
+            {
+              id: "jordan-plat",
+              name: "Amex Platinum",
+              issuer: "American Express",
+              templateKey: "amex-platinum",
+              userId: "u3",
+              offersCheckedAt: null,
+            },
+          ],
+        },
+        groupCards: {
+          cards: [
+            {
+              id: "gold",
+              userId: "u1",
+              name: "Amex Gold",
+              issuer: "American Express",
+              templateKey: "amex-gold",
+              annualFeeCents: 32500,
+              openedOn: "2025-12-01",
+              closed: false,
+            },
+            {
+              id: "alex-gold",
+              userId: "u2",
+              name: "Amex Gold",
+              issuer: "American Express",
+              templateKey: "amex-gold",
+              annualFeeCents: 32500,
+              openedOn: "2025-06-01",
+              closed: false,
+            },
+            {
+              id: "jordan-plat",
+              userId: "u3",
+              name: "Amex Platinum",
+              issuer: "American Express",
+              templateKey: "amex-platinum",
+              annualFeeCents: 69500,
+              openedOn: "2025-01-01",
+              closed: false,
+            },
+          ],
+          benefits: [
+            benefit(),
+            benefit({ id: "alex-uber", cardId: "alex-uber-card-mismatch" }),
+            benefit({ id: "alex-dining", cardId: "alex-gold", name: "Dining", amountCents: 1000 }),
+            benefit({
+              id: "jordan-uber",
+              cardId: "jordan-plat",
+              name: "Uber Cash",
+              amountCents: 1500,
+            }),
+          ],
+          usage: [
+            { benefitId: "uber", periodKey: "2026-10", usedCents: 1000 },
+            { benefitId: "alex-dining", periodKey: "2026-10", usedCents: 1000 },
+            { benefitId: "alex-dining", periodKey: "2026-11", usedCents: 1000 },
+            { benefitId: "jordan-uber", periodKey: "2026-11", usedCents: 1500 },
+          ],
+          // Jordan opted out of Group rankings!
+          hidden: new Set(["u3"]),
+        },
+      }),
+    );
+
+    // Leaderboard includes Alex (2000) and Sam (1000), but NOT Jordan (hidden)
+    expect(snap.people.leaderboard.map((r) => [r.firstName, r.capturedCents, r.isMe])).toEqual([
+      ["Alex", 2000, false],
+      ["Sam", 1000, true],
+    ]);
+
+    // Per-card standings on Sam's Amex Gold show Alex 1st and Sam 2nd
+    const goldCard = snap.cards.find((c) => c.id === "gold")!;
+    expect(goldCard.standings.map((s) => s.firstName)).toEqual(["Alex", "Sam"]);
+
+    // Alex shares cards + offers; Dell offer is flagged as missingFromMine
+    const alex = snap.people.others.find((p) => p.id === "u2")!;
+    expect(alex.sharing).toBe(true);
+    expect(alex.cards?.[0]?.place).toEqual({ rank: 1, of: 2 });
+    expect(alex.offers?.groups[0]).toMatchObject({
+      merchant: "Dell Technologies",
+      missingFromMine: true,
+    });
+
+    // Jordan has sharing: false -> cards is null (private!), but pasted offers still appear
+    const jordan = snap.people.others.find((p) => p.id === "u3")!;
+    expect(jordan.sharing).toBe(false);
+    expect(jordan.cards).toBeNull();
+    expect(jordan.offers?.groups[0]).toMatchObject({
+      merchant: "lululemon",
+      missingFromMine: false,
+    });
+  });
+
+  it("computes referrals, spend goals, catalog updates, and year-end checklist", () => {
+    const snap = buildMobileBootstrap(
+      baseInput({
+        spendTargets: [
+          {
+            id: "st1",
+            cardId: "gold",
+            name: "Annual spend bonus",
+            reward: "Free night award",
+            targetCents: 1_500_000,
+            spentCents: 600_000,
+            periodKey: "2026",
+            tracked: true,
+          },
+          {
+            id: "st-old",
+            cardId: "gold",
+            name: "Untracked goal",
+            reward: "Lounge guest",
+            targetCents: 7_500_000,
+            spentCents: 900_000,
+            periodKey: "2025",
+            tracked: false,
+          },
+        ],
+        referrals: [
+          {
+            id: "ref-friend",
+            userId: "u2",
+            firstName: "Alex",
+            templateKey: "chase-aeroplan",
+            cardName: "Chase Aeroplan",
+            url: "https://www.referyourchasecard.com/210/example",
+            reward: "15,000 pts",
+          },
+        ],
+      }),
+    );
+
+    expect(snap.overview.spendTargets).toHaveLength(1);
+    expect(snap.overview.spendTargets[0]?.spentCents).toBe(600_000);
+    // Prior-year periodKey resets spentCents to 0
+    expect(snap.overview.untrackedSpendTargets[0]?.spentCents).toBe(0);
+
+    // Amex Gold only has 2 benefits in fixture vs full catalog -> catalog updates detected
+    expect(snap.overview.catalogUpdateCards[0]?.cardId).toBe("gold");
+    expect(snap.overview.catalogUpdateCards[0]?.count).toBeGreaterThan(0);
+
+    // Referrals: Gold is shareable because Sam hasn't shared a link yet; Alex's Aeroplan link attaches to Aeroplan bonus
+    expect(snap.referrals.shareableCards.map((c) => c.templateKey)).toEqual(["amex-gold"]);
+    expect(snap.referrals.others).toHaveLength(1);
+    const aeroplanBonus = snap.bonuses.offers.find((b) => b.offer.id === "chase-aeroplan");
+    expect(aeroplanBonus?.friendReferrals.map((r) => r.firstName)).toEqual(["Alex"]);
+
+    // November 15 is inside the Nov-Dec year-end window!
+    expect(snap.yearEnd.inWindow).toBe(true);
+    expect(snap.yearEnd.daysLeft).toBe(46);
+    expect(snap.yearEnd.expiringCount).toBe(2);
+    expect(snap.yearEnd.hasAmex).toBe(true);
+    expect(snap.yearEnd.cardNotes[0]?.cardId).toBe("gold");
+  });
 });
 
 describe("parseMobileAction", () => {
@@ -211,6 +426,61 @@ describe("parseMobileAction", () => {
         centsPerPointX100: 200,
       },
     });
+
+    expect(
+      parseMobileAction({
+        type: "referral.add",
+        card: "amex-gold",
+        url: "https://americanexpress.com/en-us/credit-cards/referral/prospect",
+        reward: "15,000 MR",
+      }),
+    ).toEqual({
+      action: {
+        type: "referral.add",
+        templateKey: "amex-gold",
+        cardName: "Amex Gold",
+        url: "https://americanexpress.com/en-us/credit-cards/referral/prospect",
+        reward: "15,000 MR",
+      },
+    });
+
+    expect(
+      parseMobileAction({
+        type: "spendTarget.setSpent",
+        id: "st1",
+        spent: "$12,450",
+      }),
+    ).toEqual({
+      action: {
+        type: "spendTarget.setSpent",
+        id: "st1",
+        spentCents: 1_245_000,
+      },
+    });
+
+    expect(
+      parseMobileAction({
+        type: "settings.setShareRankings",
+        enabled: false,
+      }),
+    ).toEqual({
+      action: {
+        type: "settings.setShareRankings",
+        enabled: false,
+      },
+    });
+
+    expect(
+      parseMobileAction({
+        type: "card.applyCatalogUpdates",
+        cardId: "gold",
+      }),
+    ).toEqual({
+      action: {
+        type: "card.applyCatalogUpdates",
+        cardId: "gold",
+      },
+    });
   });
 
   it("rejects malformed payloads with clear errors", () => {
@@ -226,6 +496,13 @@ describe("parseMobileAction", () => {
         cadence: "weekly",
       }),
     ).toEqual({ error: "Choose how often the benefit resets." });
+    expect(
+      parseMobileAction({
+        type: "referral.add",
+        card: "amex-gold",
+        url: "http://insecure.example.com",
+      }),
+    ).toEqual({ error: "Paste the full referral link, starting with https://" });
     expect(parseMobileAction({ type: "unknown.op" })).toEqual({
       error: "Unknown action type: unknown.op.",
     });

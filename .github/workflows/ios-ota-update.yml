@@ -1,0 +1,56 @@
+name: iOS OTA Update
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "apps/perks-ios/**"
+      - "packages/perks-types/**"
+      - ".github/workflows/ios-ota-update.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-ota-production
+  cancel-in-progress: false
+
+jobs:
+  ota:
+    name: Publish Expo OTA Update (production)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify iOS lint, types, and tests
+        run: |
+          pnpm --filter @kch/perks-types typecheck
+          pnpm --filter @kch/perks-ios lint
+          pnpm --filter @kch/perks-ios typecheck
+          pnpm --filter @kch/perks-ios test
+
+      - name: Publish OTA update to EAS production channel
+        working-directory: apps/perks-ios
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_BUILD_NO_EXPO_GO_WARNING: "true"
+          EXPO_PUBLIC_API_URL: https://kch-six.vercel.app
+        run: |
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "::notice title=EXPO_TOKEN not configured::Skipping automatic Expo OTA update because secrets.EXPO_TOKEN is not set. Create an Expo Robot/Personal Access Token at https://expo.dev/settings/access-tokens and save it as EXPO_TOKEN in GitHub repository secrets to enable automatic OTA pushes on merge."
+            exit 0
+          fi
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          COMMIT_SUBJECT="$(git log -1 --pretty=%s)"
+          npx --yes eas-cli@latest update \
+            --channel production \
+            --message "${SHORT_SHA}: ${COMMIT_SUBJECT}" \
+            --non-interactive
