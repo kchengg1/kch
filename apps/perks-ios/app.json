@@ -14,14 +14,14 @@
       "backgroundColor": "#fbfbfb"
     },
     "ios": {
-      "bundleIdentifier": "com.kch.perks",
+      "bundleIdentifier": "com.kchengg1.perks",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.kch.perks",
+      "package": "com.kchengg1.perks",
       "adaptiveIcon": {
         "backgroundColor": "#fbfbfb",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -33,6 +33,11 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-secure-store"]
+    "plugins": ["expo-secure-store"],
+    "extra": {
+      "eas": {
+        "projectId": "ee1c1cdb-f190-4c50-9c56-4b8b1f8dd2c0"
+      }
+    }
   }
 }

@@ -6,7 +6,7 @@ const TOKEN_KEY = "perks_auth_token";
 const API_URL_KEY = "perks_api_base_url";
 
 const DEFAULT_API_URL =
-  normalizeServerUrl(process.env.EXPO_PUBLIC_API_URL ?? "") ?? "http://localhost:3100";
+  normalizeServerUrl(process.env.EXPO_PUBLIC_API_URL ?? "") ?? "https://kch-six.vercel.app";
 
 const memoryFallback = new Map<string, string>();
 
