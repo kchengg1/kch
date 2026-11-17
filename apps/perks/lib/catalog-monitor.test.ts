@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CATALOG, CATALOG_REVIEWED, RETIRED } from "./catalog";
 import {
   buildCatalogSummary,
+  evaluatePosts,
   evaluatePostsWithGemini,
   filterRecentPosts,
   formatEvaluationReport,
@@ -145,6 +146,34 @@ describe("evaluatePostsWithGemini", () => {
     expect(result.needsUpdate).toBe(true);
     expect(hasActionableFindings(result)).toBe(true);
     expect(result.findings[0]!.cardKey).toBe("amex-platinum");
+  });
+
+  it("supports GitHub Models provider via GITHUB_TOKEN", async () => {
+    const firstPost = parseRssFeed(SAMPLE_RSS)[0]!;
+    const mockPayload = {
+      needsUpdate: false,
+      summary: "No catalog changes needed.",
+      findings: [],
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify(mockPayload) } }],
+      }),
+    });
+
+    const result = await evaluatePosts({
+      llm: { provider: "github-models", token: "gh-token" },
+      posts: [firstPost],
+      catalog: CATALOG,
+      retired: RETIRED,
+      reviewedOn: CATALOG_REVIEWED,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    expect(result.needsUpdate).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -6,7 +6,13 @@ export const DOC_FEEDS = [
   "https://www.doctorofcredit.com/credit-cards/feed/",
 ] as const;
 
+export const DEFAULT_GITHUB_MODEL = "openai/gpt-4.1-mini";
 export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const GITHUB_MODELS_ENDPOINT = "https://models.github.ai/inference/chat/completions";
+
+export type LlmConfig =
+  | { provider: "github-models"; token: string; model?: string }
+  | { provider: "gemini"; apiKey: string; model?: string };
 
 export type DocPost = {
   title: string;
@@ -295,6 +301,44 @@ export async function fetchDoctorOfCreditPosts(
   return allPosts;
 }
 
+async function callGitHubModels(params: {
+  token: string;
+  model: string;
+  prompt: string;
+  jsonMode?: boolean;
+  fetchImpl?: typeof fetch;
+}): Promise<string> {
+  const fetchImpl = params.fetchImpl ?? fetch;
+  const res = await fetchImpl(GITHUB_MODELS_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${params.token}`,
+    },
+    body: JSON.stringify({
+      model: params.model,
+      messages: [{ role: "user", content: params.prompt }],
+      temperature: 0.1,
+      ...(params.jsonMode ? { response_format: { type: "json_object" } } : {}),
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`GitHub Models API error (${res.status}): ${body.slice(0, 500)}`);
+  }
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error("GitHub Models API returned no text content");
+  }
+  return text;
+}
+
 async function callGemini(params: {
   apiKey: string;
   model: string;
@@ -333,15 +377,38 @@ async function callGemini(params: {
   return text;
 }
 
+async function callLlm(params: {
+  llm: LlmConfig;
+  prompt: string;
+  jsonMode?: boolean;
+  fetchImpl?: typeof fetch;
+}): Promise<string> {
+  if (params.llm.provider === "github-models") {
+    return callGitHubModels({
+      token: params.llm.token,
+      model: params.llm.model ?? DEFAULT_GITHUB_MODEL,
+      prompt: params.prompt,
+      jsonMode: params.jsonMode,
+      fetchImpl: params.fetchImpl,
+    });
+  }
+  return callGemini({
+    apiKey: params.llm.apiKey,
+    model: params.llm.model ?? DEFAULT_GEMINI_MODEL,
+    prompt: params.prompt,
+    jsonMode: params.jsonMode,
+    fetchImpl: params.fetchImpl,
+  });
+}
+
 export function stripMarkdownCodeFence(text: string): string {
   const trimmed = text.trim();
   const match = trimmed.match(/^```(?:[a-zA-Z0-9_-]+)?\s*\n([\s\S]*?)\n```$/);
   return match?.[1] ? match[1].trim() : trimmed;
 }
 
-export async function evaluatePostsWithGemini(params: {
-  apiKey: string;
-  model?: string;
+export async function evaluatePosts(params: {
+  llm: LlmConfig;
   posts: DocPost[];
   catalog: CardTemplate[];
   retired: Record<string, string[]>;
@@ -395,9 +462,8 @@ ${catalogSummary}
 Recent Doctor of Credit posts:
 ${JSON.stringify(postsPayload, null, 2)}`;
 
-  const raw = await callGemini({
-    apiKey: params.apiKey,
-    model: params.model ?? DEFAULT_GEMINI_MODEL,
+  const raw = await callLlm({
+    llm: params.llm,
     prompt,
     jsonMode: true,
     fetchImpl: params.fetchImpl,
@@ -407,13 +473,31 @@ ${JSON.stringify(postsPayload, null, 2)}`;
   return EvaluationResultSchema.parse(parsed);
 }
 
+export async function evaluatePostsWithGemini(params: {
+  apiKey: string;
+  model?: string;
+  posts: DocPost[];
+  catalog: CardTemplate[];
+  retired: Record<string, string[]>;
+  reviewedOn: string;
+  fetchImpl?: typeof fetch;
+}): Promise<EvaluationResult> {
+  return evaluatePosts({
+    llm: { provider: "gemini", apiKey: params.apiKey, model: params.model },
+    posts: params.posts,
+    catalog: params.catalog,
+    retired: params.retired,
+    reviewedOn: params.reviewedOn,
+    fetchImpl: params.fetchImpl,
+  });
+}
+
 export function hasActionableFindings(result: EvaluationResult): boolean {
   return result.needsUpdate && result.findings.some((f) => f.confidence !== "low");
 }
 
-export async function generateUpdatedCatalogWithGemini(params: {
-  apiKey: string;
-  model?: string;
+export async function generateUpdatedCatalog(params: {
+  llm: LlmConfig;
   currentCatalogSource: string;
   todayIsoDate: string;
   evaluation: EvaluationResult;
@@ -443,9 +527,8 @@ ${JSON.stringify(relevantPosts, null, 2)}
 Current apps/perks/lib/catalog.ts:
 ${params.currentCatalogSource}`;
 
-  const raw = await callGemini({
-    apiKey: params.apiKey,
-    model: params.model ?? DEFAULT_GEMINI_MODEL,
+  const raw = await callLlm({
+    llm: params.llm,
     prompt,
     jsonMode: false,
     fetchImpl: params.fetchImpl,
@@ -457,10 +540,29 @@ ${params.currentCatalogSource}`;
     !updated.includes("export const CATALOG") ||
     !updated.includes("export function matchTemplate")
   ) {
-    throw new Error("Gemini returned an invalid catalog.ts replacement");
+    throw new Error("LLM returned an invalid catalog.ts replacement");
   }
 
   return updated.endsWith("\n") ? updated : `${updated}\n`;
+}
+
+export async function generateUpdatedCatalogWithGemini(params: {
+  apiKey: string;
+  model?: string;
+  currentCatalogSource: string;
+  todayIsoDate: string;
+  evaluation: EvaluationResult;
+  posts: DocPost[];
+  fetchImpl?: typeof fetch;
+}): Promise<string> {
+  return generateUpdatedCatalog({
+    llm: { provider: "gemini", apiKey: params.apiKey, model: params.model },
+    currentCatalogSource: params.currentCatalogSource,
+    todayIsoDate: params.todayIsoDate,
+    evaluation: params.evaluation,
+    posts: params.posts,
+    fetchImpl: params.fetchImpl,
+  });
 }
 
 export function formatEvaluationReport(
