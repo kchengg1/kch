@@ -23,21 +23,21 @@ import { centsToInputDollars, formatCents, formatDate, formatSignedCents } from 
 import { tapHaptic } from "../lib/haptics";
 import type { MobileActionPayload, MobileBootstrap, MobileCard } from "../types";
 
-function CardListItem({
+const CardListItem = React.memo(function CardListItem({
   card,
   today,
-  onPress,
+  onOpenCard,
 }: {
   card: MobileCard;
   today: string;
-  onPress: () => void;
+  onOpenCard: (cardId: string) => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={() => {
         tapHaptic();
-        onPress();
+        onOpenCard(card.id);
       }}
       style={styles.cardItem}
     >
@@ -93,9 +93,9 @@ function CardListItem({
       </View>
     </Pressable>
   );
-}
+});
 
-export function CardsScreen({
+export const CardsScreen = React.memo(function CardsScreen({
   data,
   refreshing,
   busyKey,
@@ -123,8 +123,8 @@ export function CardsScreen({
   const [business, setBusiness] = useState(false);
   const [sheetText, setSheetText] = useState("");
 
-  const openCards = data.cards.filter((c) => !c.closed);
-  const closedCards = data.cards.filter((c) => c.closed);
+  const openCards = useMemo(() => data.cards.filter((c) => !c.closed), [data.cards]);
+  const closedCards = useMemo(() => data.cards.filter((c) => c.closed), [data.cards]);
 
   const filteredCatalog = useMemo(() => {
     const q = catalogFilter.trim().toLowerCase();
@@ -338,7 +338,7 @@ export function CardsScreen({
         <View style={styles.cardStack}>
           {openCards.map((card) => (
             <SectionCard key={card.id}>
-              <CardListItem card={card} today={data.today} onPress={() => onOpenCard(card.id)} />
+              <CardListItem card={card} today={data.today} onOpenCard={onOpenCard} />
             </SectionCard>
           ))}
         </View>
@@ -346,13 +346,15 @@ export function CardsScreen({
 
       {closedCards.length > 0 ? (
         <CollapsibleSection title="Closed cards" countLabel={`${closedCards.length}`}>
-          <View style={styles.closedStack}>
-            {closedCards.map((card, idx) => (
-              <View key={card.id} style={idx > 0 ? styles.rowDivider : undefined}>
-                <CardListItem card={card} today={data.today} onPress={() => onOpenCard(card.id)} />
-              </View>
-            ))}
-          </View>
+          {() => (
+            <View style={styles.closedStack}>
+              {closedCards.map((card, idx) => (
+                <View key={card.id} style={idx > 0 ? styles.rowDivider : undefined}>
+                  <CardListItem card={card} today={data.today} onOpenCard={onOpenCard} />
+                </View>
+              ))}
+            </View>
+          )}
         </CollapsibleSection>
       ) : null}
 
@@ -361,7 +363,7 @@ export function CardsScreen({
       </Text>
     </ScrollView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   content: {

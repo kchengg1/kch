@@ -11,13 +11,21 @@ export const CADENCE_OPTIONS: { value: Cadence; label: string }[] = [
   { value: "perk", label: "Ongoing perk" },
 ];
 
+/** Format an integer with US thousands commas without allocating Intl.NumberFormat per call. */
+export function formatInteger(value: number): string {
+  const rounded = Math.round(value);
+  const sign = rounded < 0 ? "-" : "";
+  const digits = String(Math.abs(rounded));
+  return sign + digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 /** Format integer cents as "$1,234" or "$12.95". */
 export function formatCents(cents: number): string {
   const negative = cents < 0;
   const abs = Math.abs(Math.round(cents));
   const whole = Math.floor(abs / 100);
   const rem = abs % 100;
-  const wholeStr = whole.toLocaleString("en-US");
+  const wholeStr = formatInteger(whole);
   const body = rem === 0 ? `$${wholeStr}` : `$${wholeStr}.${String(rem).padStart(2, "0")}`;
   return negative ? `-${body}` : body;
 }

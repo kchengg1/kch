@@ -7,14 +7,20 @@ import {
   formatCents,
   formatCpp,
   formatDate,
+  formatInteger,
   formatSignedCents,
   normalizeServerUrl,
   parseDollars,
   sortOfferGroups,
 } from "./format";
 
-describe("formatCents and parseDollars", () => {
-  it("formats whole and fractional dollar amounts in integer cents", () => {
+describe("formatCents, formatInteger, and parseDollars", () => {
+  it("formats integers and whole/fractional dollar amounts without locale drift", () => {
+    expect(formatInteger(0)).toBe("0");
+    expect(formatInteger(999)).toBe("999");
+    expect(formatInteger(1000)).toBe("1,000");
+    expect(formatInteger(1270520)).toBe("1,270,520");
+    expect(formatInteger(-25000)).toBe("-25,000");
     expect(formatCents(0)).toBe("$0");
     expect(formatCents(1500)).toBe("$15");
     expect(formatCents(1295)).toBe("$12.95");
