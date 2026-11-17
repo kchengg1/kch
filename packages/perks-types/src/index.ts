@@ -345,6 +345,8 @@ export type MobilePersonOfferGroup = {
 export type MobilePersonEntry = {
   id: string;
   firstName: string;
+  /** ISO timestamp of when they were last active in the app, or null if never recorded. */
+  lastActiveAt: string | null;
   sharing: boolean;
   cards: MobilePersonCard[] | null;
   offers: {

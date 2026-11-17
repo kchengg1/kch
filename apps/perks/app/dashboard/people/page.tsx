@@ -10,6 +10,7 @@ import {
   type CardStatus,
   type CreditLine,
 } from "@/lib/group-standings";
+import { formatLastActive } from "@/lib/last-active";
 import { formatCents } from "@/lib/money";
 import { merchantKey } from "@/lib/offer-groups";
 import { rateLabel, WEAK_RATE } from "@/lib/offer-value";
@@ -63,6 +64,7 @@ export default async function PeoplePage({
     .map((x) => ({
       id: x.id,
       firstName: firstName(x.name),
+      lastActiveAt: x.lastActiveAt,
       offers: offersOf.get(x.id),
       cards: cardsByPerson.get(x.id),
       sharing: !group.hidden.has(x.id),
@@ -168,6 +170,10 @@ export default async function PeoplePage({
               </a>
             ))}
           </nav>
+
+          <p className="text-sm text-muted-foreground">
+            Last active: {formatLastActive(person.lastActiveAt)}
+          </p>
 
           <section className="space-y-3">
             <h2 className="font-semibold">{person.firstName}&rsquo;s cards</h2>

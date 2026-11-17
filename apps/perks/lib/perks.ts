@@ -89,7 +89,7 @@ export async function listOffers(userId: string): Promise<PerksOffer[]> {
  */
 export async function listEveryonesOffers() {
   const [people, offers, cards] = await Promise.all([
-    db.select({ id: user.id, name: user.name }).from(user),
+    db.select({ id: user.id, name: user.name, lastActiveAt: user.lastActiveAt }).from(user),
     db
       .select({
         id: perksOffer.id,
