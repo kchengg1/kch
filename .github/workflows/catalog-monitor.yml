@@ -19,6 +19,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  models: read
 
 jobs:
   monitor:
@@ -38,16 +39,13 @@ jobs:
       - name: Scrape Doctor of Credit and evaluate catalog
         id: monitor
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_MODEL: ${{ vars.GITHUB_MODEL || 'openai/gpt-4.1-mini' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
           SINCE_DATE: ${{ inputs.since || '' }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "GEMINI_API_KEY secret is not configured; skipping catalog monitor."
-            echo "updated=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           node --experimental-strip-types apps/perks/scripts/catalog-monitor.mjs \
             --output-report /tmp/catalog-report.md
 

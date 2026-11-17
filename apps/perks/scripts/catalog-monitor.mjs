@@ -1,22 +1,24 @@
 #!/usr/bin/env node
 /**
  * Scrapes Doctor of Credit's RSS feeds, evaluates recent posts against
- * apps/perks/lib/catalog.ts using Google Gemini, and optionally updates
- * catalog.ts when actionable changes are found.
+ * apps/perks/lib/catalog.ts using GitHub Models (default, via GITHUB_TOKEN)
+ * or Google Gemini (via GEMINI_API_KEY), and optionally updates catalog.ts
+ * when actionable changes are found.
  *
  * Usage:
- *   GEMINI_API_KEY=... node --experimental-strip-types apps/perks/scripts/catalog-monitor.mjs [--since YYYY-MM-DD] [--dry-run] [--output-report path]
+ *   GITHUB_TOKEN=... node --experimental-strip-types apps/perks/scripts/catalog-monitor.mjs [--since YYYY-MM-DD] [--dry-run] [--output-report path]
  */
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CATALOG, CATALOG_REVIEWED, RETIRED } from "../lib/catalog.ts";
 import {
   DEFAULT_GEMINI_MODEL,
-  evaluatePostsWithGemini,
+  DEFAULT_GITHUB_MODEL,
+  evaluatePosts,
   fetchDoctorOfCreditPosts,
   filterRecentPosts,
   formatEvaluationReport,
-  generateUpdatedCatalogWithGemini,
+  generateUpdatedCatalog,
   hasActionableFindings,
   isRelevantPost,
 } from "../lib/catalog-monitor.ts";
@@ -33,20 +35,42 @@ function setGithubOutput(key, value) {
   }
 }
 
+function resolveLlmConfig() {
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  const githubToken = process.env.GITHUB_TOKEN?.trim();
+
+  if (geminiKey && process.env.LLM_PROVIDER !== "github-models") {
+    return {
+      provider: "gemini",
+      apiKey: geminiKey,
+      model: process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
+    };
+  }
+  if (githubToken) {
+    return {
+      provider: "github-models",
+      token: githubToken,
+      model: process.env.GITHUB_MODEL?.trim() || DEFAULT_GITHUB_MODEL,
+    };
+  }
+  return null;
+}
+
 async function main() {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) {
-    console.error("Missing GEMINI_API_KEY environment variable.");
+  const llm = resolveLlmConfig();
+  if (!llm) {
+    console.error("Missing GITHUB_TOKEN (for GitHub Models) or GEMINI_API_KEY.");
     process.exit(1);
   }
 
-  const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
   const dryRun = process.argv.includes("--dry-run") || process.env.DRY_RUN === "true";
   const sinceDate = getArg("--since")?.trim() || process.env.SINCE_DATE?.trim() || CATALOG_REVIEWED;
   const reportPath = getArg("--output-report")?.trim();
   const todayIsoDate = new Date().toISOString().slice(0, 10);
 
-  console.log(`Fetching Doctor of Credit feeds (since ${sinceDate}, dryRun=${dryRun})...`);
+  console.log(
+    `Fetching Doctor of Credit feeds (since ${sinceDate}, provider=${llm.provider}, model=${llm.model}, dryRun=${dryRun})...`,
+  );
   const allPosts = await fetchDoctorOfCreditPosts();
   const recentPosts = filterRecentPosts(allPosts, sinceDate);
   const relevantPosts = recentPosts.filter((post) => isRelevantPost(post, CATALOG));
@@ -55,9 +79,8 @@ async function main() {
     `Scanned ${allPosts.length} feed items -> ${recentPosts.length} recent -> ${relevantPosts.length} relevant.`,
   );
 
-  const evaluation = await evaluatePostsWithGemini({
-    apiKey,
-    model,
+  const evaluation = await evaluatePosts({
+    llm,
     posts: relevantPosts,
     catalog: CATALOG,
     retired: RETIRED,
@@ -94,9 +117,8 @@ async function main() {
   const currentCatalogSource = readFileSync(catalogPath, "utf8");
 
   console.log("Generating updated apps/perks/lib/catalog.ts...");
-  const updatedSource = await generateUpdatedCatalogWithGemini({
-    apiKey,
-    model,
+  const updatedSource = await generateUpdatedCatalog({
+    llm,
     currentCatalogSource,
     todayIsoDate,
     evaluation,
