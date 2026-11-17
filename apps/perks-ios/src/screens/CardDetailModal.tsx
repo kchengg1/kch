@@ -30,6 +30,7 @@ import {
   formatCents,
   formatDate,
   formatSignedCents,
+  ordinal,
 } from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
 import type {
@@ -37,6 +38,7 @@ import type {
   CatalogEntry,
   MobileActionPayload,
   MobileBenefit,
+  MobileBootstrap,
   MobileCard,
 } from "../types";
 
@@ -379,16 +381,20 @@ export function CardDetailModal({
   card,
   today,
   catalog,
+  referrals,
   busyKey,
   onClose,
   onAction,
+  onOpenReferrals,
 }: {
   card: MobileCard | null;
   today: string;
   catalog: CatalogEntry[];
+  referrals: MobileBootstrap["referrals"];
   busyKey: string | null;
   onClose: () => void;
   onAction: (payload: MobileActionPayload, key: string) => Promise<void>;
+  onOpenReferrals: (templateKey?: string) => void;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -431,11 +437,18 @@ export function CardDetailModal({
 
   if (!card) return null;
 
+  const year = today.slice(0, 4);
   const credits = card.benefits.filter((b) => b.cadence !== "perk");
   const perks = card.benefits.filter((b) => b.cadence === "perk");
   const matchingCatalog = card.templateKey
     ? catalog.find((t) => t.key === card.templateKey)
     : undefined;
+  const myReferral = card.templateKey
+    ? referrals.mine.find((r) => r.templateKey === card.templateKey)
+    : undefined;
+  const friendCardReferrals = card.templateKey
+    ? referrals.others.filter((r) => r.templateKey === card.templateKey)
+    : [];
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -492,6 +505,100 @@ export function CardDetailModal({
               </Text>
             </View>
           </SectionCard>
+
+          {!card.closed && card.catalogUpdates.count > 0 ? (
+            <SectionCard style={styles.catalogUpdateBanner}>
+              <Text style={styles.catalogUpdateTitle}>
+                {card.catalogUpdates.count} catalog update
+                {card.catalogUpdates.count === 1 ? "" : "s"} available
+              </Text>
+              <Text style={styles.catalogUpdateBody}>
+                Built-in credits for {card.name} changed since you added it. Applying updates keeps
+                all your logged credit history.
+              </Text>
+              {card.catalogUpdates.added.map((line, i) => (
+                <Text key={`add:${i}`} style={styles.catalogDiffLine}>
+                  + New: {line}
+                </Text>
+              ))}
+              {card.catalogUpdates.changed.map((line, i) => (
+                <Text key={`chg:${i}`} style={styles.catalogDiffLine}>
+                  ~ Updated: {line}
+                </Text>
+              ))}
+              {card.catalogUpdates.removed.map((line, i) => (
+                <Text key={`rem:${i}`} style={styles.catalogDiffLine}>
+                  − Ended: {line}
+                </Text>
+              ))}
+              <View style={styles.actionRow}>
+                <Button
+                  label="Apply catalog updates"
+                  size="sm"
+                  loading={busyKey === `catalog.apply:${card.id}`}
+                  onPress={() =>
+                    void onAction(
+                      { type: "card.applyCatalogUpdates", cardId: card.id },
+                      `catalog.apply:${card.id}`,
+                    )
+                  }
+                />
+              </View>
+            </SectionCard>
+          ) : null}
+
+          {!card.closed && card.standings.length >= 2 ? (
+            <SectionCard style={styles.standingsCard}>
+              <Text style={styles.sectionTitle}>How you compare on this card in {year}</Text>
+              {card.standings.map((row, idx) => (
+                <View key={row.cardId} style={styles.standingRow}>
+                  <View style={styles.standingTop}>
+                    <Text style={styles.standingName}>
+                      <Text style={[styles.standingRank, NUM_STYLE]}>{ordinal(idx + 1)} </Text>
+                      {row.isMe ? "You" : row.firstName}
+                    </Text>
+                    <Text style={[styles.benefitMeta, NUM_STYLE]}>
+                      {formatCents(row.capturedCents)} of {formatCents(row.availableCents)} ·{" "}
+                      {Math.round(row.share * 100)}%
+                    </Text>
+                  </View>
+                  <Meter
+                    value={row.capturedCents}
+                    max={Math.max(row.availableCents, 1)}
+                    tone={idx === 0 ? "green" : "dark"}
+                  />
+                </View>
+              ))}
+            </SectionCard>
+          ) : null}
+
+          {!card.closed && card.templateKey ? (
+            <SectionCard style={styles.standingsCard}>
+              <View style={styles.benefitTopRow}>
+                <View style={styles.flexShrink}>
+                  <Text style={styles.sectionTitle}>Referral link</Text>
+                  <Text style={styles.noteText}>
+                    {myReferral
+                      ? `Your referral link is shared with the group${myReferral.reward ? ` (${myReferral.reward})` : ""}.`
+                      : "Share your referral link so friends in the group can use it when applying."}
+                    {friendCardReferrals.length > 0
+                      ? ` ${friendCardReferrals.length} friend${friendCardReferrals.length === 1 ? "" : "s"} also shared a link.`
+                      : ""}
+                  </Text>
+                </View>
+                <Button
+                  label={myReferral ? "See links" : "Share link"}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => {
+                    const tpl = card.templateKey ?? undefined;
+                    onClose();
+                    onOpenReferrals(tpl);
+                  }}
+                />
+              </View>
+            </SectionCard>
+          ) : null}
 
           <View style={styles.sectionBlock}>
             <Text style={styles.sectionTitle}>Credits ({credits.length})</Text>
@@ -1024,5 +1131,46 @@ const styles = StyleSheet.create({
   twoCol: {
     flexDirection: "row",
     gap: 10,
+  },
+  catalogUpdateBanner: {
+    backgroundColor: COLORS.amberBg,
+    borderColor: COLORS.amberBorder,
+    gap: 8,
+  },
+  catalogUpdateTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.amberInk,
+  },
+  catalogUpdateBody: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: COLORS.amberInk,
+  },
+  catalogDiffLine: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.amberInk,
+  },
+  standingsCard: {
+    gap: 10,
+  },
+  standingRow: {
+    gap: 5,
+  },
+  standingTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  standingName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.ink,
+  },
+  standingRank: {
+    color: COLORS.muted,
+    fontWeight: "700",
   },
 });

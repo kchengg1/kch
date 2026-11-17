@@ -20,15 +20,17 @@ import {
   setStoredToken,
 } from "./src/lib/storage";
 import { AuthScreen } from "./src/screens/AuthScreen";
-import { BonusesScreen } from "./src/screens/BonusesScreen";
 import { CardDetailModal } from "./src/screens/CardDetailModal";
 import { CardsScreen } from "./src/screens/CardsScreen";
 import { CatchUpModal } from "./src/screens/CatchUpModal";
 import { OffersScreen } from "./src/screens/OffersScreen";
 import { OverviewScreen } from "./src/screens/OverviewScreen";
+import { PeopleScreen } from "./src/screens/PeopleScreen";
 import { PointsScreen } from "./src/screens/PointsScreen";
 import { SettingsModal } from "./src/screens/SettingsModal";
+import { YearEndModal } from "./src/screens/YearEndModal";
 import type {
+  CardsSubTabKey,
   MobileActionPayload,
   MobileActionResponse,
   MobileBootstrap,
@@ -40,7 +42,7 @@ const INITIAL_MOUNTED_TABS: Record<TabKey, boolean> = {
   cards: false,
   offers: false,
   points: false,
-  bonuses: false,
+  people: false,
 };
 
 function TabPane({
@@ -77,10 +79,13 @@ function PerksShell() {
   const [banner, setBanner] = useState<{ text: string; tone: "info" | "error" } | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [cardsSubTab, setCardsSubTab] = useState<CardsSubTabKey>("cards");
+  const [shareTemplateKey, setShareTemplateKey] = useState<string | null>(null);
   const [mountedTabs, setMountedTabs] = useState<Record<TabKey, boolean>>(INITIAL_MOUNTED_TABS);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [catchUpOpen, setCatchUpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [yearEndOpen, setYearEndOpen] = useState(false);
 
   const tokenRef = useRef<string | null>(null);
   const serverRef = useRef<string>(serverUrl);
@@ -91,6 +96,22 @@ function PerksShell() {
     setActiveTab(nextTab);
     setMountedTabs((prev) => (prev[nextTab] ? prev : { ...prev, [nextTab]: true }));
   }, []);
+
+  const handleCardsSubTabChange = useCallback((nextSubTab: CardsSubTabKey) => {
+    setCardsSubTab(nextSubTab);
+    if (nextSubTab !== "bonuses") {
+      setShareTemplateKey(null);
+    }
+  }, []);
+
+  const handleOpenReferrals = useCallback(
+    (templateKey?: string) => {
+      setShareTemplateKey(templateKey ?? null);
+      setCardsSubTab("bonuses");
+      handleTabChange("cards");
+    },
+    [handleTabChange],
+  );
 
   const handleOpenCard = useCallback((cardId: string) => {
     setSelectedCardId(cardId);
@@ -114,6 +135,14 @@ function PerksShell() {
 
   const handleCloseSettings = useCallback(() => {
     setSettingsOpen(false);
+  }, []);
+
+  const handleOpenYearEnd = useCallback(() => {
+    setYearEndOpen(true);
+  }, []);
+
+  const handleCloseYearEnd = useCallback(() => {
+    setYearEndOpen(false);
   }, []);
 
   const loadSnapshot = useCallback(async (baseUrl: string, authToken: string) => {
@@ -164,7 +193,7 @@ function PerksShell() {
   const hasBootstrap = bootstrap !== null;
   useEffect(() => {
     if (!hasBootstrap) return;
-    const queue: TabKey[] = ["cards", "offers", "points", "bonuses"];
+    const queue: TabKey[] = ["cards", "offers", "points", "people"];
     const timers = queue.map((tab, idx) =>
       setTimeout(
         () => {
@@ -274,7 +303,10 @@ function PerksShell() {
     setSettingsOpen(false);
     setSelectedCardId(null);
     setCatchUpOpen(false);
+    setYearEndOpen(false);
     setActiveTab("overview");
+    setCardsSubTab("cards");
+    setShareTemplateKey(null);
     setMountedTabs(INITIAL_MOUNTED_TABS);
     await setStoredToken(null);
     setToken(null);
@@ -384,6 +416,8 @@ function PerksShell() {
             onOpenCard={handleOpenCard}
             onOpenCatchUp={handleOpenCatchUp}
             onOpenSettings={handleOpenSettings}
+            onOpenYearEnd={handleOpenYearEnd}
+            onOpenReferrals={handleOpenReferrals}
             onNavigateTab={handleTabChange}
           />
         </TabPane>
@@ -393,10 +427,15 @@ function PerksShell() {
             data={bootstrap}
             refreshing={refreshing}
             busyKey={busyKey}
+            subTab={cardsSubTab}
+            onSubTabChange={handleCardsSubTabChange}
+            shareTemplateKey={shareTemplateKey}
             onRefresh={triggerRefresh}
             onAction={handleActionReturningCardId}
+            onVoidAction={handleAction}
             onOpenCard={handleOpenCard}
             onOpenCatchUp={handleOpenCatchUp}
+            onNavigateTab={handleTabChange}
           />
         </TabPane>
 
@@ -420,8 +459,8 @@ function PerksShell() {
           />
         </TabPane>
 
-        <TabPane active={activeTab === "bonuses"} mounted={mountedTabs.bonuses}>
-          <BonusesScreen data={bootstrap} refreshing={refreshing} onRefresh={triggerRefresh} />
+        <TabPane active={activeTab === "people"} mounted={mountedTabs.people}>
+          <PeopleScreen data={bootstrap} refreshing={refreshing} onRefresh={triggerRefresh} />
         </TabPane>
       </View>
 
@@ -431,9 +470,11 @@ function PerksShell() {
         card={selectedCard}
         today={bootstrap.today}
         catalog={bootstrap.catalog}
+        referrals={bootstrap.referrals}
         busyKey={busyKey}
         onClose={handleCloseCard}
         onAction={handleAction}
+        onOpenReferrals={handleOpenReferrals}
       />
 
       <CatchUpModal
@@ -442,6 +483,22 @@ function PerksShell() {
         busyKey={busyKey}
         onClose={handleCloseCatchUp}
         onRunRawAction={handleRunRawAction}
+      />
+
+      <YearEndModal
+        visible={yearEndOpen}
+        data={bootstrap}
+        busyKey={busyKey}
+        onClose={handleCloseYearEnd}
+        onAction={handleAction}
+        onOpenCard={(id) => {
+          setYearEndOpen(false);
+          setSelectedCardId(id);
+        }}
+        onOpenReferrals={() => {
+          setYearEndOpen(false);
+          handleOpenReferrals();
+        }}
       />
 
       <SettingsModal

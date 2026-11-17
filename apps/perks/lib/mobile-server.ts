@@ -3,11 +3,16 @@ import { auth } from "./auth";
 import { buildMobileBootstrap, type MobileBootstrap } from "./mobile-api";
 import {
   dateOf,
+  ensureSpendTargets,
   getSettings,
+  listEveryonesOffers,
   listHiddenMerchants,
   listOffers,
   listPoints,
   listRedemptions,
+  listReferrals,
+  listSpendTargets,
+  loadGroupCards,
   loadPortfolio,
   today,
 } from "./perks";
@@ -28,14 +33,30 @@ export async function getMobileUser(request: Request): Promise<MobileUser | null
 /** Load and shape the caller's complete Perks snapshot. */
 export async function loadMobileBootstrap(user: MobileUser): Promise<MobileBootstrap> {
   const now = today();
-  const [portfolio, offers, hiddenMerchants, points, redemptions, settings] = await Promise.all([
+  const [
+    portfolio,
+    offers,
+    hiddenMerchants,
+    points,
+    redemptions,
+    settings,
+    referrals,
+    groupOffers,
+    groupCards,
+  ] = await Promise.all([
     loadPortfolio(user.id),
     listOffers(user.id),
     listHiddenMerchants(user.id),
     listPoints(user.id),
     listRedemptions(user.id),
     getSettings(user.id),
+    listReferrals(),
+    listEveryonesOffers(),
+    loadGroupCards(),
   ]);
+
+  await ensureSpendTargets(user.id, portfolio.cards);
+  const spendTargets = await listSpendTargets(user.id);
 
   return buildMobileBootstrap({
     user,
@@ -50,7 +71,12 @@ export async function loadMobileBootstrap(user: MobileUser): Promise<MobileBoots
     settings: {
       digestEnabled: settings.digestEnabled,
       lastDigestOn: settings.lastDigestOn,
+      shareRankings: settings.shareRankings,
     },
+    spendTargets,
+    referrals,
+    groupOffers,
+    groupCards,
     dateOf,
   });
 }

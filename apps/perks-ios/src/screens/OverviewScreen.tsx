@@ -152,6 +152,8 @@ export const OverviewScreen = React.memo(function OverviewScreen({
   onOpenCard,
   onOpenCatchUp,
   onOpenSettings,
+  onOpenYearEnd,
+  onOpenReferrals,
   onNavigateTab,
 }: {
   data: MobileBootstrap;
@@ -162,10 +164,14 @@ export const OverviewScreen = React.memo(function OverviewScreen({
   onOpenCard: (cardId: string) => void;
   onOpenCatchUp: () => void;
   onOpenSettings: () => void;
+  onOpenYearEnd: () => void;
+  onOpenReferrals: (templateKey?: string) => void;
   onNavigateTab: (tab: TabKey) => void;
 }) {
   const [spentDrafts, setSpentDrafts] = useState<Record<string, string>>({});
   const [editingBonusCardId, setEditingBonusCardId] = useState<string | null>(null);
+  const [targetDrafts, setTargetDrafts] = useState<Record<string, string>>({});
+  const [editingTargetId, setEditingTargetId] = useState<string | null>(null);
   const [pickQuery, setPickQuery] = useState("");
 
   const year = data.today.slice(0, 4);
@@ -185,6 +191,11 @@ export const OverviewScreen = React.memo(function OverviewScreen({
           g.merchant.toLowerCase().includes(trimmedPick.toLowerCase()),
         )
       : [];
+
+  const shareablePreview = data.referrals.shareableCards
+    .slice(0, 2)
+    .map((c) => c.name)
+    .join(" and ");
 
   return (
     <ScrollView
@@ -234,6 +245,91 @@ export const OverviewScreen = React.memo(function OverviewScreen({
           <Text style={styles.statFoot}>{openCards.length} open cards</Text>
         </SectionCard>
       </View>
+
+      {data.yearEnd.inWindow ? (
+        <SectionCard style={styles.calloutAmber}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.calloutAmberTitle}>Year-end checklist</Text>
+            <Badge
+              label={
+                data.yearEnd.daysLeft === 0
+                  ? "Dec 31 today"
+                  : `${data.yearEnd.daysLeft}d until Dec 31`
+              }
+              tone="amber"
+            />
+          </View>
+          <Text style={styles.calloutAmberBody}>
+            {data.yearEnd.expiringCount > 0
+              ? `${formatCents(data.yearEnd.expiringCents)} across ${data.yearEnd.expiringCount} credit${data.yearEnd.expiringCount === 1 ? "" : "s"} resets on Jan 1 — plus annual caps, spend goals, and Dec vs Jan card timing.`
+              : "All calendar-year credits logged! Check annual spend caps, referral resets, and Dec vs Jan timing."}
+          </Text>
+          <View style={styles.actionRow}>
+            <Button label="Open year-end checklist" size="sm" onPress={onOpenYearEnd} />
+          </View>
+        </SectionCard>
+      ) : null}
+
+      {data.overview.catalogUpdateCards.length > 0 ? (
+        <SectionCard style={styles.calloutAmber}>
+          <Text style={styles.calloutAmberTitle}>Built-in card benefits updated</Text>
+          <Text style={styles.calloutAmberBody}>
+            Our card catalog has newer credits or terms for{" "}
+            {data.overview.catalogUpdateCards.length === 1
+              ? "one of your cards"
+              : `${data.overview.catalogUpdateCards.length} of your cards`}
+            . Your logged history stays intact.
+          </Text>
+          {data.overview.catalogUpdateCards.map((u, idx) => (
+            <View
+              key={u.cardId}
+              style={[styles.catalogUpdateRow, idx > 0 && styles.calloutDivider]}
+            >
+              <Pressable onPress={() => onOpenCard(u.cardId)} style={styles.creditTitleBlock}>
+                <CardSwatch style={u.cardStyle} />
+                <View style={styles.flexShrink}>
+                  <Text style={styles.itemTitle}>{u.cardName}</Text>
+                  <Text style={styles.itemMeta} numberOfLines={2}>
+                    {u.summary.join(" · ")}
+                  </Text>
+                </View>
+              </Pressable>
+              <Button
+                label="Apply"
+                size="sm"
+                loading={busyKey === `catalog.apply:${u.cardId}`}
+                onPress={() =>
+                  void onAction(
+                    { type: "card.applyCatalogUpdates", cardId: u.cardId },
+                    `catalog.apply:${u.cardId}`,
+                  )
+                }
+              />
+            </View>
+          ))}
+        </SectionCard>
+      ) : null}
+
+      {data.referrals.mine.length === 0 && data.referrals.shareableCards.length > 0 ? (
+        <SectionCard style={styles.referralCallout}>
+          <Text style={styles.sectionHeading}>Share your referral links</Text>
+          <Text style={styles.noteText}>
+            You hold {shareablePreview}
+            {data.referrals.shareableCards.length > 2
+              ? ` and ${data.referrals.shareableCards.length - 2} more`
+              : ""}
+            . Drop your referral links in so friends in the group use yours when applying.
+          </Text>
+          <View style={styles.actionRow}>
+            <Button
+              label="Share a referral link"
+              size="sm"
+              variant="secondary"
+              onPress={() => onOpenReferrals(data.referrals.shareableCards[0]?.templateKey)}
+            />
+          </View>
+        </SectionCard>
+      ) : null}
 
       {openCards.length > 0 ? (
         <SectionCard style={styles.pickerCard}>
@@ -469,6 +565,132 @@ export const OverviewScreen = React.memo(function OverviewScreen({
         </View>
       ) : null}
 
+      {data.overview.spendTargets.length > 0 || data.overview.untrackedSpendTargets.length > 0 ? (
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeading}>Spending goals for {year}</Text>
+          {data.overview.spendTargets.map((t) => {
+            const editing = editingTargetId === t.id;
+            const draft = targetDrafts[t.id] ?? centsToInputDollars(t.spentCents);
+            const leftCents = Math.max(0, t.targetCents - t.spentCents);
+            const met = t.spentCents >= t.targetCents;
+            return (
+              <SectionCard key={t.id} style={styles.bonusCard}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => onOpenCard(t.cardId)}
+                  style={styles.creditTitleBlock}
+                >
+                  <CardSwatch style={t.cardStyle} />
+                  <View style={styles.flexShrink}>
+                    <Text style={styles.itemTitle}>{t.name}</Text>
+                    <Text style={styles.itemMeta}>
+                      {t.cardName} · {t.reward}
+                    </Text>
+                  </View>
+                </Pressable>
+
+                <Meter value={t.spentCents} max={t.targetCents} tone={met ? "green" : "dark"} />
+
+                <View style={styles.bonusMetaRow}>
+                  <Text style={[styles.itemMeta, NUM_STYLE]}>
+                    {formatCents(t.spentCents)} of {formatCents(t.targetCents)}
+                  </Text>
+                  <Text style={[styles.itemMeta, NUM_STYLE]}>
+                    {met ? "Goal met ✓" : `${formatCents(leftCents)} to go`}
+                  </Text>
+                </View>
+
+                <View style={styles.actionRow}>
+                  <Button
+                    label={editing ? "Cancel" : "Update spend"}
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => setEditingTargetId(editing ? null : t.id)}
+                  />
+                  <Button
+                    label="Not chasing"
+                    size="sm"
+                    variant="ghost"
+                    loading={busyKey === `target.track:${t.id}`}
+                    onPress={() =>
+                      void onAction(
+                        { type: "spendTarget.setTracked", id: t.id, tracked: false },
+                        `target.track:${t.id}`,
+                      )
+                    }
+                  />
+                </View>
+
+                {editing ? (
+                  <View style={styles.inlineEditor}>
+                    <TextInput
+                      value={draft}
+                      onChangeText={(v) => setTargetDrafts((prev) => ({ ...prev, [t.id]: v }))}
+                      placeholder="Spent in calendar year ($)"
+                      placeholderTextColor={COLORS.faint}
+                      keyboardType="decimal-pad"
+                      style={styles.inlineInput}
+                    />
+                    <Button
+                      label="Save"
+                      size="sm"
+                      loading={busyKey === `target.spent:${t.id}`}
+                      onPress={() =>
+                        void onAction(
+                          {
+                            type: "spendTarget.setSpent",
+                            id: t.id,
+                            spent: draft || "0",
+                          },
+                          `target.spent:${t.id}`,
+                        ).then(() => setEditingTargetId(null))
+                      }
+                    />
+                  </View>
+                ) : null}
+              </SectionCard>
+            );
+          })}
+
+          {data.overview.untrackedSpendTargets.length > 0 ? (
+            <CollapsibleSection
+              title="Paused spend goals"
+              countLabel={`${data.overview.untrackedSpendTargets.length}`}
+            >
+              {() => (
+                <View style={styles.laterStack}>
+                  {data.overview.untrackedSpendTargets.map((t, idx) => (
+                    <View key={t.id} style={[styles.simpleRow, idx > 0 && styles.rowDivider]}>
+                      <View style={styles.creditTitleBlock}>
+                        <CardSwatch style={t.cardStyle} />
+                        <View style={styles.flexShrink}>
+                          <Text style={styles.itemTitle}>{t.name}</Text>
+                          <Text style={[styles.itemMeta, NUM_STYLE]}>
+                            {t.cardName} · {formatCents(t.targetCents)}/yr · {t.reward}
+                          </Text>
+                        </View>
+                      </View>
+                      <Button
+                        label="Track"
+                        size="sm"
+                        variant="secondary"
+                        loading={busyKey === `target.track:${t.id}`}
+                        onPress={() =>
+                          void onAction(
+                            { type: "spendTarget.setTracked", id: t.id, tracked: true },
+                            `target.track:${t.id}`,
+                          )
+                        }
+                      />
+                    </View>
+                  ))}
+                </View>
+              )}
+            </CollapsibleSection>
+          ) : null}
+        </View>
+      ) : null}
+
       {data.overview.expiringOffers.length > 0 ? (
         <View style={styles.sectionBlock}>
           <View style={styles.sectionTitleRow}>
@@ -570,6 +792,12 @@ export const OverviewScreen = React.memo(function OverviewScreen({
           </SectionCard>
         </View>
       ) : null}
+
+      {!data.yearEnd.inWindow && openCards.length > 0 ? (
+        <Pressable onPress={onOpenYearEnd} style={styles.yearEndFooterLink}>
+          <Text style={styles.linkText}>Preview year-end checklist →</Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
   );
 });
@@ -626,6 +854,35 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.muted,
   },
+  calloutAmber: {
+    backgroundColor: COLORS.amberBg,
+    borderColor: COLORS.amberBorder,
+    gap: 10,
+  },
+  calloutAmberTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.amberInk,
+  },
+  calloutAmberBody: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: COLORS.amberInk,
+  },
+  calloutDivider: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.amberBorder,
+    paddingTop: 10,
+  },
+  catalogUpdateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  referralCallout: {
+    gap: 8,
+  },
   emptyCard: {
     gap: 10,
   },
@@ -636,6 +893,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
   },
   sectionHeading: {
     fontSize: 16,
@@ -789,5 +1047,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: COLORS.greenInk,
+  },
+  yearEndFooterLink: {
+    alignItems: "center",
+    paddingVertical: 4,
   },
 });

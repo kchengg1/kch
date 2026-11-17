@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@kch/config": "workspace:*",
+    "@kch/perks-types": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.20.3",
     "@types/react": "^19.3.0",

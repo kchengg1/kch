@@ -11,10 +11,13 @@ import {
   perksOffer,
   perksPoints,
   perksRedemption,
+  perksReferral,
   perksSettings,
+  perksSpendTarget,
   perksUsage,
 } from "@kch/db";
 import { getTemplate, onStatement } from "@/lib/catalog";
+import { catalogUpdates, templateRow, updateCount } from "@/lib/catalog-sync";
 import { sendDigest } from "@/lib/digest";
 import { parseMobileAction, type MobileAction, type MobileActionResponse } from "@/lib/mobile-api";
 import { getMobileUser, loadMobileBootstrap, type MobileUser } from "@/lib/mobile-server";
@@ -28,10 +31,12 @@ import {
   listOffers,
   listPoints,
   loadPortfolio,
+  otherUserIds,
   today,
 } from "@/lib/perks";
 import { currentPeriod, isCadence, periodsThisYear } from "@/lib/periods";
 import { defaultCentsPerPoint, parseBalances } from "@/lib/points";
+import { sendPush } from "@/lib/push";
 import { parseCardSheet, parseSheetDate } from "@/lib/sheet-import";
 import { parseStatementCsv, suggestBenefit } from "@/lib/statement-import";
 
@@ -278,6 +283,58 @@ async function runAction(
       return { message: `Added ${template.name} credits.` };
     }
 
+    case "card.applyCatalogUpdates": {
+      const card = await getCard(action.cardId, user.id);
+      if (!card?.templateKey) return { error: "Card or catalog template not found.", status: 404 };
+      const benefits = await db
+        .select()
+        .from(perksBenefit)
+        .where(and(eq(perksBenefit.cardId, card.id), eq(perksBenefit.userId, user.id)));
+      const updates = catalogUpdates(card.templateKey, benefits);
+      const count = updateCount(updates);
+      if (updates.removed.length > 0) {
+        await db.delete(perksBenefit).where(
+          and(
+            eq(perksBenefit.userId, user.id),
+            inArray(
+              perksBenefit.id,
+              updates.removed.map((b) => b.id),
+            ),
+          ),
+        );
+      }
+      const nextOrder = benefits.reduce((n, b) => Math.max(n, b.sortOrder + 1), 0);
+      if (updates.added.length > 0) {
+        await db.insert(perksBenefit).values(
+          updates.added.map((t, i) => ({
+            id: crypto.randomUUID(),
+            cardId: card.id,
+            userId: user.id,
+            sortOrder: nextOrder + i,
+            ...templateRow(t),
+          })),
+        );
+      }
+      for (const { benefit, template } of updates.changed) {
+        const row = templateRow(template);
+        await db
+          .update(perksBenefit)
+          .set({
+            cadence: row.cadence,
+            amountCents: row.amountCents,
+            endsOn: row.endsOn,
+            notes: row.notes,
+          })
+          .where(and(eq(perksBenefit.id, benefit.id), eq(perksBenefit.userId, user.id)));
+      }
+      return {
+        message:
+          count > 0
+            ? `Applied ${count} catalog update${count === 1 ? "" : "s"} to ${card.name}.`
+            : `${card.name} is already up to date.`,
+      };
+    }
+
     case "card.importSheet": {
       const { cards, error } = parseCardSheet(action.sheet);
       if (error) return { error };
@@ -442,13 +499,12 @@ async function runAction(
         const details = o.details.slice(0, 300);
         const expiresOn = o.expiresOn ? parseSheetDate(o.expiresOn) : null;
         if (!merchant) continue;
-        if (hiddenKeys.has(merchantKey(merchant))) {
-          hiddenCount++;
-          continue;
-        }
         const key = offerKey({ merchant, details, expiresOn });
         if (have.has(key)) continue;
         have.add(key);
+        // Save hidden-merchant offers with status "hidden" so the People tab still sees them.
+        const isHidden = hiddenKeys.has(merchantKey(merchant));
+        if (isHidden) hiddenCount++;
         rows.push({
           id: crypto.randomUUID(),
           userId: user.id,
@@ -457,7 +513,7 @@ async function runAction(
           details,
           valueCents: Number.isInteger(o.valueCents) ? o.valueCents : null,
           expiresOn,
-          status: o.added ? "added" : "available",
+          status: isHidden ? "hidden" : o.added ? "added" : "available",
         });
       }
       if (rows.length > 0) await db.insert(perksOffer).values(rows);
@@ -467,13 +523,14 @@ async function runAction(
           .set({ offersCheckedAt: new Date() })
           .where(and(eq(perksCard.id, card.id), eq(perksCard.userId, user.id)));
       }
-      const skipped = parsed.length - rows.length - hiddenCount;
+      const skipped = parsed.length - rows.length;
+      const shown = rows.length - hiddenCount;
       const notes = [
         skipped ? `skipped ${skipped} already saved` : "",
         hiddenCount ? `left out ${hiddenCount} from merchants you hid` : "",
       ].filter(Boolean);
       return {
-        message: `Saved ${rows.length} offer${rows.length === 1 ? "" : "s"}${notes.length ? `, ${notes.join(", ")}` : ""}.`,
+        message: `Saved ${shown} offer${shown === 1 ? "" : "s"}${notes.length ? `, ${notes.join(", ")}` : ""}.`,
       };
     }
 
@@ -521,6 +578,16 @@ async function runAction(
             eq(perksHiddenMerchant.merchantKey, action.merchantKey),
           ),
         );
+      // Restore offers pasted while the merchant was hidden.
+      const hiddenOfferIds = (await listOffers(user.id))
+        .filter((o) => o.status === "hidden" && merchantKey(o.merchant) === action.merchantKey)
+        .map((o) => o.id);
+      if (hiddenOfferIds.length > 0) {
+        await db
+          .update(perksOffer)
+          .set({ status: "available" })
+          .where(and(inArray(perksOffer.id, hiddenOfferIds), eq(perksOffer.userId, user.id)));
+      }
       return {};
     }
 
@@ -607,6 +674,55 @@ async function runAction(
       return {};
     }
 
+    case "referral.add": {
+      await db.insert(perksReferral).values({
+        id: crypto.randomUUID(),
+        userId: user.id,
+        templateKey: action.templateKey,
+        cardName: action.cardName,
+        url: action.url,
+        reward: action.reward,
+      });
+      const first = user.name.split(" ")[0] || "Someone";
+      const others = await otherUserIds(user.id);
+      await Promise.allSettled(
+        others.map((id) =>
+          sendPush(id, {
+            title: `${first} shared a ${action.cardName} referral link`,
+            body: "Applying for this card? Use their link so the bonus stays in the group.",
+            url: "/dashboard/bonuses#referrals",
+            tag: "referral",
+          }),
+        ),
+      );
+      return {
+        message: `Shared your ${action.cardName} link.${others.length ? " Everyone with notifications on was told." : ""}`,
+      };
+    }
+
+    case "referral.delete": {
+      await db
+        .delete(perksReferral)
+        .where(and(eq(perksReferral.id, action.id), eq(perksReferral.userId, user.id)));
+      return { message: "Removed referral link." };
+    }
+
+    case "spendTarget.setSpent": {
+      await db
+        .update(perksSpendTarget)
+        .set({ spentCents: action.spentCents, periodKey: today().slice(0, 4) })
+        .where(and(eq(perksSpendTarget.id, action.id), eq(perksSpendTarget.userId, user.id)));
+      return {};
+    }
+
+    case "spendTarget.setTracked": {
+      await db
+        .update(perksSpendTarget)
+        .set({ tracked: action.tracked })
+        .where(and(eq(perksSpendTarget.id, action.id), eq(perksSpendTarget.userId, user.id)));
+      return {};
+    }
+
     case "settings.setDigest": {
       await db
         .insert(perksSettings)
@@ -614,6 +730,17 @@ async function runAction(
         .onConflictDoUpdate({
           target: perksSettings.userId,
           set: { digestEnabled: action.enabled },
+        });
+      return {};
+    }
+
+    case "settings.setShareRankings": {
+      await db
+        .insert(perksSettings)
+        .values({ userId: user.id, shareRankings: action.enabled })
+        .onConflictDoUpdate({
+          target: perksSettings.userId,
+          set: { shareRankings: action.enabled },
         });
       return {};
     }

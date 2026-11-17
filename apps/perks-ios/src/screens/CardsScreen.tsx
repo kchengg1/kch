@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import {
@@ -18,10 +19,31 @@ import {
   Meter,
   NUM_STYLE,
   SectionCard,
+  SegmentedBar,
 } from "../components/ui";
-import { centsToInputDollars, formatCents, formatDate, formatSignedCents } from "../lib/format";
+import { CATEGORIES, classify, EARN_REVIEWED, rankCards } from "../lib/earn";
+import {
+  centsToInputDollars,
+  formatCents,
+  formatCpp,
+  formatDate,
+  formatSignedCents,
+} from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
-import type { MobileActionPayload, MobileBootstrap, MobileCard } from "../types";
+import type {
+  CardsSubTabKey,
+  MobileActionPayload,
+  MobileBootstrap,
+  MobileCard,
+  TabKey,
+} from "../types";
+import { BonusesScreen } from "./BonusesScreen";
+
+const SUB_TABS: { key: CardsSubTabKey; label: string }[] = [
+  { key: "cards", label: "My cards" },
+  { key: "pick", label: "Which card?" },
+  { key: "bonuses", label: "Bonuses & links" },
+];
 
 const CardListItem = React.memo(function CardListItem({
   card,
@@ -80,6 +102,12 @@ const CardListItem = React.memo(function CardListItem({
       ) : null}
 
       <View style={styles.badgeWrap}>
+        {!card.closed && card.catalogUpdates.count > 0 ? (
+          <Badge
+            label={`${card.catalogUpdates.count} catalog update${card.catalogUpdates.count === 1 ? "" : "s"}`}
+            tone="amber"
+          />
+        ) : null}
         {card.msr && card.msr.state === "active" ? (
           <Badge label={`Bonus: ${formatCents(card.msr.leftCents)} left`} tone="amber" />
         ) : null}
@@ -95,22 +123,218 @@ const CardListItem = React.memo(function CardListItem({
   );
 });
 
+const WhichCardPane = React.memo(function WhichCardPane({
+  data,
+  refreshing,
+  headerSlot,
+  onRefresh,
+  onOpenCard,
+  onNavigateTab,
+  onAddFirstCard,
+}: {
+  data: MobileBootstrap;
+  refreshing: boolean;
+  headerSlot: React.ReactNode;
+  onRefresh: () => void;
+  onOpenCard: (cardId: string) => void;
+  onNavigateTab: (tab: TabKey) => void;
+  onAddFirstCard: () => void;
+}) {
+  const [query, setQuery] = useState("Dining");
+  const openCards = useMemo(() => data.cards.filter((c) => !c.closed), [data.cards]);
+  const cardById = useMemo(() => new Map(openCards.map((c) => [c.id, c])), [openCards]);
+  const valueByProgram = useMemo(
+    () => new Map(data.points.programs.map((p) => [p.program, p.centsPerPoint])),
+    [data.points.programs],
+  );
+
+  const trimmed = query.trim();
+  const target = useMemo(() => classify(trimmed || "other"), [trimmed]);
+  const categoryLabel =
+    CATEGORIES.find((c) => c.id === target.category)?.label ?? "Everything else";
+  const picks = useMemo(
+    () => rankCards(openCards, target, (program) => valueByProgram.get(program) ?? 1),
+    [openCards, target, valueByProgram],
+  );
+  const matchingOffers = useMemo(
+    () =>
+      trimmed.length >= 3
+        ? [...data.offers.strong, ...data.offers.weak].filter((g) =>
+            g.merchant.toLowerCase().includes(trimmed.toLowerCase()),
+          )
+        : [],
+    [data.offers.strong, data.offers.weak, trimmed],
+  );
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      keyboardShouldPersistTaps="handled"
+    >
+      {headerSlot}
+
+      <View style={styles.headerBlock}>
+        <Text style={styles.title}>Which card?</Text>
+        <Text style={styles.subtitle}>
+          Type a merchant or pick a spending category to rank your open cards by estimated return.
+        </Text>
+      </View>
+
+      {openCards.length === 0 ? (
+        <SectionCard style={styles.panelGap}>
+          <Text style={styles.cardSub}>
+            Add at least one open card from the catalog to compare earn rates across categories.
+          </Text>
+          <Button label="Add a card" size="sm" onPress={onAddFirstCard} />
+        </SectionCard>
+      ) : (
+        <>
+          <SectionCard style={styles.panelGap}>
+            <View style={styles.searchHeaderRow}>
+              <Text style={styles.searchLabel}>Merchant or category</Text>
+              {trimmed ? (
+                <Pressable onPress={() => setQuery("")}>
+                  <Text style={styles.clearLink}>Clear</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Whole Foods, Hyatt, Costco, dining, flights..."
+              placeholderTextColor={COLORS.faint}
+              style={styles.searchInput}
+            />
+            <View style={styles.catGrid}>
+              {CATEGORIES.map((cat) => {
+                const active =
+                  trimmed.toLowerCase() === cat.label.toLowerCase() ||
+                  (!trimmed && cat.id === "other");
+                return (
+                  <Pressable
+                    key={cat.id}
+                    onPress={() => {
+                      tapHaptic();
+                      setQuery(cat.label);
+                    }}
+                    style={[styles.catChip, active && styles.catChipActive]}
+                  >
+                    <Text style={[styles.catChipText, active && styles.catChipTextActive]}>
+                      {cat.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </SectionCard>
+
+          {matchingOffers.length > 0 ? (
+            <SectionCard style={styles.offerAlertCard}>
+              <Text style={styles.offerAlertTitle}>Saved card offers matching “{trimmed}”</Text>
+              {matchingOffers.map((o) => (
+                <Pressable
+                  key={o.key}
+                  onPress={() => onNavigateTab("offers")}
+                  style={styles.offerAlertRow}
+                >
+                  <Text style={styles.offerAlertText}>
+                    {o.merchant}: {o.details} →
+                  </Text>
+                </Pressable>
+              ))}
+            </SectionCard>
+          ) : null}
+
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>
+              Ranked for {categoryLabel}
+              {target.chain ? ` (${target.chain})` : ""}
+            </Text>
+            <Text style={[styles.cardSub, NUM_STYLE]}>{picks.length} cards</Text>
+          </View>
+
+          {picks.length === 0 ? (
+            <SectionCard>
+              <Text style={styles.cardSub}>
+                None of your open cards are linked to a built-in catalog template yet. Open a card
+                and sync its template to rank earn rates.
+              </Text>
+            </SectionCard>
+          ) : (
+            <View style={styles.cardStack}>
+              {picks.map((p, idx) => {
+                const card = cardById.get(p.cardId);
+                return (
+                  <Pressable
+                    key={p.cardId}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      tapHaptic();
+                      onOpenCard(p.cardId);
+                    }}
+                  >
+                    <SectionCard style={styles.pickCard}>
+                      <View style={styles.cardTopRow}>
+                        <View style={styles.cardIdentity}>
+                          {card ? <CardSwatch style={card.style} size="md" /> : null}
+                          <View style={styles.flexShrink}>
+                            <Text style={styles.cardName}>{p.cardName}</Text>
+                            <Text style={[styles.cardSub, NUM_STYLE]}>
+                              {Number(p.x.toFixed(2))}x {p.currency}
+                              {p.currency !== "Cash back"
+                                ? ` · valued at ${formatCpp(p.centsPerPoint)}`
+                                : ""}
+                            </Text>
+                          </View>
+                        </View>
+                        <Badge label={`~${p.returnPct}%`} tone={idx === 0 ? "green" : "neutral"} />
+                      </View>
+                      {p.note ? <Text style={styles.pickNote}>{p.note}</Text> : null}
+                      {p.portal ? <Text style={styles.portalNote}>Portal: {p.portal}</Text> : null}
+                      {p.rotating ? (
+                        <Badge label="Has rotating 5% quarterly categories" tone="amber" />
+                      ) : null}
+                    </SectionCard>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </>
+      )}
+
+      <Text style={styles.footNote}>Earn rates last reviewed {formatDate(EARN_REVIEWED)}.</Text>
+    </ScrollView>
+  );
+});
+
 export const CardsScreen = React.memo(function CardsScreen({
   data,
   refreshing,
   busyKey,
+  subTab,
+  onSubTabChange,
+  shareTemplateKey,
   onRefresh,
   onAction,
+  onVoidAction,
   onOpenCard,
   onOpenCatchUp,
+  onNavigateTab,
 }: {
   data: MobileBootstrap;
   refreshing: boolean;
   busyKey: string | null;
+  subTab: CardsSubTabKey;
+  onSubTabChange: (tab: CardsSubTabKey) => void;
+  shareTemplateKey?: string | null;
   onRefresh: () => void;
   onAction: (payload: MobileActionPayload, key: string) => Promise<string | undefined>;
+  onVoidAction: (payload: MobileActionPayload, key: string) => Promise<void>;
   onOpenCard: (cardId: string) => void;
   onOpenCatchUp: () => void;
+  onNavigateTab: (tab: TabKey) => void;
 }) {
   const [panel, setPanel] = useState<"none" | "add" | "import">("none");
   const [addMode, setAddMode] = useState<"catalog" | "custom">("catalog");
@@ -133,6 +357,41 @@ export const CardsScreen = React.memo(function CardsScreen({
       (c) => c.name.toLowerCase().includes(q) || c.issuer.toLowerCase().includes(q),
     );
   }, [catalogFilter, data.catalog]);
+
+  const segmentedBar = (
+    <SegmentedBar<CardsSubTabKey> options={SUB_TABS} value={subTab} onChange={onSubTabChange} />
+  );
+
+  if (subTab === "bonuses") {
+    return (
+      <BonusesScreen
+        data={data}
+        refreshing={refreshing}
+        busyKey={busyKey}
+        onRefresh={onRefresh}
+        onAction={onVoidAction}
+        headerSlot={segmentedBar}
+        initialShareTemplateKey={shareTemplateKey}
+      />
+    );
+  }
+
+  if (subTab === "pick") {
+    return (
+      <WhichCardPane
+        data={data}
+        refreshing={refreshing}
+        headerSlot={segmentedBar}
+        onRefresh={onRefresh}
+        onOpenCard={onOpenCard}
+        onNavigateTab={onNavigateTab}
+        onAddFirstCard={() => {
+          onSubTabChange("cards");
+          setPanel("add");
+        }}
+      />
+    );
+  }
 
   async function submitAddCard() {
     const payload: MobileActionPayload =
@@ -169,6 +428,8 @@ export const CardsScreen = React.memo(function CardsScreen({
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       keyboardShouldPersistTaps="handled"
     >
+      {segmentedBar}
+
       <View style={styles.headerRow}>
         <View style={styles.flexShrink}>
           <Text style={styles.title}>Cards</Text>
@@ -372,6 +633,9 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     gap: 14,
   },
+  headerBlock: {
+    gap: 3,
+  },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -389,6 +653,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.muted,
     marginTop: 2,
+    lineHeight: 18,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.ink,
   },
   buttonRow: {
     flexDirection: "row",
@@ -524,6 +799,89 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
+  },
+  searchHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  searchLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.muted,
+  },
+  clearLink: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.muted,
+  },
+  searchInput: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 15,
+    color: COLORS.ink,
+    backgroundColor: COLORS.bg,
+  },
+  catGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  catChip: {
+    minHeight: 32,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    backgroundColor: COLORS.card,
+    justifyContent: "center",
+  },
+  catChipActive: {
+    backgroundColor: COLORS.ink,
+    borderColor: COLORS.ink,
+  },
+  catChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.ink,
+  },
+  catChipTextActive: {
+    color: "#ffffff",
+  },
+  offerAlertCard: {
+    backgroundColor: COLORS.greenBg,
+    borderColor: COLORS.greenBorder,
+    gap: 6,
+  },
+  offerAlertTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.greenInk,
+  },
+  offerAlertRow: {
+    paddingVertical: 2,
+  },
+  offerAlertText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.greenInk,
+  },
+  pickCard: {
+    gap: 8,
+  },
+  pickNote: {
+    fontSize: 13,
+    color: COLORS.muted,
+    lineHeight: 18,
+  },
+  portalNote: {
+    fontSize: 12,
+    color: COLORS.faint,
+    lineHeight: 17,
   },
   footNote: {
     fontSize: 12,
