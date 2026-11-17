@@ -30,7 +30,7 @@ import {
 import { tapHaptic } from "../lib/haptics";
 import type { BenefitStatus, MobileActionPayload, MobileBootstrap, TabKey } from "../types";
 
-function CreditActionRow({
+const CreditActionRow = React.memo(function CreditActionRow({
   item,
   busyKey,
   onAction,
@@ -141,9 +141,9 @@ function CreditActionRow({
       ) : null}
     </View>
   );
-}
+});
 
-export function OverviewScreen({
+export const OverviewScreen = React.memo(function OverviewScreen({
   data,
   refreshing,
   busyKey,
@@ -348,21 +348,23 @@ export function OverviewScreen({
 
         {data.overview.later.length > 0 ? (
           <CollapsibleSection title="Later this year" countLabel={`${data.overview.later.length}`}>
-            <View style={styles.laterStack}>
-              {data.overview.later.map((item, idx) => (
-                <View
-                  key={`${item.benefit.id}:${item.period?.key ?? idx}`}
-                  style={idx > 0 ? styles.rowDivider : undefined}
-                >
-                  <CreditActionRow
-                    item={item}
-                    busyKey={busyKey}
-                    onAction={onAction}
-                    onOpenCard={onOpenCard}
-                  />
-                </View>
-              ))}
-            </View>
+            {() => (
+              <View style={styles.laterStack}>
+                {data.overview.later.map((item, idx) => (
+                  <View
+                    key={`${item.benefit.id}:${item.period?.key ?? idx}`}
+                    style={idx > 0 ? styles.rowDivider : undefined}
+                  >
+                    <CreditActionRow
+                      item={item}
+                      busyKey={busyKey}
+                      onAction={onAction}
+                      onOpenCard={onOpenCard}
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
           </CollapsibleSection>
         ) : null}
       </View>
@@ -570,7 +572,7 @@ export function OverviewScreen({
       ) : null}
     </ScrollView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   content: {

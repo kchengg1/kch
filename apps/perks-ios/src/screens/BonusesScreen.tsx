@@ -1,19 +1,73 @@
-import React, { useState } from "react";
-import {
-  Linking,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import React, { useMemo, useState } from "react";
+import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Badge, COLORS, NUM_STYLE, SectionCard } from "../components/ui";
-import { formatDate } from "../lib/format";
+import { formatDate, formatInteger } from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
-import type { MobileBootstrap } from "../types";
+import type { BonusOffer, BonusVerdict, MobileBootstrap } from "../types";
 
-export function BonusesScreen({
+const BonusOfferCard = React.memo(function BonusOfferCard({
+  offer,
+  verdict,
+}: {
+  offer: BonusOffer;
+  verdict: BonusVerdict;
+}) {
+  const verdictBadge =
+    verdict.status === "eligible"
+      ? { label: "Looks clear", tone: "green" as const }
+      : verdict.status === "caution"
+        ? { label: "Check rules", tone: "amber" as const }
+        : { label: "Likely ineligible", tone: "red" as const };
+
+  return (
+    <SectionCard style={styles.offerCard}>
+      <View style={styles.offerTop}>
+        <View style={styles.flexShrink}>
+          <Text style={styles.itemTitle}>{offer.card}</Text>
+          <Text style={[styles.metaLine, NUM_STYLE]}>
+            {offer.issuer}
+            {offer.business ? " · Business" : ""} · ${offer.annualFee}/yr
+          </Text>
+        </View>
+        <Badge label={verdictBadge.label} tone={verdictBadge.tone} />
+      </View>
+
+      <View style={styles.headlineRow}>
+        <Text style={styles.bonusHeadline}>{offer.bonus}</Text>
+        {offer.estValue ? (
+          <Text style={[styles.estValue, NUM_STYLE]}>~${formatInteger(offer.estValue)}</Text>
+        ) : null}
+      </View>
+
+      {offer.spend ? <Text style={styles.noteText}>Spend: {offer.spend}</Text> : null}
+
+      <View style={styles.badgeWrap}>
+        {offer.elevated ? <Badge label="Elevated offer" tone="green" /> : null}
+        {offer.noLifetimeLanguage ? <Badge label="No lifetime language" tone="neutral" /> : null}
+      </View>
+
+      {verdict.reasons.map((reason, idx) => (
+        <Text key={idx} style={styles.reasonText}>
+          • {reason}
+        </Text>
+      ))}
+
+      {offer.note ? <Text style={styles.noteText}>{offer.note}</Text> : null}
+
+      {offer.url ? (
+        <Pressable onPress={() => void Linking.openURL(offer.url!)}>
+          <Text style={styles.linkText}>View offer details →</Text>
+        </Pressable>
+      ) : null}
+    </SectionCard>
+  );
+});
+
+function ItemSpacer() {
+  return <View style={styles.itemSpacer} />;
+}
+
+export const BonusesScreen = React.memo(function BonusesScreen({
   data,
   refreshing,
   onRefresh,
@@ -26,160 +80,120 @@ export function BonusesScreen({
   const fiveCount = data.bonuses.fiveTwentyFour;
   const under524 = fiveCount < 5;
 
-  const visibleOffers =
-    filter === "eligible"
-      ? data.bonuses.offers.filter((o) => o.verdict.status !== "ineligible")
-      : data.bonuses.offers;
+  const visibleOffers = useMemo(
+    () =>
+      filter === "eligible"
+        ? data.bonuses.offers.filter((o) => o.verdict.status !== "ineligible")
+        : data.bonuses.offers,
+    [data.bonuses.offers, filter],
+  );
 
   return (
-    <ScrollView
+    <FlatList
+      data={visibleOffers}
+      keyExtractor={(item) => item.offer.id}
+      initialNumToRender={6}
+      maxToRenderPerBatch={8}
+      windowSize={5}
       contentContainerStyle={styles.content}
+      ItemSeparatorComponent={ItemSpacer}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
-      <View style={styles.headerBlock}>
-        <Text style={styles.title}>Bonuses</Text>
-        <Text style={styles.subtitle}>
-          Application rules and sign-up bonus eligibility from your card history.
-        </Text>
-      </View>
-
-      <SectionCard style={styles.fiveCard}>
-        <View style={styles.fiveTop}>
-          <View style={styles.flexShrink}>
-            <Text style={styles.sectionTitle}>Chase 5/24</Text>
-            <Text style={styles.noteText}>Personal cards opened in the last 24 months.</Text>
+      ListHeaderComponent={
+        <View style={styles.headerContainer}>
+          <View style={styles.headerBlock}>
+            <Text style={styles.title}>Bonuses</Text>
+            <Text style={styles.subtitle}>
+              Application rules and sign-up bonus eligibility from your card history.
+            </Text>
           </View>
-          <Badge label={`${fiveCount} / 5`} tone={under524 ? "green" : "amber"} />
-        </View>
-      </SectionCard>
 
-      {data.bonuses.rules.length > 0 ? (
-        <View style={styles.sectionBlock}>
-          <Text style={styles.sectionTitle}>Issuer velocity rules</Text>
-          <SectionCard style={styles.divideList}>
-            {data.bonuses.rules.map((rule, idx) => (
-              <View key={rule.id} style={[styles.ruleRow, idx > 0 && styles.rowDivider]}>
-                <View style={styles.flexShrink}>
-                  <Text style={styles.itemTitle}>{rule.title}</Text>
-                  <Text style={styles.noteText}>{rule.detail}</Text>
-                </View>
-                <Badge
-                  label={
-                    rule.status === "clear"
-                      ? "Clear"
-                      : rule.until
-                        ? `Wait ${formatDate(rule.until, data.today)}`
-                        : "Wait"
-                  }
-                  tone={rule.status === "clear" ? "green" : "amber"}
-                />
+          <SectionCard style={styles.fiveCard}>
+            <View style={styles.fiveTop}>
+              <View style={styles.flexShrink}>
+                <Text style={styles.sectionTitle}>Chase 5/24</Text>
+                <Text style={styles.noteText}>Personal cards opened in the last 24 months.</Text>
               </View>
-            ))}
+              <Badge label={`${fiveCount} / 5`} tone={under524 ? "green" : "amber"} />
+            </View>
           </SectionCard>
-        </View>
-      ) : null}
 
-      <View style={styles.sectionBlock}>
-        <View style={styles.filterHeader}>
-          <Text style={styles.sectionTitle}>Sign-up bonuses</Text>
-          <View style={styles.filterPills}>
-            <Pressable
-              onPress={() => {
-                tapHaptic();
-                setFilter("all");
-              }}
-              style={[styles.pill, filter === "all" && styles.pillActive]}
-            >
-              <Text style={[styles.pillText, filter === "all" && styles.pillTextActive]}>
-                All ({data.bonuses.offers.length})
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                tapHaptic();
-                setFilter("eligible");
-              }}
-              style={[styles.pill, filter === "eligible" && styles.pillActive]}
-            >
-              <Text style={[styles.pillText, filter === "eligible" && styles.pillTextActive]}>
-                Likely eligible
-              </Text>
-            </Pressable>
+          {data.bonuses.rules.length > 0 ? (
+            <View style={styles.sectionBlock}>
+              <Text style={styles.sectionTitle}>Issuer velocity rules</Text>
+              <SectionCard style={styles.divideList}>
+                {data.bonuses.rules.map((rule, idx) => (
+                  <View key={rule.id} style={[styles.ruleRow, idx > 0 && styles.rowDivider]}>
+                    <View style={styles.flexShrink}>
+                      <Text style={styles.itemTitle}>{rule.title}</Text>
+                      <Text style={styles.noteText}>{rule.detail}</Text>
+                    </View>
+                    <Badge
+                      label={
+                        rule.status === "clear"
+                          ? "Clear"
+                          : rule.until
+                            ? `Wait ${formatDate(rule.until, data.today)}`
+                            : "Wait"
+                      }
+                      tone={rule.status === "clear" ? "green" : "amber"}
+                    />
+                  </View>
+                ))}
+              </SectionCard>
+            </View>
+          ) : null}
+
+          <View style={styles.filterHeader}>
+            <Text style={styles.sectionTitle}>Sign-up bonuses</Text>
+            <View style={styles.filterPills}>
+              <Pressable
+                onPress={() => {
+                  tapHaptic();
+                  setFilter("all");
+                }}
+                style={[styles.pill, filter === "all" && styles.pillActive]}
+              >
+                <Text style={[styles.pillText, filter === "all" && styles.pillTextActive]}>
+                  All ({data.bonuses.offers.length})
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  tapHaptic();
+                  setFilter("eligible");
+                }}
+                style={[styles.pill, filter === "eligible" && styles.pillActive]}
+              >
+                <Text style={[styles.pillText, filter === "eligible" && styles.pillTextActive]}>
+                  Likely eligible
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </View>
-
-        <View style={styles.offerStack}>
-          {visibleOffers.map(({ offer, verdict }) => {
-            const verdictBadge =
-              verdict.status === "eligible"
-                ? { label: "Looks clear", tone: "green" as const }
-                : verdict.status === "caution"
-                  ? { label: "Check rules", tone: "amber" as const }
-                  : { label: "Likely ineligible", tone: "red" as const };
-
-            return (
-              <SectionCard key={offer.id} style={styles.offerCard}>
-                <View style={styles.offerTop}>
-                  <View style={styles.flexShrink}>
-                    <Text style={styles.itemTitle}>{offer.card}</Text>
-                    <Text style={[styles.metaLine, NUM_STYLE]}>
-                      {offer.issuer}
-                      {offer.business ? " · Business" : ""} · ${offer.annualFee}/yr
-                    </Text>
-                  </View>
-                  <Badge label={verdictBadge.label} tone={verdictBadge.tone} />
-                </View>
-
-                <View style={styles.headlineRow}>
-                  <Text style={styles.bonusHeadline}>{offer.bonus}</Text>
-                  {offer.estValue ? (
-                    <Text style={[styles.estValue, NUM_STYLE]}>
-                      ~${offer.estValue.toLocaleString("en-US")}
-                    </Text>
-                  ) : null}
-                </View>
-
-                {offer.spend ? <Text style={styles.noteText}>Spend: {offer.spend}</Text> : null}
-
-                <View style={styles.badgeWrap}>
-                  {offer.elevated ? <Badge label="Elevated offer" tone="green" /> : null}
-                  {offer.noLifetimeLanguage ? (
-                    <Badge label="No lifetime language" tone="neutral" />
-                  ) : null}
-                </View>
-
-                {verdict.reasons.map((reason, idx) => (
-                  <Text key={idx} style={styles.reasonText}>
-                    • {reason}
-                  </Text>
-                ))}
-
-                {offer.note ? <Text style={styles.noteText}>{offer.note}</Text> : null}
-
-                {offer.url ? (
-                  <Pressable onPress={() => void Linking.openURL(offer.url!)}>
-                    <Text style={styles.linkText}>View offer details →</Text>
-                  </Pressable>
-                ) : null}
-              </SectionCard>
-            );
-          })}
-        </View>
-
+      }
+      renderItem={({ item }) => <BonusOfferCard offer={item.offer} verdict={item.verdict} />}
+      ListFooterComponent={
         <Text style={styles.footNote}>
           Bonus list updated {formatDate(data.bonuses.asOf)}. Issuers make the final call.
         </Text>
-      </View>
-    </ScrollView>
+      }
+    />
   );
-}
+});
 
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 28,
+  },
+  headerContainer: {
     gap: 16,
+    marginBottom: 8,
+  },
+  itemSpacer: {
+    height: 10,
   },
   headerBlock: {
     gap: 2,
@@ -277,9 +291,6 @@ const styles = StyleSheet.create({
   pillTextActive: {
     color: "#ffffff",
   },
-  offerStack: {
-    gap: 10,
-  },
   offerCard: {
     gap: 8,
   },
@@ -326,6 +337,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.faint,
     textAlign: "center",
-    marginTop: 4,
+    marginTop: 14,
   },
 });

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import {
   Badge,
@@ -21,7 +21,7 @@ import type {
   OfferStatus,
 } from "../types";
 
-function OfferGroupCard({
+const OfferGroupCard = React.memo(function OfferGroupCard({
   group,
   busyKey,
   onAction,
@@ -142,9 +142,9 @@ function OfferGroupCard({
       </View>
     </View>
   );
-}
+});
 
-export function OffersScreen({
+export const OffersScreen = React.memo(function OffersScreen({
   data,
   refreshing,
   busyKey,
@@ -157,7 +157,7 @@ export function OffersScreen({
   onRefresh: () => void;
   onAction: (payload: MobileActionPayload, key: string) => Promise<void>;
 }) {
-  const openCards = data.cards.filter((c) => !c.closed);
+  const openCards = useMemo(() => data.cards.filter((c) => !c.closed), [data.cards]);
   const [showPaste, setShowPaste] = useState(false);
   const [pasteCardId, setPasteCardId] = useState<string>(openCards[0]?.id ?? "");
   const [pasteText, setPasteText] = useState("");
@@ -166,6 +166,13 @@ export function OffersScreen({
     label: string;
     items: { id: string; status: OfferStatus }[];
   } | null>(null);
+
+  const handleRecordUndo = useCallback(
+    (label: string, items: { id: string; status: OfferStatus }[]) => {
+      setUndoState({ label, items });
+    },
+    [],
+  );
 
   const sortedStrong = useMemo(
     () => sortOfferGroups(data.offers.strong, sortBy),
@@ -183,258 +190,312 @@ export function OffersScreen({
     }
   }
 
+  const hasFooter =
+    sortedWeak.length > 0 ||
+    data.offers.cardChecks.length > 0 ||
+    data.offers.hiddenMerchants.length > 0 ||
+    data.offers.past.length > 0;
+
   return (
-    <ScrollView
+    <FlatList
+      data={sortedStrong}
+      keyExtractor={(item) => item.key}
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      windowSize={5}
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.headerRow}>
-        <View style={styles.flexShrink}>
-          <Text style={styles.title}>Offers</Text>
-          <Text style={[styles.subtitle, NUM_STYLE]}>
-            {data.offers.strong.length} worth a look · {formatCents(data.offers.strongValueCents)}{" "}
-            potential back
-          </Text>
-        </View>
-        <Button
-          label={showPaste ? "Close" : "Paste offers"}
-          size="sm"
-          variant={showPaste ? "secondary" : "primary"}
-          onPress={() => setShowPaste((v) => !v)}
-        />
-      </View>
-
-      {undoState ? (
-        <SectionCard style={styles.undoBar}>
-          <Text style={styles.undoText} numberOfLines={1}>
-            {undoState.label}
-          </Text>
-          <View style={styles.rowGap}>
-            <Button
-              label="Undo"
-              size="sm"
-              variant="secondary"
-              loading={busyKey === "offers.restore"}
-              onPress={() =>
-                void onAction(
-                  { type: "offers.restore", items: undoState.items },
-                  "offers.restore",
-                ).then(() => setUndoState(null))
-              }
-            />
-            <Button label="Dismiss" size="sm" variant="ghost" onPress={() => setUndoState(null)} />
-          </View>
-        </SectionCard>
-      ) : null}
-
-      {showPaste ? (
-        <SectionCard style={styles.pastePanel}>
-          <Text style={styles.smallLabel}>Which card are these offers from?</Text>
-          <View style={styles.cardChipRow}>
-            <Pressable
-              onPress={() => setPasteCardId("")}
-              style={[styles.cardChip, pasteCardId === "" && styles.cardChipSelected]}
-            >
-              <Text style={styles.cardChipLabel}>Any card</Text>
-            </Pressable>
-            {openCards.map((c) => (
-              <Pressable
-                key={c.id}
-                onPress={() => setPasteCardId(c.id)}
-                style={[styles.cardChip, pasteCardId === c.id && styles.cardChipSelected]}
-              >
-                <CardSwatch style={c.style} />
-                <Text style={styles.cardChipLabel} numberOfLines={1}>
-                  {c.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <View style={styles.rowGap}>
-            <Button
-              label="Paste from clipboard"
-              size="sm"
-              variant="secondary"
-              onPress={() => void handleClipboardPaste()}
-            />
-          </View>
-
-          <FieldInput
-            label="Copied Amex / Chase offers page text"
-            value={pasteText}
-            onChangeText={setPasteText}
-            multiline
-            placeholder={"JetBlue\nSpend $250 or more, earn $50 back\nExpires 12/15/2026"}
-          />
-
-          <Button
-            label="Save offers"
-            loading={busyKey === "offers.paste"}
-            disabled={!pasteText.trim()}
-            onPress={() =>
-              void onAction(
-                {
-                  type: "offers.paste",
-                  cardId: pasteCardId || undefined,
-                  text: pasteText,
-                },
-                "offers.paste",
-              ).then(() => {
-                setPasteText("");
-                setShowPaste(false);
-              })
-            }
-          />
-        </SectionCard>
-      ) : null}
-
-      <View style={styles.sortRow}>
-        {(
-          [
-            { key: "return", label: "Best return" },
-            { key: "value", label: "Biggest reward" },
-            { key: "expiry", label: "Expiring soonest" },
-          ] as { key: OfferSortKey; label: string }[]
-        ).map((pill) => {
-          const active = sortBy === pill.key;
-          return (
-            <Pressable
-              key={pill.key}
-              onPress={() => {
-                tapHaptic();
-                setSortBy(pill.key);
-              }}
-              style={[styles.sortPill, active && styles.sortPillActive]}
-            >
-              <Text style={[styles.sortPillText, active && styles.sortPillTextActive]}>
-                {pill.label}
+      ListHeaderComponent={
+        <View style={styles.sectionStack}>
+          <View style={styles.headerRow}>
+            <View style={styles.flexShrink}>
+              <Text style={styles.title}>Offers</Text>
+              <Text style={[styles.subtitle, NUM_STYLE]}>
+                {data.offers.strong.length} worth a look ·{" "}
+                {formatCents(data.offers.strongValueCents)} potential back
               </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {sortedStrong.length === 0 ? (
-        <SectionCard>
-          <Text style={styles.noteText}>
-            No strong offers saved right now. Copy your Amex or Chase offers page and tap Paste
-            offers above.
-          </Text>
-        </SectionCard>
-      ) : (
-        <SectionCard style={styles.divideList}>
-          {sortedStrong.map((g, idx) => (
-            <View key={g.key} style={idx > 0 ? styles.rowDivider : undefined}>
-              <OfferGroupCard
-                group={g}
-                busyKey={busyKey}
-                onAction={onAction}
-                onRecordUndo={(label, items) => setUndoState({ label, items })}
-              />
             </View>
-          ))}
-        </SectionCard>
-      )}
+            <Button
+              label={showPaste ? "Close" : "Paste offers"}
+              size="sm"
+              variant={showPaste ? "secondary" : "primary"}
+              onPress={() => setShowPaste((v) => !v)}
+            />
+          </View>
 
-      {sortedWeak.length > 0 ? (
-        <CollapsibleSection
-          title={`Under ${Math.round(data.offers.weakRateThreshold * 100)}% back`}
-          countLabel={`${sortedWeak.length}`}
-        >
-          {sortedWeak.map((g, idx) => (
-            <View key={g.key} style={idx > 0 ? styles.rowDivider : undefined}>
-              <OfferGroupCard
-                group={g}
-                busyKey={busyKey}
-                onAction={onAction}
-                onRecordUndo={(label, items) => setUndoState({ label, items })}
-              />
-            </View>
-          ))}
-        </CollapsibleSection>
-      ) : null}
-
-      {data.offers.cardChecks.length > 0 ? (
-        <CollapsibleSection
-          title="Last pasted by card"
-          countLabel={`${data.offers.cardChecks.length}`}
-        >
-          {data.offers.cardChecks.map((check, idx) => (
-            <View key={check.cardId} style={[styles.simpleRow, idx > 0 && styles.rowDivider]}>
-              <View style={styles.rowIdentity}>
-                <CardSwatch style={check.cardStyle} />
-                <Text style={styles.simpleTitle} numberOfLines={1}>
-                  {check.cardName}
-                </Text>
+          {undoState ? (
+            <SectionCard style={styles.undoBar}>
+              <Text style={styles.undoText} numberOfLines={1}>
+                {undoState.label}
+              </Text>
+              <View style={styles.rowGap}>
+                <Button
+                  label="Undo"
+                  size="sm"
+                  variant="secondary"
+                  loading={busyKey === "offers.restore"}
+                  onPress={() =>
+                    void onAction(
+                      { type: "offers.restore", items: undoState.items },
+                      "offers.restore",
+                    ).then(() => setUndoState(null))
+                  }
+                />
+                <Button
+                  label="Dismiss"
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => setUndoState(null)}
+                />
               </View>
-              <Badge
-                label={check.checkedOn ? formatDate(check.checkedOn, data.today) : "Never pasted"}
-                tone={check.stale ? "amber" : "green"}
-              />
-            </View>
-          ))}
-        </CollapsibleSection>
-      ) : null}
+            </SectionCard>
+          ) : null}
 
-      {data.offers.hiddenMerchants.length > 0 ? (
-        <CollapsibleSection
-          title="Hidden merchants"
-          countLabel={`${data.offers.hiddenMerchants.length}`}
-        >
-          {data.offers.hiddenMerchants.map((h, idx) => (
-            <View key={h.merchantKey} style={[styles.simpleRow, idx > 0 && styles.rowDivider]}>
-              <Text style={styles.simpleTitle}>{h.label}</Text>
+          {showPaste ? (
+            <SectionCard style={styles.pastePanel}>
+              <Text style={styles.smallLabel}>Which card are these offers from?</Text>
+              <View style={styles.cardChipRow}>
+                <Pressable
+                  onPress={() => setPasteCardId("")}
+                  style={[styles.cardChip, pasteCardId === "" && styles.cardChipSelected]}
+                >
+                  <Text style={styles.cardChipLabel}>Any card</Text>
+                </Pressable>
+                {openCards.map((c) => (
+                  <Pressable
+                    key={c.id}
+                    onPress={() => setPasteCardId(c.id)}
+                    style={[styles.cardChip, pasteCardId === c.id && styles.cardChipSelected]}
+                  >
+                    <CardSwatch style={c.style} />
+                    <Text style={styles.cardChipLabel} numberOfLines={1}>
+                      {c.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <View style={styles.rowGap}>
+                <Button
+                  label="Paste from clipboard"
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => void handleClipboardPaste()}
+                />
+              </View>
+
+              <FieldInput
+                label="Copied Amex / Chase offers page text"
+                value={pasteText}
+                onChangeText={setPasteText}
+                multiline
+                placeholder={"JetBlue\nSpend $250 or more, earn $50 back\nExpires 12/15/2026"}
+              />
+
               <Button
-                label="Show again"
-                size="sm"
-                variant="secondary"
-                loading={busyKey === `unhide:${h.merchantKey}`}
+                label="Save offers"
+                loading={busyKey === "offers.paste"}
+                disabled={!pasteText.trim()}
                 onPress={() =>
                   void onAction(
-                    { type: "offers.unhideMerchant", merchantKey: h.merchantKey },
-                    `unhide:${h.merchantKey}`,
-                  )
+                    {
+                      type: "offers.paste",
+                      cardId: pasteCardId || undefined,
+                      text: pasteText,
+                    },
+                    "offers.paste",
+                  ).then(() => {
+                    setPasteText("");
+                    setShowPaste(false);
+                  })
                 }
               />
-            </View>
-          ))}
-        </CollapsibleSection>
-      ) : null}
+            </SectionCard>
+          ) : null}
 
-      {data.offers.past.length > 0 ? (
-        <CollapsibleSection title="Used & skipped" countLabel={`${data.offers.past.length}`}>
-          {data.offers.past.slice(0, 40).map((p, idx) => (
-            <View key={p.id} style={[styles.simpleRow, idx > 0 && styles.rowDivider]}>
-              <View style={styles.flexShrink}>
-                <Text style={styles.simpleTitle}>{p.merchant}</Text>
-                <Text style={styles.noteText} numberOfLines={1}>
-                  {p.status === "used" ? "Used" : "Skipped"} · {p.details}
-                </Text>
-              </View>
-              <Button
-                label="Delete"
-                size="sm"
-                variant="ghost"
-                loading={busyKey === `offer.del:${p.id}`}
-                onPress={() =>
-                  void onAction({ type: "offers.delete", id: p.id }, `offer.del:${p.id}`)
+          <View style={styles.sortRow}>
+            {(
+              [
+                { key: "return", label: "Best return" },
+                { key: "value", label: "Biggest reward" },
+                { key: "expiry", label: "Expiring soonest" },
+              ] as { key: OfferSortKey; label: string }[]
+            ).map((pill) => {
+              const active = sortBy === pill.key;
+              return (
+                <Pressable
+                  key={pill.key}
+                  onPress={() => {
+                    tapHaptic();
+                    setSortBy(pill.key);
+                  }}
+                  style={[styles.sortPill, active && styles.sortPillActive]}
+                >
+                  <Text style={[styles.sortPillText, active && styles.sortPillTextActive]}>
+                    {pill.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {sortedStrong.length === 0 ? (
+            <SectionCard>
+              <Text style={styles.noteText}>
+                No strong offers saved right now. Copy your Amex or Chase offers page and tap Paste
+                offers above.
+              </Text>
+            </SectionCard>
+          ) : null}
+        </View>
+      }
+      renderItem={({ item: g, index }) => {
+        const isFirst = index === 0;
+        const isLast = index === sortedStrong.length - 1;
+        return (
+          <View
+            style={[
+              styles.offerListCell,
+              isFirst && styles.offerListCellFirst,
+              !isFirst && styles.rowDivider,
+              isLast && styles.offerListCellLast,
+            ]}
+          >
+            <OfferGroupCard
+              group={g}
+              busyKey={busyKey}
+              onAction={onAction}
+              onRecordUndo={handleRecordUndo}
+            />
+          </View>
+        );
+      }}
+      ListFooterComponent={
+        hasFooter ? (
+          <View style={styles.footerStack}>
+            {sortedWeak.length > 0 ? (
+              <CollapsibleSection
+                title={`Under ${Math.round(data.offers.weakRateThreshold * 100)}% back`}
+                countLabel={`${sortedWeak.length}`}
+              >
+                {() =>
+                  sortedWeak.map((g, idx) => (
+                    <View key={g.key} style={idx > 0 ? styles.rowDivider : undefined}>
+                      <OfferGroupCard
+                        group={g}
+                        busyKey={busyKey}
+                        onAction={onAction}
+                        onRecordUndo={handleRecordUndo}
+                      />
+                    </View>
+                  ))
                 }
-              />
-            </View>
-          ))}
-        </CollapsibleSection>
-      ) : null}
-    </ScrollView>
+              </CollapsibleSection>
+            ) : null}
+
+            {data.offers.cardChecks.length > 0 ? (
+              <CollapsibleSection
+                title="Last pasted by card"
+                countLabel={`${data.offers.cardChecks.length}`}
+              >
+                {() =>
+                  data.offers.cardChecks.map((check, idx) => (
+                    <View
+                      key={check.cardId}
+                      style={[styles.simpleRow, idx > 0 && styles.rowDivider]}
+                    >
+                      <View style={styles.rowIdentity}>
+                        <CardSwatch style={check.cardStyle} />
+                        <Text style={styles.simpleTitle} numberOfLines={1}>
+                          {check.cardName}
+                        </Text>
+                      </View>
+                      <Badge
+                        label={
+                          check.checkedOn ? formatDate(check.checkedOn, data.today) : "Never pasted"
+                        }
+                        tone={check.stale ? "amber" : "green"}
+                      />
+                    </View>
+                  ))
+                }
+              </CollapsibleSection>
+            ) : null}
+
+            {data.offers.hiddenMerchants.length > 0 ? (
+              <CollapsibleSection
+                title="Hidden merchants"
+                countLabel={`${data.offers.hiddenMerchants.length}`}
+              >
+                {() =>
+                  data.offers.hiddenMerchants.map((h, idx) => (
+                    <View
+                      key={h.merchantKey}
+                      style={[styles.simpleRow, idx > 0 && styles.rowDivider]}
+                    >
+                      <Text style={styles.simpleTitle}>{h.label}</Text>
+                      <Button
+                        label="Show again"
+                        size="sm"
+                        variant="secondary"
+                        loading={busyKey === `unhide:${h.merchantKey}`}
+                        onPress={() =>
+                          void onAction(
+                            { type: "offers.unhideMerchant", merchantKey: h.merchantKey },
+                            `unhide:${h.merchantKey}`,
+                          )
+                        }
+                      />
+                    </View>
+                  ))
+                }
+              </CollapsibleSection>
+            ) : null}
+
+            {data.offers.past.length > 0 ? (
+              <CollapsibleSection title="Used & skipped" countLabel={`${data.offers.past.length}`}>
+                {() =>
+                  data.offers.past.slice(0, 40).map((p, idx) => (
+                    <View key={p.id} style={[styles.simpleRow, idx > 0 && styles.rowDivider]}>
+                      <View style={styles.flexShrink}>
+                        <Text style={styles.simpleTitle}>{p.merchant}</Text>
+                        <Text style={styles.noteText} numberOfLines={1}>
+                          {p.status === "used" ? "Used" : "Skipped"} · {p.details}
+                        </Text>
+                      </View>
+                      <Button
+                        label="Delete"
+                        size="sm"
+                        variant="ghost"
+                        loading={busyKey === `offer.del:${p.id}`}
+                        onPress={() =>
+                          void onAction({ type: "offers.delete", id: p.id }, `offer.del:${p.id}`)
+                        }
+                      />
+                    </View>
+                  ))
+                }
+              </CollapsibleSection>
+            ) : null}
+          </View>
+        ) : undefined
+      }
+    />
   );
-}
+});
 
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 28,
+  },
+  sectionStack: {
+    gap: 14,
+  },
+  footerStack: {
+    marginTop: 14,
     gap: 14,
   },
   headerRow: {
@@ -510,8 +571,25 @@ const styles = StyleSheet.create({
   sortPillTextActive: {
     color: "#ffffff",
   },
-  divideList: {
-    paddingVertical: 6,
+  offerListCell: {
+    backgroundColor: COLORS.card,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 14,
+  },
+  offerListCellFirst: {
+    marginTop: 14,
+    borderTopWidth: 1,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    paddingTop: 6,
+  },
+  offerListCellLast: {
+    borderBottomWidth: 1,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    paddingBottom: 6,
   },
   rowDivider: {
     borderTopWidth: 1,

@@ -213,7 +213,7 @@ export function CollapsibleSection({
   title: string;
   countLabel?: string;
   defaultOpen?: boolean;
-  children: React.ReactNode;
+  children: React.ReactNode | (() => React.ReactNode);
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -232,7 +232,11 @@ export function CollapsibleSection({
           <Text style={styles.collapsibleChevron}>{open ? "Hide" : "Show"}</Text>
         </View>
       </Pressable>
-      {open ? <View style={styles.collapsibleBody}>{children}</View> : null}
+      {open ? (
+        <View style={styles.collapsibleBody}>
+          {typeof children === "function" ? children() : children}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -285,7 +289,7 @@ const TABS: { key: TabKey; label: string; mark: string }[] = [
   { key: "bonuses", label: "Bonuses", mark: "★" },
 ];
 
-export function TabBar({
+export const TabBar = React.memo(function TabBar({
   active,
   onChange,
   bottomInset,
@@ -298,15 +302,19 @@ export function TabBar({
     <View style={[styles.tabBar, { paddingBottom: Math.max(bottomInset, 8) }]}>
       {TABS.map((t) => {
         const selected = t.key === active;
+        const activate = () => {
+          if (!selected) {
+            tapHaptic();
+            onChange(t.key);
+          }
+        };
         return (
           <Pressable
             key={t.key}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            onPress={() => {
-              tapHaptic();
-              onChange(t.key);
-            }}
+            onPressIn={activate}
+            onPress={activate}
             style={styles.tabItem}
           >
             <Text style={[styles.tabMark, selected && styles.tabMarkSelected]}>{t.mark}</Text>
@@ -318,7 +326,7 @@ export function TabBar({
       })}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   swatch: {

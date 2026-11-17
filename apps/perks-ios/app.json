@@ -35,6 +35,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": ["expo-secure-store"],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ee1c1cdb-f190-4c50-9c56-4b8b1f8dd2c0",
+      "fallbackToCacheTimeout": 0
+    },
     "extra": {
       "eas": {
         "projectId": "ee1c1cdb-f190-4c50-9c56-4b8b1f8dd2c0"
