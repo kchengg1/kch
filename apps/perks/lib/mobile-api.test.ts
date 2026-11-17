@@ -105,7 +105,12 @@ const baseInput = (over: Partial<MobileBootstrapInput> = {}): MobileBootstrapInp
       note: "Tokyo flight",
     },
   ],
-  settings: { digestEnabled: true, lastDigestOn: null, shareRankings: true },
+  settings: {
+    digestEnabled: true,
+    lastDigestOn: null,
+    shareRankings: true,
+    lastActiveAt: "2026-11-16T12:00:00.000Z",
+  },
   dateOf: () => TODAY,
   ...over,
 });
@@ -136,6 +141,19 @@ describe("buildMobileBootstrap", () => {
     expect(uber.openPastCount).toBe(9);
     const nov = dining.periods.find((p) => p.key === "2026-11")!;
     expect(nov).toMatchObject({ partial: true, full: false, current: true, usedCents: 400 });
+  });
+
+  it("passes through the user's last active time, null when unrecorded", () => {
+    expect(buildMobileBootstrap(baseInput()).settings.lastActiveAt).toBe(
+      "2026-11-16T12:00:00.000Z",
+    );
+    expect(
+      buildMobileBootstrap(
+        baseInput({
+          settings: { digestEnabled: true, lastDigestOn: null, lastActiveAt: null },
+        }),
+      ).settings.lastActiveAt,
+    ).toBeNull();
   });
 
   it("separates strong and weak offers and filters hidden merchants", () => {

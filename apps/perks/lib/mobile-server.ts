@@ -1,4 +1,5 @@
 import "server-only";
+import { getLastActiveAt, recordActivity } from "@kch/auth/server";
 import { auth } from "./auth";
 import { buildMobileBootstrap, type MobileBootstrap } from "./mobile-api";
 import {
@@ -23,6 +24,7 @@ export type MobileUser = { id: string; name: string; email: string };
 export async function getMobileUser(request: Request): Promise<MobileUser | null> {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user) return null;
+  recordActivity(session.user.id);
   return {
     id: session.user.id,
     name: session.user.name,
@@ -43,6 +45,7 @@ export async function loadMobileBootstrap(user: MobileUser): Promise<MobileBoots
     referrals,
     groupOffers,
     groupCards,
+    lastActiveAt,
   ] = await Promise.all([
     loadPortfolio(user.id),
     listOffers(user.id),
@@ -53,6 +56,7 @@ export async function loadMobileBootstrap(user: MobileUser): Promise<MobileBoots
     listReferrals(),
     listEveryonesOffers(),
     loadGroupCards(),
+    getLastActiveAt(user.id),
   ]);
 
   await ensureSpendTargets(user.id, portfolio.cards);
@@ -72,6 +76,7 @@ export async function loadMobileBootstrap(user: MobileUser): Promise<MobileBoots
       digestEnabled: settings.digestEnabled,
       lastDigestOn: settings.lastDigestOn,
       shareRankings: settings.shareRankings,
+      lastActiveAt: lastActiveAt?.toISOString() ?? null,
     },
     spendTargets,
     referrals,

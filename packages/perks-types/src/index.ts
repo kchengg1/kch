@@ -474,6 +474,8 @@ export type MobileBootstrap = {
     digestEnabled: boolean;
     lastDigestOn: string | null;
     shareRankings: boolean;
+    /** ISO timestamp of the user's last authenticated activity, or null if never recorded. */
+    lastActiveAt: string | null;
   };
 };
 
