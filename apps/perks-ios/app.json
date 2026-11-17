@@ -2,6 +2,7 @@
   "expo": {
     "name": "Perks",
     "slug": "perks",
+    "owner": "kchengg1s-team",
     "scheme": "perks",
     "version": "0.1.0",
     "orientation": "portrait",
