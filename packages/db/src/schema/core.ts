@@ -13,6 +13,8 @@ export const user = pgTable("user", {
   image: text("image"),
   // App-specific extras. Declared as additionalFields in @kch/auth.
   stripeCustomerId: text("stripe_customer_id").unique(),
+  // Last authenticated request (throttled). Null until the user is next seen.
+  lastActiveAt: timestamp("last_active_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at")
     .notNull()

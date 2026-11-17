@@ -57,6 +57,13 @@
       "when": 1794770962276,
       "tag": "0007_spotty_justin_hammer",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794914958040,
+      "tag": "0008_steep_barracuda",
+      "breakpoints": true
     }
   ]
 }

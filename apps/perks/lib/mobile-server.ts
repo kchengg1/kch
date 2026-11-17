@@ -1,4 +1,5 @@
 import "server-only";
+import { recordActivity } from "@kch/auth/server";
 import { auth } from "./auth";
 import { buildMobileBootstrap, type MobileBootstrap } from "./mobile-api";
 import {
@@ -18,6 +19,7 @@ export type MobileUser = { id: string; name: string; email: string };
 export async function getMobileUser(request: Request): Promise<MobileUser | null> {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user) return null;
+  recordActivity(session.user.id);
   return {
     id: session.user.id,
     name: session.user.name,
