@@ -1,0 +1,91 @@
+name: Catalog Monitor (Doctor of Credit)
+
+on:
+  schedule:
+    # Run daily at 14:00 UTC (09:00 AM ET / 06:00 AM PT)
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "Optional YYYY-MM-DD date to scan posts from (defaults to CATALOG_REVIEWED)"
+        required: false
+        type: string
+      dry_run:
+        description: "Evaluate only without modifying catalog.ts or opening a PR"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Scrape Doctor of Credit and evaluate catalog
+        id: monitor
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+          SINCE_DATE: ${{ inputs.since || '' }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "GEMINI_API_KEY secret is not configured; skipping catalog monitor."
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node --experimental-strip-types apps/perks/scripts/catalog-monitor.mjs \
+            --output-report /tmp/catalog-report.md
+
+      - name: Format and verify updated catalog
+        id: verify
+        if: steps.monitor.outputs.updated == 'true'
+        run: |
+          pnpm prettier --write apps/perks/lib/catalog.ts
+          if git diff --quiet apps/perks/lib/catalog.ts; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pnpm --filter @kch/perks lint
+          pnpm --filter @kch/perks typecheck
+          pnpm --filter @kch/perks test
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update pull request
+        if: steps.verify.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="chore/catalog-doc-update"
+          TITLE="Perks: update card catalog from Doctor of Credit ($(date -u +%Y-%m-%d))"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add apps/perks/lib/catalog.ts
+          git commit -m "$TITLE"
+          git push --force-with-lease origin "$BRANCH"
+
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING_PR" ]; then
+            gh pr edit "$EXISTING_PR" --title "$TITLE" --body-file /tmp/catalog-report.md
+          else
+            gh pr create \
+              --base "${{ github.event.repository.default_branch }}" \
+              --head "$BRANCH" \
+              --title "$TITLE" \
+              --body-file /tmp/catalog-report.md
+          fi
