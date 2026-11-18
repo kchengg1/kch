@@ -11,7 +11,7 @@ on:
         required: false
         type: string
       dry_run:
-        description: "Evaluate only without modifying catalog.ts or opening a PR"
+        description: "Evaluate only without modifying catalog.ts or opening a PR/Issue"
         required: false
         default: false
         type: boolean
@@ -19,7 +19,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  models: read
+  issues: write
 
 jobs:
   monitor:
@@ -39,8 +39,6 @@ jobs:
       - name: Scrape Doctor of Credit and evaluate catalog
         id: monitor
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_MODEL: ${{ vars.GITHUB_MODEL || 'openai/gpt-4.1-mini' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
           SINCE_DATE: ${{ inputs.since || '' }}
@@ -86,4 +84,18 @@ jobs:
               --head "$BRANCH" \
               --title "$TITLE" \
               --body-file /tmp/catalog-report.md
+          fi
+
+      - name: Open or update review issue (digest mode)
+        if: steps.monitor.outputs.issue_needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PREFIX="Perks: Doctor of Credit catalog review"
+          TITLE="$PREFIX ($(date -u +%Y-%m-%d))"
+          EXISTING_ISSUE=$(gh issue list --state open --search "\"$PREFIX\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING_ISSUE" ]; then
+            gh issue edit "$EXISTING_ISSUE" --title "$TITLE" --body-file /tmp/catalog-report.md
+          else
+            gh issue create --title "$TITLE" --body-file /tmp/catalog-report.md
           fi

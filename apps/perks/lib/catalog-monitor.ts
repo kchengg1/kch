@@ -6,13 +6,9 @@ export const DOC_FEEDS = [
   "https://www.doctorofcredit.com/credit-cards/feed/",
 ] as const;
 
-export const DEFAULT_GITHUB_MODEL = "openai/gpt-4.1-mini";
 export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
-export const GITHUB_MODELS_ENDPOINT = "https://models.github.ai/inference/chat/completions";
 
-export type LlmConfig =
-  | { provider: "github-models"; token: string; model?: string }
-  | { provider: "gemini"; apiKey: string; model?: string };
+export type LlmConfig = { provider: "gemini"; apiKey: string; model?: string };
 
 export type DocPost = {
   title: string;
@@ -301,51 +297,6 @@ export async function fetchDoctorOfCreditPosts(
   return allPosts;
 }
 
-async function callGitHubModels(params: {
-  token: string;
-  model: string;
-  prompt: string;
-  jsonMode?: boolean;
-  fetchImpl?: typeof fetch;
-}): Promise<string> {
-  const fetchImpl = params.fetchImpl ?? fetch;
-  const res = await fetchImpl(GITHUB_MODELS_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${params.token}`,
-    },
-    body: JSON.stringify({
-      model: params.model,
-      messages: [{ role: "user", content: params.prompt }],
-      temperature: 0.1,
-      ...(params.jsonMode ? { response_format: { type: "json_object" } } : {}),
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
-
-  const rawBody = await res.text();
-  if (!res.ok) {
-    throw new Error(`GitHub Models API error (${res.status}): ${rawBody.slice(0, 500)}`);
-  }
-
-  let data: { choices?: Array<{ message?: { content?: string } }> };
-  try {
-    data = JSON.parse(rawBody) as { choices?: Array<{ message?: { content?: string } }> };
-  } catch {
-    throw new Error(
-      `GitHub Models API returned non-JSON (${res.status} ${res.headers.get("content-type") ?? ""}): ${rawBody.slice(0, 200)}`,
-    );
-  }
-  const text = data.choices?.[0]?.message?.content;
-  if (!text) {
-    throw new Error("GitHub Models API returned no text content");
-  }
-  return text;
-}
-
 async function callGemini(params: {
   apiKey: string;
   model: string;
@@ -390,15 +341,6 @@ async function callLlm(params: {
   jsonMode?: boolean;
   fetchImpl?: typeof fetch;
 }): Promise<string> {
-  if (params.llm.provider === "github-models") {
-    return callGitHubModels({
-      token: params.llm.token,
-      model: params.llm.model ?? DEFAULT_GITHUB_MODEL,
-      prompt: params.prompt,
-      jsonMode: params.jsonMode,
-      fetchImpl: params.fetchImpl,
-    });
-  }
   return callGemini({
     apiKey: params.llm.apiKey,
     model: params.llm.model ?? DEFAULT_GEMINI_MODEL,
@@ -600,6 +542,37 @@ export function formatEvaluationReport(
   lines.push(
     "",
     "> Automated check against Doctor of Credit. Please verify all benefit amounts, cadences, and fine print against the issuer's official terms before merging.",
+  );
+  return lines.join("\n");
+}
+
+export function formatDigestIssueBody(
+  posts: DocPost[],
+  stats: { totalFetched: number; sinceDate: string },
+): string {
+  const lines: string[] = [
+    "## Doctor of Credit News Digest",
+    "",
+    `Found **${posts.length}** credit-card-related post(s) since \`${stats.sinceDate}\` (out of ${stats.totalFetched} recent feed items) that may affect \`apps/perks/lib/catalog.ts\`.`,
+    "",
+    "### Relevant Posts",
+    "",
+  ];
+
+  for (const post of posts.slice(0, 25)) {
+    const snippet = post.content.replace(/\s+/g, " ").slice(0, 220).trim();
+    const ellipsis = post.content.length > 220 ? "..." : "";
+    const dateLabel = post.pubDate ? ` (${post.pubDate})` : "";
+    lines.push(`- **[${post.title}](${post.link})**${dateLabel}`);
+    if (snippet) {
+      lines.push(`  > ${snippet}${ellipsis}`);
+    }
+  }
+
+  lines.push(
+    "",
+    "---",
+    "_Automated digest (no LLM API key configured). Add a free-tier `GEMINI_API_KEY` secret in **Settings → Secrets and variables → Actions** to enable automatic AI evaluation and PR creation, or review these posts and update `CATALOG_REVIEWED` in `apps/perks/lib/catalog.ts`._",
   );
   return lines.join("\n");
 }
