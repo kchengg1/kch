@@ -312,6 +312,8 @@ async function callGitHubModels(params: {
   const res = await fetchImpl(GITHUB_MODELS_ENDPOINT, {
     method: "POST",
     headers: {
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
       "Content-Type": "application/json",
       Authorization: `Bearer ${params.token}`,
     },
@@ -324,14 +326,19 @@ async function callGitHubModels(params: {
     signal: AbortSignal.timeout(60_000),
   });
 
+  const rawBody = await res.text();
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`GitHub Models API error (${res.status}): ${body.slice(0, 500)}`);
+    throw new Error(`GitHub Models API error (${res.status}): ${rawBody.slice(0, 500)}`);
   }
 
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
+  let data: { choices?: Array<{ message?: { content?: string } }> };
+  try {
+    data = JSON.parse(rawBody) as { choices?: Array<{ message?: { content?: string } }> };
+  } catch {
+    throw new Error(
+      `GitHub Models API returned non-JSON (${res.status} ${res.headers.get("content-type") ?? ""}): ${rawBody.slice(0, 200)}`,
+    );
+  }
   const text = data.choices?.[0]?.message?.content;
   if (!text) {
     throw new Error("GitHub Models API returned no text content");
