@@ -158,9 +158,12 @@ describe("evaluatePostsWithGemini", () => {
 
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({
-        choices: [{ message: { content: JSON.stringify(mockPayload) } }],
-      }),
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      text: async () =>
+        JSON.stringify({
+          choices: [{ message: { content: JSON.stringify(mockPayload) } }],
+        }),
     });
 
     const result = await evaluatePosts({
