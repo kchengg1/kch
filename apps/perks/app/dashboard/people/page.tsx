@@ -83,215 +83,226 @@ export default async function PeoplePage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">People</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-bold tracking-tight">People</h1>
+        <p className="text-sm text-muted-foreground">
           How everyone in the group is doing with their cards this year, and every Amex Offer and
           Chase Offer on their cards.
         </p>
       </div>
 
-      {leaderboard.length >= 2 && (
-        <Card className="max-w-xl">
-          <p className="text-sm text-muted-foreground">Credits used in {year}</p>
-          <ol className="mt-3 space-y-3">
-            {leaderboard.map((s, i) => {
-              const me = s.userId === user.id;
-              const label = (
-                <span className={me ? "font-semibold" : undefined}>
-                  <span className="mr-2 inline-block w-8 text-muted-foreground">
-                    {ordinal(i + 1)}
-                  </span>
-                  {me ? "You" : s.firstName}
-                </span>
-              );
-              return (
-                <li key={s.userId}>
-                  <div className="flex items-baseline justify-between gap-3 text-sm">
-                    {me ? (
-                      label
-                    ) : (
-                      <a
-                        href={`/dashboard/people?p=${encodeURIComponent(s.userId)}`}
-                        className="hover:underline"
-                      >
-                        {label}
-                      </a>
-                    )}
-                    <span className="tabular-nums">
-                      {formatCents(s.capturedCents)}
-                      <span className="text-muted-foreground">
-                        {s.availableCents
-                          ? ` of ${formatCents(s.availableCents)} · ${Math.round(s.share * 100)}%`
-                          : ""}
-                      </span>
+      <div className={cn("grid gap-6 items-start", leaderboard.length >= 2 && "lg:grid-cols-12")}>
+        {leaderboard.length >= 2 && (
+          <Card className="lg:sticky lg:top-20 lg:col-span-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Credits used in {year}
+            </p>
+            <ol className="mt-3 space-y-3">
+              {leaderboard.map((s, i) => {
+                const me = s.userId === user.id;
+                const label = (
+                  <span className={me ? "font-semibold" : undefined}>
+                    <span className="mr-2 inline-block w-8 text-muted-foreground">
+                      {ordinal(i + 1)}
                     </span>
-                  </div>
-                  <Meter
-                    value={s.capturedCents}
-                    max={leaderboard[0]!.capturedCents || 1}
-                    className="mt-1.5"
-                  />
-                </li>
-              );
-            })}
-          </ol>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Only people sharing group rankings in Settings are listed.
-          </p>
-        </Card>
-      )}
-
-      {!person ? (
-        <Card>
-          <p className="text-sm text-muted-foreground">
-            Nobody else has added cards or pasted an offers page yet. Once they do, they show up
-            here.
-          </p>
-        </Card>
-      ) : (
-        <>
-          <nav
-            aria-label="Choose a person"
-            className="-mx-4 flex items-center gap-1 overflow-x-auto px-4 text-sm whitespace-nowrap sm:mx-0 sm:flex-wrap sm:px-0"
-          >
-            {others.map((x) => (
-              <a
-                key={x.id}
-                href={`/dashboard/people?p=${encodeURIComponent(x.id)}`}
-                aria-current={x.id === person.id ? "page" : undefined}
-                className={cn(
-                  "rounded-full px-3 py-1",
-                  x.id === person.id
-                    ? "bg-primary/10 font-medium text-primary"
-                    : "text-muted-foreground hover:bg-muted",
-                )}
-              >
-                {x.firstName}
-              </a>
-            ))}
-          </nav>
-
-          <p className="text-sm text-muted-foreground">
-            Last active: {formatLastActive(person.lastActiveAt)}
-          </p>
-
-          <section className="space-y-3">
-            <h2 className="font-semibold">{person.firstName}&rsquo;s cards</h2>
-            {person.cards ? (
-              <>
-                <p className="text-sm text-muted-foreground sm:hidden">
-                  Tap a card to see its credits.
-                </p>
-                <CardList cards={person.cards} credits={credits} year={year} />
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {person.sharing
-                  ? "No open cards yet."
-                  : `${person.firstName} keeps card totals private (Group rankings is off in their Settings).`}
-              </p>
-            )}
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="font-semibold">
-              {person.firstName}&rsquo;s offers{" "}
-              <span className="font-normal text-muted-foreground">
-                · {person.offers?.groups.length ?? 0} available
-              </span>
-            </h2>
-            {!person.offers ? (
-              <p className="text-sm text-muted-foreground">No offers pasted yet.</p>
-            ) : (
-              <>
-                {(() => {
-                  const at = person.offers.lastPastedAt;
-                  const ago = at ? daysBetween(dateOf(at), today) : null;
-                  return (
-                    <p
-                      className={cn(
-                        "text-sm",
-                        ago === null || ago > 14 ? "text-destructive" : "text-muted-foreground",
+                    {me ? "You" : s.firstName}
+                  </span>
+                );
+                return (
+                  <li key={s.userId}>
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      {me ? (
+                        label
+                      ) : (
+                        <a
+                          href={`/dashboard/people?p=${encodeURIComponent(s.userId)}`}
+                          className="hover:text-primary hover:underline"
+                        >
+                          {label}
+                        </a>
                       )}
-                    >
-                      {at
-                        ? `Last pasted ${formatDate(dateOf(at), today)}${ago! > 14 ? ", so this may be out of date" : ""}. Offers are targeted, so these may not be on your cards.`
-                        : "Pasted without picking a card, so freshness is unknown."}
+                      <span className="tabular-nums">
+                        {formatCents(s.capturedCents)}
+                        <span className="text-muted-foreground">
+                          {s.availableCents
+                            ? ` of ${formatCents(s.availableCents)} · ${Math.round(s.share * 100)}%`
+                            : ""}
+                        </span>
+                      </span>
+                    </div>
+                    <Meter
+                      value={s.capturedCents}
+                      max={leaderboard[0]!.capturedCents || 1}
+                      tone={i === 0 ? "success" : "primary"}
+                      className="mt-1.5"
+                    />
+                  </li>
+                );
+              })}
+            </ol>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Only people sharing group rankings in Settings are listed.
+            </p>
+          </Card>
+        )}
+
+        <div className={cn("space-y-6", leaderboard.length >= 2 && "lg:col-span-8")}>
+          {!person ? (
+            <Card>
+              <p className="text-sm text-muted-foreground">
+                Nobody else has added cards or pasted an offers page yet. Once they do, they show up
+                here.
+              </p>
+            </Card>
+          ) : (
+            <>
+              <nav
+                aria-label="Choose a person"
+                className="-mx-4 flex items-center gap-1.5 overflow-x-auto px-4 text-sm whitespace-nowrap sm:mx-0 sm:flex-wrap sm:px-0"
+              >
+                {others.map((x) => (
+                  <a
+                    key={x.id}
+                    href={`/dashboard/people?p=${encodeURIComponent(x.id)}`}
+                    aria-current={x.id === person.id ? "page" : undefined}
+                    className={cn(
+                      "rounded-full border px-3.5 py-1.5 transition-colors",
+                      x.id === person.id
+                        ? "border-primary bg-primary font-medium text-primary-foreground"
+                        : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    {x.firstName}
+                  </a>
+                ))}
+              </nav>
+
+              <p className="text-sm text-muted-foreground">
+                Last active: {formatLastActive(person.lastActiveAt)}
+              </p>
+
+              <section className="space-y-3">
+                <h2 className="font-semibold">{person.firstName}&rsquo;s cards</h2>
+                {person.cards ? (
+                  <>
+                    <p className="text-sm text-muted-foreground sm:hidden">
+                      Tap a card to see its credits.
                     </p>
-                  );
-                })()}
-                <Card className="py-2">
-                  <ul className="divide-y">
-                    {person.offers.groups.map((g) => {
-                      const days = g.expiresOn ? daysBetween(today, g.expiresOn) : null;
-                      const weak = g.rate !== null && g.rate < WEAK_RATE;
-                      const missing = !mine.has(merchantKey(g.merchant));
+                    <CardList cards={person.cards} credits={credits} year={year} />
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {person.sharing
+                      ? "No open cards yet."
+                      : `${person.firstName} keeps card totals private (Group rankings is off in their Settings).`}
+                  </p>
+                )}
+              </section>
+
+              <section className="space-y-3">
+                <h2 className="font-semibold">
+                  {person.firstName}&rsquo;s offers{" "}
+                  <span className="font-normal text-muted-foreground">
+                    · {person.offers?.groups.length ?? 0} available
+                  </span>
+                </h2>
+                {!person.offers ? (
+                  <p className="text-sm text-muted-foreground">No offers pasted yet.</p>
+                ) : (
+                  <>
+                    {(() => {
+                      const at = person.offers.lastPastedAt;
+                      const ago = at ? daysBetween(dateOf(at), today) : null;
                       return (
-                        <li key={g.key} className="py-4">
-                          <p className="flex flex-wrap items-center gap-2 font-medium">
-                            {g.merchant}
-                            {g.rate !== null && (
-                              <Badge
-                                variant={g.rate >= 0.5 ? "success" : weak ? "secondary" : "outline"}
-                              >
-                                {rateLabel(g.rate)}
-                              </Badge>
-                            )}
-                            {missing && (
-                              <Badge
-                                variant="secondary"
-                                title="You have no saved offer for this merchant"
-                              >
-                                Not in your offers
-                              </Badge>
-                            )}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {g.details || "Added to card. Deal text wasn't saved."}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {g.maxCents !== null && `Up to ${formatCents(g.maxCents)} · `}
-                            {g.expiresOn
-                              ? `Expires ${formatDate(g.expiresOn, today)}`
-                              : "No expiry saved"}
-                            {days !== null && (
-                              <span
-                                className={days <= 7 ? "font-medium text-destructive" : undefined}
-                              >
-                                {" · "}
-                                {dueLabel(days)}
-                              </span>
-                            )}
-                          </p>
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {g.items.map((o) => {
-                              const card = o.cardId ? cardById.get(o.cardId) : undefined;
-                              return (
-                                <span
-                                  key={o.id}
-                                  className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs text-muted-foreground"
-                                >
-                                  <CardIcon
-                                    templateKey={card?.templateKey}
-                                    issuer={card?.issuer}
-                                    className="h-3 w-[19px]"
-                                  />
-                                  {card?.name ?? "Any card"}
-                                  {o.status === "added" && <span>· added</span>}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </li>
+                        <p
+                          className={cn(
+                            "text-sm",
+                            ago === null || ago > 14 ? "text-destructive" : "text-muted-foreground",
+                          )}
+                        >
+                          {at
+                            ? `Last pasted ${formatDate(dateOf(at), today)}${ago! > 14 ? ", so this may be out of date" : ""}. Offers are targeted, so these may not be on your cards.`
+                            : "Pasted without picking a card, so freshness is unknown."}
+                        </p>
                       );
-                    })}
-                  </ul>
-                </Card>
-              </>
-            )}
-          </section>
-        </>
-      )}
+                    })()}
+                    <Card className="py-2">
+                      <ul className="divide-y">
+                        {person.offers.groups.map((g) => {
+                          const days = g.expiresOn ? daysBetween(today, g.expiresOn) : null;
+                          const weak = g.rate !== null && g.rate < WEAK_RATE;
+                          const missing = !mine.has(merchantKey(g.merchant));
+                          return (
+                            <li key={g.key} className="py-4">
+                              <p className="flex flex-wrap items-center gap-2 font-medium">
+                                {g.merchant}
+                                {g.rate !== null && (
+                                  <Badge
+                                    variant={
+                                      g.rate >= 0.5 ? "success" : weak ? "secondary" : "outline"
+                                    }
+                                  >
+                                    {rateLabel(g.rate)}
+                                  </Badge>
+                                )}
+                                {missing && (
+                                  <Badge
+                                    variant="secondary"
+                                    title="You have no saved offer for this merchant"
+                                  >
+                                    Not in your offers
+                                  </Badge>
+                                )}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {g.details || "Added to card. Deal text wasn't saved."}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {g.maxCents !== null && `Up to ${formatCents(g.maxCents)} · `}
+                                {g.expiresOn
+                                  ? `Expires ${formatDate(g.expiresOn, today)}`
+                                  : "No expiry saved"}
+                                {days !== null && (
+                                  <span
+                                    className={
+                                      days <= 7 ? "font-medium text-destructive" : undefined
+                                    }
+                                  >
+                                    {" · "}
+                                    {dueLabel(days)}
+                                  </span>
+                                )}
+                              </p>
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {g.items.map((o) => {
+                                  const card = o.cardId ? cardById.get(o.cardId) : undefined;
+                                  return (
+                                    <span
+                                      key={o.id}
+                                      className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs text-muted-foreground"
+                                    >
+                                      <CardIcon
+                                        templateKey={card?.templateKey}
+                                        issuer={card?.issuer}
+                                        className="h-3 w-[19px]"
+                                      />
+                                      {card?.name ?? "Any card"}
+                                      {o.status === "added" && <span>· added</span>}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </Card>
+                  </>
+                )}
+              </section>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

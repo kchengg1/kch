@@ -8,7 +8,14 @@ import {
   Text,
   View,
 } from "react-native";
-import { Button, CollapsibleSection, COLORS, FieldInput, SectionCard } from "../components/ui";
+import {
+  Button,
+  CollapsibleSection,
+  FieldInput,
+  SectionCard,
+  useThemedStyles,
+  type ThemeColors,
+} from "../components/ui";
 import { normalizeServerUrl } from "../lib/format";
 
 export function AuthScreen({
@@ -24,6 +31,7 @@ export function AuthScreen({
   onSignUp: (name: string, email: string, password: string, serverUrl: string) => Promise<void>;
   onSaveServerUrl: (url: string | null) => Promise<string>;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -197,75 +205,76 @@ export function AuthScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  scrollContent: {
-    paddingHorizontal: 18,
-    paddingTop: 48,
-    paddingBottom: 40,
-    gap: 18,
-  },
-  brandHeader: {
-    gap: 6,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: "700",
-    color: COLORS.ink,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 21,
-    color: COLORS.muted,
-  },
-  cardGap: {
-    gap: 14,
-  },
-  modeSwitch: {
-    flexDirection: "row",
-    backgroundColor: COLORS.subtle,
-    borderRadius: 10,
-    padding: 3,
-  },
-  modeTab: {
-    flex: 1,
-    minHeight: 38,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
-  },
-  modeTabActive: {
-    backgroundColor: COLORS.card,
-  },
-  modeText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.muted,
-  },
-  modeTextActive: {
-    color: COLORS.ink,
-  },
-  errorText: {
-    fontSize: 13,
-    color: COLORS.redInk,
-    backgroundColor: COLORS.redBg,
-    borderColor: COLORS.redBorder,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  serverActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  savedText: {
-    fontSize: 12,
-    color: COLORS.greenInk,
-  },
-});
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    flex: {
+      flex: 1,
+      backgroundColor: COLORS.bg,
+    },
+    scrollContent: {
+      paddingHorizontal: 18,
+      paddingTop: 48,
+      paddingBottom: 40,
+      gap: 18,
+    },
+    brandHeader: {
+      gap: 6,
+    },
+    title: {
+      fontSize: 30,
+      fontWeight: "700",
+      color: COLORS.ink,
+      letterSpacing: -0.5,
+    },
+    subtitle: {
+      fontSize: 15,
+      lineHeight: 21,
+      color: COLORS.muted,
+    },
+    cardGap: {
+      gap: 14,
+    },
+    modeSwitch: {
+      flexDirection: "row",
+      backgroundColor: COLORS.subtle,
+      borderRadius: 10,
+      padding: 3,
+    },
+    modeTab: {
+      flex: 1,
+      minHeight: 38,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 8,
+    },
+    modeTabActive: {
+      backgroundColor: COLORS.card,
+    },
+    modeText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.muted,
+    },
+    modeTextActive: {
+      color: COLORS.ink,
+    },
+    errorText: {
+      fontSize: 13,
+      color: COLORS.redInk,
+      backgroundColor: COLORS.redBg,
+      borderColor: COLORS.redBorder,
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    serverActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    savedText: {
+      fontSize: 12,
+      color: COLORS.greenInk,
+    },
+  });

@@ -13,26 +13,24 @@ import {
 } from "react-native";
 import type { CardStyle, TabKey } from "../types";
 import { tapHaptic } from "../lib/haptics";
+import {
+  isLightHex,
+  LIGHT_COLORS,
+  useTheme,
+  useThemedStyles,
+  type ThemeColors,
+} from "../lib/theme";
 
-export const COLORS = {
-  bg: "#fbfbfb",
-  card: "#ffffff",
-  subtle: "#f4f4f5",
-  border: "#e4e4e7",
-  borderStrong: "#d4d4d8",
-  ink: "#111111",
-  muted: "#666666",
-  faint: "#999999",
-  greenBg: "#ecfdf5",
-  greenBorder: "#bbf7d0",
-  greenInk: "#166534",
-  amberBg: "#fffbeb",
-  amberBorder: "#fde68a",
-  amberInk: "#92400e",
-  redBg: "#fef2f2",
-  redBorder: "#fecaca",
-  redInk: "#991b1b",
-};
+export {
+  isLightHex,
+  useTheme,
+  useThemedStyles,
+  type ThemeColors,
+  type ThemeMode,
+} from "../lib/theme";
+
+/** Default light palette export preserved for static references; prefer `useTheme()` in components. */
+export const COLORS = LIGHT_COLORS;
 
 export const NUM_STYLE: TextStyle = {
   fontVariant: ["tabular-nums"],
@@ -56,7 +54,7 @@ export function CardSwatch({
   return (
     <View
       style={[
-        styles.swatch,
+        staticStyles.swatch,
         {
           width,
           height,
@@ -67,7 +65,7 @@ export function CardSwatch({
     >
       <View
         style={[
-          styles.swatchShade,
+          staticStyles.swatchShade,
           {
             backgroundColor: cardStyle.to,
             height: Math.round(height * 0.48),
@@ -76,7 +74,7 @@ export function CardSwatch({
       />
       <View
         style={[
-          styles.swatchChip,
+          staticStyles.swatchChip,
           {
             backgroundColor: chipColor,
             width: size === "md" ? 8 : 6,
@@ -90,6 +88,57 @@ export function CardSwatch({
   );
 }
 
+/** Tactile metallic card face header used in the iOS Cards Wallet screen. */
+export function CardWalletHeader({
+  cardStyle,
+  issuer,
+  name,
+  feeLabel,
+  closed = false,
+}: {
+  cardStyle: CardStyle;
+  issuer: string;
+  name: string;
+  feeLabel: string;
+  closed?: boolean;
+}) {
+  const lightFace = isLightHex(cardStyle.from);
+  const ink = lightFace ? "#141a24" : "#f8fafc";
+  const subInk = lightFace ? "rgba(20, 26, 36, 0.7)" : "rgba(248, 250, 252, 0.75)";
+  const chipColor = cardStyle.chip.startsWith("#")
+    ? cardStyle.chip
+    : cardStyle.chip === "gold"
+      ? "#e5c16c"
+      : "#d4d8dd";
+
+  return (
+    <View
+      style={[
+        staticStyles.walletFace,
+        { backgroundColor: cardStyle.from, opacity: closed ? 0.55 : 1 },
+      ]}
+    >
+      <View style={[staticStyles.walletFaceShade, { backgroundColor: cardStyle.to }]} />
+      <View style={staticStyles.walletFaceTop}>
+        <View style={staticStyles.walletIdentity}>
+          <View style={[staticStyles.walletChip, { backgroundColor: chipColor }]} />
+          <View style={staticStyles.walletTextBlock}>
+            <Text style={[staticStyles.walletIssuer, { color: subInk }]} numberOfLines={1}>
+              {issuer.toUpperCase()}
+            </Text>
+            <Text style={[staticStyles.walletName, { color: ink }]} numberOfLines={1}>
+              {name}
+            </Text>
+          </View>
+        </View>
+        <View style={staticStyles.walletFeePill}>
+          <Text style={[staticStyles.walletFeeText, NUM_STYLE]}>{feeLabel}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export function Badge({
   label,
   tone = "neutral",
@@ -97,18 +146,21 @@ export function Badge({
   label: string;
   tone?: "neutral" | "green" | "amber" | "red";
 }) {
+  const { colors } = useTheme();
   const palette =
     tone === "green"
-      ? { bg: COLORS.greenBg, border: COLORS.greenBorder, ink: COLORS.greenInk }
+      ? { bg: colors.greenBg, border: colors.greenBorder, ink: colors.greenInk }
       : tone === "amber"
-        ? { bg: COLORS.amberBg, border: COLORS.amberBorder, ink: COLORS.amberInk }
+        ? { bg: colors.amberBg, border: colors.amberBorder, ink: colors.amberInk }
         : tone === "red"
-          ? { bg: COLORS.redBg, border: COLORS.redBorder, ink: COLORS.redInk }
-          : { bg: COLORS.subtle, border: COLORS.border, ink: COLORS.muted };
+          ? { bg: colors.redBg, border: colors.redBorder, ink: colors.redInk }
+          : { bg: colors.subtle, border: colors.border, ink: colors.muted };
 
   return (
-    <View style={[styles.badge, { backgroundColor: palette.bg, borderColor: palette.border }]}>
-      <Text style={[styles.badgeText, { color: palette.ink }]} numberOfLines={1}>
+    <View
+      style={[staticStyles.badge, { backgroundColor: palette.bg, borderColor: palette.border }]}
+    >
+      <Text style={[staticStyles.badgeText, { color: palette.ink }]} numberOfLines={1}>
         {label}
       </Text>
     </View>
@@ -132,6 +184,8 @@ export function Button({
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const isDisabled = disabled || loading;
   return (
     <Pressable
@@ -157,7 +211,11 @@ export function Button({
         <ActivityIndicator
           size="small"
           color={
-            variant === "primary" ? "#ffffff" : variant === "danger" ? COLORS.redInk : COLORS.ink
+            variant === "primary"
+              ? colors.primaryInk
+              : variant === "danger"
+                ? colors.redInk
+                : colors.ink
           }
         />
       ) : (
@@ -187,8 +245,11 @@ export function Meter({
   max: number;
   tone?: "dark" | "green" | "amber";
 }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const ratio = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
-  const fill = tone === "green" ? "#16a34a" : tone === "amber" ? "#d97706" : COLORS.ink;
+  const fill =
+    tone === "green" ? colors.greenFill : tone === "amber" ? colors.amberFill : colors.primary;
   return (
     <View style={styles.meterTrack}>
       <View
@@ -205,6 +266,7 @@ export function SectionCard({
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const styles = useThemedStyles(makeStyles);
   return <View style={[styles.sectionCard, style]}>{children}</View>;
 }
 
@@ -219,6 +281,7 @@ export function CollapsibleSection({
   defaultOpen?: boolean;
   children: React.ReactNode | (() => React.ReactNode);
 }) {
+  const styles = useThemedStyles(makeStyles);
   const [open, setOpen] = useState(defaultOpen);
   return (
     <View style={styles.collapsibleWrap}>
@@ -266,6 +329,8 @@ export function FieldInput({
   multiline?: boolean;
   hint?: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -273,7 +338,7 @@ export function FieldInput({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={COLORS.faint}
+        placeholderTextColor={colors.faint}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         secureTextEntry={secureTextEntry}
@@ -294,6 +359,7 @@ export function SegmentedBar<K extends string>({
   value: K;
   onChange: (next: K) => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.segmentWrap}>
       {options.map((opt) => {
@@ -326,12 +392,63 @@ export function SegmentedBar<K extends string>({
   );
 }
 
-const TABS: { key: TabKey; label: string; mark: string }[] = [
-  { key: "overview", label: "Overview", mark: "◎" },
-  { key: "cards", label: "Cards", mark: "▭" },
-  { key: "offers", label: "Offers", mark: "✦" },
-  { key: "points", label: "Points", mark: "◈" },
-  { key: "people", label: "People", mark: "◉" },
+/** Crisp pure-View geometric icons for the bottom tab bar (zero native icon dependencies). */
+function TabGlyph({ tab, color }: { tab: TabKey; color: string }) {
+  if (tab === "overview") {
+    return (
+      <View style={staticStyles.iconBox}>
+        <View style={staticStyles.gridRow}>
+          <View style={[staticStyles.gridCell, { borderColor: color }]} />
+          <View style={[staticStyles.gridCell, { borderColor: color }]} />
+        </View>
+        <View style={staticStyles.gridRow}>
+          <View style={[staticStyles.gridCell, { borderColor: color }]} />
+          <View style={[staticStyles.gridCell, { borderColor: color }]} />
+        </View>
+      </View>
+    );
+  }
+  if (tab === "cards") {
+    return (
+      <View style={staticStyles.iconBox}>
+        <View style={[staticStyles.cardGlyph, { borderColor: color }]}>
+          <View style={[staticStyles.cardStripe, { backgroundColor: color }]} />
+        </View>
+      </View>
+    );
+  }
+  if (tab === "offers") {
+    return (
+      <View style={staticStyles.iconBox}>
+        <View style={[staticStyles.tagDiamond, { borderColor: color }]}>
+          <View style={[staticStyles.tagDot, { backgroundColor: color }]} />
+        </View>
+      </View>
+    );
+  }
+  if (tab === "points") {
+    return (
+      <View style={staticStyles.iconBox}>
+        <View style={[staticStyles.coinOuter, { borderColor: color }]}>
+          <View style={[staticStyles.coinInner, { backgroundColor: color }]} />
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={staticStyles.iconBox}>
+      <View style={[staticStyles.personHead, { borderColor: color }]} />
+      <View style={[staticStyles.personBody, { borderColor: color }]} />
+    </View>
+  );
+}
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "overview", label: "Overview" },
+  { key: "cards", label: "Cards" },
+  { key: "offers", label: "Offers" },
+  { key: "points", label: "Points" },
+  { key: "people", label: "People" },
 ];
 
 export const TabBar = React.memo(function TabBar({
@@ -343,37 +460,45 @@ export const TabBar = React.memo(function TabBar({
   onChange: (tab: TabKey) => void;
   bottomInset: number;
 }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
-    <View style={[styles.tabBar, { paddingBottom: Math.max(bottomInset, 8) }]}>
-      {TABS.map((t) => {
-        const selected = t.key === active;
-        const activate = () => {
-          if (!selected) {
-            tapHaptic();
-            onChange(t.key);
-          }
-        };
-        return (
-          <Pressable
-            key={t.key}
-            accessibilityRole="tab"
-            accessibilityState={{ selected }}
-            onPressIn={activate}
-            onPress={activate}
-            style={styles.tabItem}
-          >
-            <Text style={[styles.tabMark, selected && styles.tabMarkSelected]}>{t.mark}</Text>
-            <Text style={[styles.tabLabel, selected && styles.tabLabelSelected]} numberOfLines={1}>
-              {t.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+    <View style={[styles.tabBarOuter, { paddingBottom: Math.max(bottomInset, 10) }]}>
+      <View style={styles.tabBar}>
+        {TABS.map((t) => {
+          const selected = t.key === active;
+          const color = selected ? colors.primary : colors.faint;
+          const activate = () => {
+            if (!selected) {
+              tapHaptic();
+              onChange(t.key);
+            }
+          };
+          return (
+            <Pressable
+              key={t.key}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              onPressIn={activate}
+              onPress={activate}
+              style={[styles.tabItem, selected && styles.tabItemSelected]}
+            >
+              <TabGlyph tab={t.key} color={color} />
+              <Text
+                style={[styles.tabLabel, selected && styles.tabLabelSelected]}
+                numberOfLines={1}
+              >
+                {t.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 });
 
-const styles = StyleSheet.create({
+const staticStyles = StyleSheet.create({
   swatch: {
     borderRadius: 5,
     borderWidth: 1,
@@ -392,6 +517,65 @@ const styles = StyleSheet.create({
     position: "absolute",
     borderRadius: 1.5,
   },
+  walletFace: {
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    position: "relative",
+    overflow: "hidden",
+  },
+  walletFaceShade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "54%",
+    opacity: 0.55,
+  },
+  walletFaceTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  walletIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  walletChip: {
+    width: 26,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 0.5,
+    borderColor: "rgba(0,0,0,0.22)",
+    flexShrink: 0,
+  },
+  walletTextBlock: {
+    flex: 1,
+  },
+  walletIssuer: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.7,
+  },
+  walletName: {
+    fontSize: 15,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  walletFeePill: {
+    backgroundColor: "rgba(0, 0, 0, 0.25)",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    flexShrink: 0,
+  },
+  walletFeeText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
   badge: {
     borderRadius: 999,
     borderWidth: 1,
@@ -401,207 +585,293 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
     fontVariant: ["tabular-nums"],
   },
-  buttonBase: {
-    borderRadius: 10,
+  iconBox: {
+    width: 18,
+    height: 18,
     alignItems: "center",
     justifyContent: "center",
+  },
+  gridRow: {
     flexDirection: "row",
+    gap: 2.5,
+    marginVertical: 1.25,
   },
-  buttonSm: {
-    minHeight: 38,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+  gridCell: {
+    width: 6.5,
+    height: 6.5,
+    borderRadius: 1.8,
+    borderWidth: 1.7,
   },
-  buttonMd: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  buttonPrimary: {
-    backgroundColor: COLORS.ink,
-  },
-  buttonSecondary: {
-    backgroundColor: COLORS.card,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-  },
-  buttonGhost: {
-    backgroundColor: "transparent",
-  },
-  buttonDanger: {
-    backgroundColor: COLORS.redBg,
-    borderWidth: 1,
-    borderColor: COLORS.redBorder,
-  },
-  buttonPressed: {
-    opacity: 0.78,
-  },
-  buttonDisabled: {
-    opacity: 0.45,
-  },
-  buttonText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  buttonTextSm: {
-    fontSize: 13,
-  },
-  buttonTextPrimary: {
-    color: "#ffffff",
-  },
-  buttonTextSecondary: {
-    color: COLORS.ink,
-  },
-  buttonTextGhost: {
-    color: COLORS.muted,
-  },
-  buttonTextDanger: {
-    color: COLORS.redInk,
-  },
-  meterTrack: {
-    height: 7,
-    borderRadius: 999,
-    backgroundColor: COLORS.subtle,
+  cardGlyph: {
+    width: 17,
+    height: 12,
+    borderRadius: 2.5,
+    borderWidth: 1.7,
     overflow: "hidden",
+    justifyContent: "flex-start",
   },
-  meterFill: {
-    height: "100%",
-    borderRadius: 999,
+  cardStripe: {
+    height: 2.5,
+    marginTop: 2.5,
+    width: "100%",
   },
-  sectionCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 14,
-  },
-  collapsibleWrap: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.card,
-    overflow: "hidden",
-  },
-  collapsibleHeader: {
-    minHeight: 46,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  collapsibleTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.ink,
-    flex: 1,
-  },
-  collapsibleRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  collapsibleCount: {
-    fontSize: 13,
-    color: COLORS.muted,
-    fontVariant: ["tabular-nums"],
-  },
-  collapsibleChevron: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.muted,
-  },
-  collapsibleBody: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    padding: 14,
-    gap: 12,
-  },
-  fieldWrap: {
-    gap: 5,
-  },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: COLORS.muted,
-  },
-  input: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    borderRadius: 10,
-    backgroundColor: COLORS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 15,
-    color: COLORS.ink,
-  },
-  inputMultiline: {
-    minHeight: 110,
-    textAlignVertical: "top",
-  },
-  fieldHint: {
-    fontSize: 12,
-    color: COLORS.muted,
-  },
-  segmentWrap: {
-    flexDirection: "row",
-    backgroundColor: COLORS.subtle,
-    borderRadius: 10,
-    padding: 3,
-    gap: 2,
-  },
-  segmentBtn: {
-    flex: 1,
-    minHeight: 36,
+  tagDiamond: {
+    width: 12,
+    height: 12,
+    borderRadius: 2.5,
+    borderWidth: 1.7,
+    transform: [{ rotate: "45deg" }],
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 8,
-    paddingHorizontal: 8,
   },
-  segmentBtnActive: {
-    backgroundColor: COLORS.card,
+  tagDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 99,
   },
-  segmentLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.muted,
-  },
-  segmentLabelActive: {
-    color: COLORS.ink,
-  },
-  tabBar: {
-    flexDirection: "row",
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    backgroundColor: COLORS.card,
-    paddingTop: 6,
-  },
-  tabItem: {
-    flex: 1,
-    minHeight: 46,
+  coinOuter: {
+    width: 15,
+    height: 15,
+    borderRadius: 99,
+    borderWidth: 1.7,
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
   },
-  tabMark: {
-    fontSize: 15,
-    color: COLORS.faint,
+  coinInner: {
+    width: 5,
+    height: 5,
+    borderRadius: 99,
   },
-  tabMarkSelected: {
-    color: COLORS.ink,
+  personHead: {
+    width: 6.5,
+    height: 6.5,
+    borderRadius: 99,
+    borderWidth: 1.7,
+    marginBottom: 1.5,
   },
-  tabLabel: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: COLORS.muted,
-  },
-  tabLabelSelected: {
-    color: COLORS.ink,
-    fontWeight: "700",
+  personBody: {
+    width: 13,
+    height: 6.5,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderWidth: 1.7,
+    borderBottomWidth: 0,
   },
 });
+
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    buttonBase: {
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "row",
+    },
+    buttonSm: {
+      minHeight: 38,
+      paddingHorizontal: 13,
+      paddingVertical: 7,
+    },
+    buttonMd: {
+      minHeight: 44,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    buttonPrimary: {
+      backgroundColor: COLORS.primary,
+    },
+    buttonSecondary: {
+      backgroundColor: COLORS.card,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+    },
+    buttonGhost: {
+      backgroundColor: "transparent",
+    },
+    buttonDanger: {
+      backgroundColor: COLORS.redBg,
+      borderWidth: 1,
+      borderColor: COLORS.redBorder,
+    },
+    buttonPressed: {
+      opacity: 0.78,
+    },
+    buttonDisabled: {
+      opacity: 0.45,
+    },
+    buttonText: {
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    buttonTextSm: {
+      fontSize: 13,
+    },
+    buttonTextPrimary: {
+      color: COLORS.primaryInk,
+    },
+    buttonTextSecondary: {
+      color: COLORS.ink,
+    },
+    buttonTextGhost: {
+      color: COLORS.muted,
+    },
+    buttonTextDanger: {
+      color: COLORS.redInk,
+    },
+    meterTrack: {
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: COLORS.subtle,
+      overflow: "hidden",
+    },
+    meterFill: {
+      height: "100%",
+      borderRadius: 999,
+    },
+    sectionCard: {
+      backgroundColor: COLORS.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      padding: 14,
+    },
+    collapsibleWrap: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      backgroundColor: COLORS.card,
+      overflow: "hidden",
+    },
+    collapsibleHeader: {
+      minHeight: 46,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    collapsibleTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: COLORS.ink,
+      flex: 1,
+    },
+    collapsibleRight: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    collapsibleCount: {
+      fontSize: 13,
+      color: COLORS.muted,
+      fontVariant: ["tabular-nums"],
+    },
+    collapsibleChevron: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.primary,
+    },
+    collapsibleBody: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+      padding: 14,
+      gap: 12,
+    },
+    fieldWrap: {
+      gap: 5,
+    },
+    fieldLabel: {
+      fontSize: 13,
+      fontWeight: "500",
+      color: COLORS.muted,
+    },
+    input: {
+      minHeight: 44,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      borderRadius: 11,
+      backgroundColor: COLORS.card,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      fontSize: 15,
+      color: COLORS.ink,
+    },
+    inputMultiline: {
+      minHeight: 110,
+      textAlignVertical: "top",
+    },
+    fieldHint: {
+      fontSize: 12,
+      color: COLORS.muted,
+    },
+    segmentWrap: {
+      flexDirection: "row",
+      backgroundColor: COLORS.subtle,
+      borderRadius: 12,
+      padding: 3,
+      gap: 2,
+    },
+    segmentBtn: {
+      flex: 1,
+      minHeight: 36,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 9,
+      paddingHorizontal: 8,
+    },
+    segmentBtnActive: {
+      backgroundColor: COLORS.primary,
+    },
+    segmentLabel: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.muted,
+    },
+    segmentLabelActive: {
+      color: COLORS.primaryInk,
+    },
+    tabBarOuter: {
+      paddingHorizontal: 12,
+      paddingTop: 6,
+      backgroundColor: COLORS.bg,
+    },
+    tabBar: {
+      flexDirection: "row",
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      backgroundColor: COLORS.card,
+      borderRadius: 18,
+      padding: 5,
+      gap: 2,
+      shadowColor: "#0f1f3d",
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    },
+    tabItem: {
+      flex: 1,
+      minHeight: 46,
+      borderRadius: 13,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 3,
+      paddingVertical: 4,
+    },
+    tabItemSelected: {
+      backgroundColor: COLORS.primarySoft,
+    },
+    tabLabel: {
+      fontSize: 10.5,
+      fontWeight: "600",
+      color: COLORS.faint,
+    },
+    tabLabelSelected: {
+      color: COLORS.primary,
+      fontWeight: "700",
+    },
+  });

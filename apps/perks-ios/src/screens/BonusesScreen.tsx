@@ -15,10 +15,11 @@ import {
   Button,
   CardSwatch,
   CollapsibleSection,
-  COLORS,
   FieldInput,
   NUM_STYLE,
   SectionCard,
+  useThemedStyles,
+  type ThemeColors,
 } from "../components/ui";
 import { formatDate, formatInteger } from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
@@ -39,6 +40,7 @@ const BonusOfferCard = React.memo(function BonusOfferCard({
   verdict: BonusVerdict;
   friendReferrals: MobileReferral[];
 }) {
+  const styles = useThemedStyles(makeStyles);
   const verdictBadge =
     verdict.status === "eligible"
       ? { label: "Looks eligible", tone: "green" as const }
@@ -108,6 +110,7 @@ const BonusOfferCard = React.memo(function BonusOfferCard({
 });
 
 function ItemSpacer() {
+  const styles = useThemedStyles(makeStyles);
   return <View style={styles.itemSpacer} />;
 }
 
@@ -128,6 +131,7 @@ export const BonusesScreen = React.memo(function BonusesScreen({
   headerSlot?: React.ReactNode;
   initialShareTemplateKey?: string | null;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const [filter, setFilter] = useState<"all" | "eligible">("all");
   const [shareOpen, setShareOpen] = useState(Boolean(initialShareTemplateKey));
   const [selectedTemplate, setSelectedTemplate] = useState<string>(
@@ -506,250 +510,251 @@ export const BonusesScreen = React.memo(function BonusesScreen({
   );
 });
 
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 28,
-  },
-  headerContainer: {
-    gap: 16,
-    marginBottom: 10,
-  },
-  itemSpacer: {
-    height: 10,
-  },
-  headerBlock: {
-    gap: 2,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: COLORS.ink,
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: COLORS.muted,
-    lineHeight: 18,
-  },
-  fiveCard: {
-    paddingVertical: 12,
-  },
-  fiveTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  flexShrink: {
-    flex: 1,
-  },
-  sectionBlock: {
-    gap: 10,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  subLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.muted,
-    paddingTop: 4,
-    paddingBottom: 4,
-  },
-  divideList: {
-    paddingVertical: 6,
-  },
-  rowDivider: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  ruleRow: {
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  cardIdentity: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  shareableRow: {
-    flexDirection: "row",
-    gap: 8,
-    paddingVertical: 2,
-  },
-  shareableChip: {
-    minHeight: 38,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.card,
-  },
-  shareableName: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: COLORS.ink,
-  },
-  shareableAction: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.greenInk,
-  },
-  shareForm: {
-    gap: 12,
-  },
-  modeRow: {
-    flexDirection: "row",
-    backgroundColor: COLORS.subtle,
-    borderRadius: 10,
-    padding: 3,
-  },
-  modeBtn: {
-    flex: 1,
-    minHeight: 34,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
-  },
-  modeBtnActive: {
-    backgroundColor: COLORS.card,
-  },
-  modeText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.muted,
-  },
-  modeTextActive: {
-    color: COLORS.ink,
-  },
-  urlRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 8,
-  },
-  pasteBtn: {
-    marginBottom: 2,
-  },
-  itemTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  metaLine: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginTop: 1,
-  },
-  noteText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.muted,
-  },
-  filterHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  filterPills: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  pill: {
-    minHeight: 34,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.card,
-    justifyContent: "center",
-  },
-  pillActive: {
-    backgroundColor: COLORS.ink,
-    borderColor: COLORS.ink,
-  },
-  pillText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  pillTextActive: {
-    color: "#ffffff",
-  },
-  offerCard: {
-    gap: 8,
-  },
-  offerTop: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  headlineRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  bonusHeadline: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.ink,
-    flex: 1,
-  },
-  estValue: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.greenInk,
-  },
-  badgeWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  reasonText: {
-    fontSize: 12,
-    color: COLORS.muted,
-    lineHeight: 17,
-  },
-  friendLinksWrap: {
-    gap: 6,
-    marginTop: 2,
-  },
-  friendLinkBanner: {
-    backgroundColor: COLORS.greenBg,
-    borderWidth: 1,
-    borderColor: COLORS.greenBorder,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  friendLinkText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.greenInk,
-  },
-  linkText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.ink,
-    marginTop: 2,
-  },
-  howStack: {
-    gap: 6,
-  },
-});
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    content: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 28,
+    },
+    headerContainer: {
+      gap: 16,
+      marginBottom: 10,
+    },
+    itemSpacer: {
+      height: 10,
+    },
+    headerBlock: {
+      gap: 2,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: COLORS.ink,
+      letterSpacing: -0.3,
+    },
+    subtitle: {
+      fontSize: 13,
+      color: COLORS.muted,
+      lineHeight: 18,
+    },
+    fiveCard: {
+      paddingVertical: 12,
+    },
+    fiveTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    flexShrink: {
+      flex: 1,
+    },
+    sectionBlock: {
+      gap: 10,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    subLabel: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: COLORS.muted,
+      paddingTop: 4,
+      paddingBottom: 4,
+    },
+    divideList: {
+      paddingVertical: 6,
+    },
+    rowDivider: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+    },
+    ruleRow: {
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    cardIdentity: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      flex: 1,
+    },
+    shareableRow: {
+      flexDirection: "row",
+      gap: 8,
+      paddingVertical: 2,
+    },
+    shareableChip: {
+      minHeight: 38,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      backgroundColor: COLORS.card,
+    },
+    shareableName: {
+      fontSize: 13,
+      fontWeight: "500",
+      color: COLORS.ink,
+    },
+    shareableAction: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: COLORS.greenInk,
+    },
+    shareForm: {
+      gap: 12,
+    },
+    modeRow: {
+      flexDirection: "row",
+      backgroundColor: COLORS.subtle,
+      borderRadius: 10,
+      padding: 3,
+    },
+    modeBtn: {
+      flex: 1,
+      minHeight: 34,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 8,
+    },
+    modeBtnActive: {
+      backgroundColor: COLORS.card,
+    },
+    modeText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.muted,
+    },
+    modeTextActive: {
+      color: COLORS.ink,
+    },
+    urlRow: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: 8,
+    },
+    pasteBtn: {
+      marginBottom: 2,
+    },
+    itemTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    metaLine: {
+      fontSize: 12,
+      color: COLORS.muted,
+      marginTop: 1,
+    },
+    noteText: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: COLORS.muted,
+    },
+    filterHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    filterPills: {
+      flexDirection: "row",
+      gap: 6,
+    },
+    pill: {
+      minHeight: 34,
+      paddingHorizontal: 11,
+      paddingVertical: 5,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      backgroundColor: COLORS.card,
+      justifyContent: "center",
+    },
+    pillActive: {
+      backgroundColor: COLORS.primary,
+      borderColor: COLORS.primary,
+    },
+    pillText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    pillTextActive: {
+      color: COLORS.primaryInk,
+    },
+    offerCard: {
+      gap: 8,
+    },
+    offerTop: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    headlineRow: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    bonusHeadline: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.ink,
+      flex: 1,
+    },
+    estValue: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: COLORS.greenInk,
+    },
+    badgeWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    reasonText: {
+      fontSize: 12,
+      color: COLORS.muted,
+      lineHeight: 17,
+    },
+    friendLinksWrap: {
+      gap: 6,
+      marginTop: 2,
+    },
+    friendLinkBanner: {
+      backgroundColor: COLORS.greenBg,
+      borderWidth: 1,
+      borderColor: COLORS.greenBorder,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    friendLinkText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.greenInk,
+    },
+    linkText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.ink,
+      marginTop: 2,
+    },
+    howStack: {
+      gap: 6,
+    },
+  });

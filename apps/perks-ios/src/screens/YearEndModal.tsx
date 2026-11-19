@@ -15,9 +15,10 @@ import {
   Button,
   CardSwatch,
   CollapsibleSection,
-  COLORS,
   NUM_STYLE,
   SectionCard,
+  useThemedStyles,
+  type ThemeColors,
 } from "../components/ui";
 import { dueLabel, formatCents } from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
@@ -49,6 +50,7 @@ function ChecklistCreditRow({
   onAction: (payload: MobileActionPayload, key: string) => Promise<void>;
   onOpenCard: (cardId: string) => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const periodKey = item.period?.key ?? "";
   const actionKey = `ye:${item.benefit.id}:${periodKey}`;
   const due = dueLabel(item.daysLeft);
@@ -121,6 +123,7 @@ export function YearEndModal({
   onOpenReferrals: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const styles = useThemedStyles(makeStyles);
   const { yearEnd } = data;
   const year = data.today.slice(0, 4);
 
@@ -379,161 +382,162 @@ export function YearEndModal({
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.card,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginTop: 1,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    gap: 18,
-  },
-  highlightCard: {
-    gap: 10,
-    borderColor: COLORS.borderStrong,
-  },
-  sectionBlock: {
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  divideCard: {
-    paddingVertical: 4,
-  },
-  rowDivider: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  creditRow: {
-    paddingVertical: 10,
-    gap: 8,
-  },
-  creditTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  cardIdentity: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flex: 1,
-  },
-  flexShrink: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  metaText: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginTop: 1,
-  },
-  metaStrong: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  amountText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  rowActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  badgeWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    flex: 1,
-  },
-  goneText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.redInk,
-  },
-  renewStack: {
-    gap: 8,
-  },
-  updateItem: {
-    paddingTop: 8,
-    gap: 6,
-  },
-  goalRow: {
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  cardNoteItem: {
-    paddingVertical: 10,
-    gap: 8,
-  },
-  noteLine: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-  },
-  noteText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.muted,
-  },
-  boldInk: {
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  refCard: {
-    gap: 8,
-  },
-  tipItem: {
-    paddingVertical: 10,
-    gap: 4,
-  },
-  tipHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  sourceText: {
-    fontSize: 12,
-    color: COLORS.faint,
-    textDecorationLine: "underline",
-    lineHeight: 17,
-  },
-});
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: COLORS.bg,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+      backgroundColor: COLORS.card,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    subtitle: {
+      fontSize: 12,
+      color: COLORS.muted,
+      marginTop: 1,
+    },
+    content: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      gap: 18,
+    },
+    highlightCard: {
+      gap: 10,
+      borderColor: COLORS.borderStrong,
+    },
+    sectionBlock: {
+      gap: 8,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    divideCard: {
+      paddingVertical: 4,
+    },
+    rowDivider: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+    },
+    creditRow: {
+      paddingVertical: 10,
+      gap: 8,
+    },
+    creditTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    cardIdentity: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      flex: 1,
+    },
+    flexShrink: {
+      flex: 1,
+    },
+    itemTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    metaText: {
+      fontSize: 12,
+      color: COLORS.muted,
+      marginTop: 1,
+    },
+    metaStrong: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    amountText: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    rowActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    badgeWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+      flex: 1,
+    },
+    goneText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.redInk,
+    },
+    renewStack: {
+      gap: 8,
+    },
+    updateItem: {
+      paddingTop: 8,
+      gap: 6,
+    },
+    goalRow: {
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    cardNoteItem: {
+      paddingVertical: 10,
+      gap: 8,
+    },
+    noteLine: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+    },
+    noteText: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: COLORS.muted,
+    },
+    boldInk: {
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    refCard: {
+      gap: 8,
+    },
+    tipItem: {
+      paddingVertical: 10,
+      gap: 4,
+    },
+    tipHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    sourceText: {
+      fontSize: 12,
+      color: COLORS.faint,
+      textDecorationLine: "underline",
+      lineHeight: 17,
+    },
+  });

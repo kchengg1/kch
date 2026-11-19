@@ -18,11 +18,13 @@ import {
   Button,
   CardSwatch,
   CollapsibleSection,
-  COLORS,
   FieldInput,
   Meter,
   NUM_STYLE,
   SectionCard,
+  useTheme,
+  useThemedStyles,
+  type ThemeColors,
 } from "../components/ui";
 import {
   CADENCE_OPTIONS,
@@ -64,6 +66,7 @@ function BenefitEditorForm({
   onCancel?: () => void;
   onDelete?: () => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const [name, setName] = useState(initial?.name ?? "");
   const [cadence, setCadence] = useState<Cadence>(initial?.cadence ?? "monthly");
   const [amount, setAmount] = useState(
@@ -169,6 +172,8 @@ function BenefitCardBlock({
   busyKey: string | null;
   onAction: (payload: MobileActionPayload, key: string) => Promise<void>;
 }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [editing, setEditing] = useState(false);
   const [partialChipKey, setPartialChipKey] = useState<string | null>(null);
   const [partialAmount, setPartialAmount] = useState("");
@@ -317,7 +322,7 @@ function BenefitCardBlock({
                 value={partialAmount}
                 onChangeText={setPartialAmount}
                 placeholder="Used amount ($)"
-                placeholderTextColor={COLORS.faint}
+                placeholderTextColor={colors.faint}
                 keyboardType="decimal-pad"
                 style={styles.inlineInput}
               />
@@ -397,6 +402,8 @@ export function CardDetailModal({
   onOpenReferrals: (templateKey?: string) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
 
   const [worthDrafts, setWorthDrafts] = useState<Record<string, string>>({});
   const [bonusText, setBonusText] = useState("");
@@ -498,7 +505,7 @@ export function CardDetailModal({
                 style={[
                   styles.summaryNumber,
                   NUM_STYLE,
-                  { color: card.worth.netCents >= 0 ? COLORS.greenInk : COLORS.redInk },
+                  { color: card.worth.netCents >= 0 ? colors.greenInk : colors.redInk },
                 ]}
               >
                 {formatSignedCents(card.worth.netCents)}
@@ -664,7 +671,7 @@ export function CardDetailModal({
                     value={worthDrafts[b.id] ?? ""}
                     onChangeText={(val) => setWorthDrafts((prev) => ({ ...prev, [b.id]: val }))}
                     placeholder={centsToInputDollars(b.faceYearlyCents)}
-                    placeholderTextColor={COLORS.faint}
+                    placeholderTextColor={colors.faint}
                     keyboardType="decimal-pad"
                     style={styles.worthInput}
                   />
@@ -871,306 +878,307 @@ export function CardDetailModal({
   );
 }
 
-const styles = StyleSheet.create({
-  modalRoot: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.card,
-  },
-  topIdentity: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  flexShrink: {
-    flex: 1,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  modalSub: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginTop: 1,
-  },
-  scrollBody: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    gap: 14,
-  },
-  summaryStrip: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  summaryItem: {
-    flex: 1,
-    gap: 2,
-  },
-  summaryLabel: {
-    fontSize: 11,
-    color: COLORS.muted,
-    fontWeight: "500",
-  },
-  summaryNumber: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  sectionBlock: {
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  divideList: {
-    paddingVertical: 6,
-  },
-  rowDivider: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  benefitBlock: {
-    paddingVertical: 10,
-    gap: 8,
-  },
-  untrackedOpacity: {
-    opacity: 0.65,
-  },
-  benefitTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  benefitName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  benefitMeta: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginTop: 1,
-  },
-  noteText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.muted,
-  },
-  badgeWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  chipsSection: {
-    gap: 8,
-  },
-  chipGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  periodChip: {
-    minHeight: 36,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.card,
-    justifyContent: "center",
-  },
-  periodChipCurrent: {
-    borderColor: COLORS.ink,
-    borderWidth: 1.5,
-  },
-  periodChipFull: {
-    backgroundColor: COLORS.greenBg,
-    borderColor: COLORS.greenBorder,
-  },
-  periodChipPartial: {
-    backgroundColor: COLORS.amberBg,
-    borderColor: COLORS.amberBorder,
-  },
-  periodChipFuture: {
-    opacity: 0.45,
-  },
-  periodChipText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.ink,
-    fontVariant: ["tabular-nums"],
-  },
-  periodChipTextFull: {
-    color: COLORS.greenInk,
-  },
-  periodChipTextPartial: {
-    color: COLORS.amberInk,
-  },
-  chipFootActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  inlineRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  inlineInput: {
-    flex: 1,
-    minHeight: 40,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    borderRadius: 9,
-    paddingHorizontal: 10,
-    fontSize: 14,
-    color: COLORS.ink,
-    backgroundColor: COLORS.bg,
-  },
-  editDrawer: {
-    marginTop: 4,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  formStack: {
-    gap: 10,
-  },
-  fieldGap: {
-    gap: 6,
-  },
-  smallLabel: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: COLORS.muted,
-  },
-  pillWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  cadencePill: {
-    minHeight: 34,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.card,
-    justifyContent: "center",
-  },
-  cadencePillActive: {
-    backgroundColor: COLORS.ink,
-    borderColor: COLORS.ink,
-  },
-  cadenceText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  cadenceTextActive: {
-    color: "#ffffff",
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    minHeight: 40,
-  },
-  switchLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.ink,
-  },
-  actionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  worthRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  worthName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  worthInput: {
-    width: 92,
-    minHeight: 40,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    fontSize: 14,
-    textAlign: "right",
-    color: COLORS.ink,
-    backgroundColor: COLORS.bg,
-    fontVariant: ["tabular-nums"],
-  },
-  twoCol: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  catalogUpdateBanner: {
-    backgroundColor: COLORS.amberBg,
-    borderColor: COLORS.amberBorder,
-    gap: 8,
-  },
-  catalogUpdateTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.amberInk,
-  },
-  catalogUpdateBody: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.amberInk,
-  },
-  catalogDiffLine: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.amberInk,
-  },
-  standingsCard: {
-    gap: 10,
-  },
-  standingRow: {
-    gap: 5,
-  },
-  standingTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  standingName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  standingRank: {
-    color: COLORS.muted,
-    fontWeight: "700",
-  },
-});
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    modalRoot: {
+      flex: 1,
+      backgroundColor: COLORS.bg,
+    },
+    topBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+      backgroundColor: COLORS.card,
+    },
+    topIdentity: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      flex: 1,
+    },
+    flexShrink: {
+      flex: 1,
+    },
+    modalTitle: {
+      fontSize: 17,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    modalSub: {
+      fontSize: 12,
+      color: COLORS.muted,
+      marginTop: 1,
+    },
+    scrollBody: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      gap: 14,
+    },
+    summaryStrip: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    summaryItem: {
+      flex: 1,
+      gap: 2,
+    },
+    summaryLabel: {
+      fontSize: 11,
+      color: COLORS.muted,
+      fontWeight: "500",
+    },
+    summaryNumber: {
+      fontSize: 17,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    sectionBlock: {
+      gap: 8,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    divideList: {
+      paddingVertical: 6,
+    },
+    rowDivider: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+    },
+    benefitBlock: {
+      paddingVertical: 10,
+      gap: 8,
+    },
+    untrackedOpacity: {
+      opacity: 0.65,
+    },
+    benefitTopRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    benefitName: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    benefitMeta: {
+      fontSize: 12,
+      color: COLORS.muted,
+      marginTop: 1,
+    },
+    noteText: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: COLORS.muted,
+    },
+    badgeWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    chipsSection: {
+      gap: 8,
+    },
+    chipGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    periodChip: {
+      minHeight: 36,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      backgroundColor: COLORS.card,
+      justifyContent: "center",
+    },
+    periodChipCurrent: {
+      borderColor: COLORS.ink,
+      borderWidth: 1.5,
+    },
+    periodChipFull: {
+      backgroundColor: COLORS.greenBg,
+      borderColor: COLORS.greenBorder,
+    },
+    periodChipPartial: {
+      backgroundColor: COLORS.amberBg,
+      borderColor: COLORS.amberBorder,
+    },
+    periodChipFuture: {
+      opacity: 0.45,
+    },
+    periodChipText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.ink,
+      fontVariant: ["tabular-nums"],
+    },
+    periodChipTextFull: {
+      color: COLORS.greenInk,
+    },
+    periodChipTextPartial: {
+      color: COLORS.amberInk,
+    },
+    chipFootActions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    inlineRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    inlineInput: {
+      flex: 1,
+      minHeight: 40,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      borderRadius: 9,
+      paddingHorizontal: 10,
+      fontSize: 14,
+      color: COLORS.ink,
+      backgroundColor: COLORS.bg,
+    },
+    editDrawer: {
+      marginTop: 4,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+    },
+    formStack: {
+      gap: 10,
+    },
+    fieldGap: {
+      gap: 6,
+    },
+    smallLabel: {
+      fontSize: 13,
+      fontWeight: "500",
+      color: COLORS.muted,
+    },
+    pillWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    cadencePill: {
+      minHeight: 34,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      backgroundColor: COLORS.card,
+      justifyContent: "center",
+    },
+    cadencePillActive: {
+      backgroundColor: COLORS.primary,
+      borderColor: COLORS.primary,
+    },
+    cadenceText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    cadenceTextActive: {
+      color: COLORS.primaryInk,
+    },
+    switchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      minHeight: 40,
+    },
+    switchLabel: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: COLORS.ink,
+    },
+    actionRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    worthRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    worthName: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    worthInput: {
+      width: 92,
+      minHeight: 40,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      fontSize: 14,
+      textAlign: "right",
+      color: COLORS.ink,
+      backgroundColor: COLORS.bg,
+      fontVariant: ["tabular-nums"],
+    },
+    twoCol: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    catalogUpdateBanner: {
+      backgroundColor: COLORS.amberBg,
+      borderColor: COLORS.amberBorder,
+      gap: 8,
+    },
+    catalogUpdateTitle: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: COLORS.amberInk,
+    },
+    catalogUpdateBody: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: COLORS.amberInk,
+    },
+    catalogDiffLine: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.amberInk,
+    },
+    standingsCard: {
+      gap: 10,
+    },
+    standingRow: {
+      gap: 5,
+    },
+    standingTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    standingName: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    standingRank: {
+      color: COLORS.muted,
+      fontWeight: "700",
+    },
+  });

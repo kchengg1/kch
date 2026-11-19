@@ -9,11 +9,18 @@ export default async function HomePage() {
   if (await getSession()) redirect("/dashboard");
   return (
     <>
-      <section className="py-24 sm:py-32">
+      <section className="relative overflow-hidden py-20 sm:py-28">
         <Container className="max-w-3xl text-center">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">{appConfig.tagline}</h1>
-          <p className="mt-6 text-lg text-muted-foreground">{appConfig.description}</p>
-          <div className="mt-10 flex items-center justify-center gap-3">
+          <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3.5 py-1 text-xs font-semibold text-primary">
+            Credit card benefits, offers &amp; points
+          </span>
+          <h1 className="mt-5 text-4xl font-bold tracking-tight sm:text-6xl">
+            {appConfig.tagline}
+          </h1>
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
+            {appConfig.description}
+          </p>
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Link href="/signup">
               <Button size="lg">Create your account</Button>
             </Link>
@@ -28,10 +35,10 @@ export default async function HomePage() {
 
       <section className="pb-24">
         <Container>
-          <div className="grid gap-6 sm:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-3">
             {appConfig.features.map((f) => (
-              <Card key={f.title}>
-                <CardTitle>{f.title}</CardTitle>
+              <Card key={f.title} className="transition-colors hover:border-primary/30">
+                <CardTitle className="text-base">{f.title}</CardTitle>
                 <CardDescription className="mt-2">{f.description}</CardDescription>
               </Card>
             ))}

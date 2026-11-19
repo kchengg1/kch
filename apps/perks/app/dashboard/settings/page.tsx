@@ -3,6 +3,7 @@ import { Badge, Button, Card, CardDescription, CardTitle } from "@kch/ui";
 import { ActionForm } from "@/components/action-form";
 import { PushToggle } from "@/components/push-toggle";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ThemeModeSelector } from "@/components/theme-toggle";
 import { getLastActiveAt } from "@kch/auth/server";
 import { formatLastActive } from "@/lib/last-active";
 import { vapidPublicKey } from "@/lib/push";
@@ -21,7 +22,17 @@ export default async function SettingsPage() {
   ]);
   return (
     <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold">Settings</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+
+      <Card>
+        <CardTitle>Appearance</CardTitle>
+        <CardDescription className="mt-1">
+          Choose Light, Dark, or match your device&rsquo;s appearance automatically.
+        </CardDescription>
+        <div className="mt-4">
+          <ThemeModeSelector />
+        </div>
+      </Card>
 
       <Card>
         <CardTitle>Phone notifications</CardTitle>

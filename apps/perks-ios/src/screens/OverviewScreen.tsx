@@ -13,10 +13,12 @@ import {
   Button,
   CardSwatch,
   CollapsibleSection,
-  COLORS,
   Meter,
   NUM_STYLE,
   SectionCard,
+  useTheme,
+  useThemedStyles,
+  type ThemeColors,
 } from "../components/ui";
 import { CATEGORIES, classify, rankCards } from "../lib/earn";
 import {
@@ -41,6 +43,8 @@ const CreditActionRow = React.memo(function CreditActionRow({
   onAction: (payload: MobileActionPayload, key: string) => Promise<void>;
   onOpenCard: (cardId: string) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [showPartial, setShowPartial] = useState(false);
   const [partialText, setPartialText] = useState(
     item.usedCents > 0 ? centsToInputDollars(item.usedCents) : "",
@@ -48,10 +52,16 @@ const CreditActionRow = React.memo(function CreditActionRow({
   const periodKey = item.period?.key ?? "";
   const actionKey = `${item.benefit.id}:${periodKey}`;
   const isUrgent = item.daysLeft !== null && item.daysLeft <= 7;
+  const isSoon = !isUrgent && item.daysLeft !== null && item.daysLeft <= 31;
   const due = dueLabel(item.daysLeft);
 
   return (
-    <View style={styles.creditRow}>
+    <View
+      style={[
+        styles.creditRow,
+        isUrgent ? styles.creditRowUrgent : isSoon ? styles.creditRowSoon : styles.creditRowNormal,
+      ]}
+    >
       <View style={styles.creditMain}>
         <Pressable
           accessibilityRole="button"
@@ -71,7 +81,11 @@ const CreditActionRow = React.memo(function CreditActionRow({
           </View>
         </Pressable>
         {item.benefit.amountCents > 0 ? (
-          <Text style={[styles.creditAmount, NUM_STYLE]}>{formatCents(item.remainingCents)}</Text>
+          <View style={[styles.amountPill, isUrgent && styles.amountPillUrgent]}>
+            <Text style={[styles.creditAmount, isUrgent && styles.creditAmountUrgent, NUM_STYLE]}>
+              {formatCents(item.remainingCents)}
+            </Text>
+          </View>
         ) : null}
       </View>
 
@@ -117,7 +131,7 @@ const CreditActionRow = React.memo(function CreditActionRow({
             value={partialText}
             onChangeText={setPartialText}
             placeholder="Used so far ($)"
-            placeholderTextColor={COLORS.faint}
+            placeholderTextColor={colors.faint}
             keyboardType="decimal-pad"
             style={styles.inlineInput}
           />
@@ -168,6 +182,8 @@ export const OverviewScreen = React.memo(function OverviewScreen({
   onOpenReferrals: (templateKey?: string) => void;
   onNavigateTab: (tab: TabKey) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [spentDrafts, setSpentDrafts] = useState<Record<string, string>>({});
   const [editingBonusCardId, setEditingBonusCardId] = useState<string | null>(null);
   const [targetDrafts, setTargetDrafts] = useState<Record<string, string>>({});
@@ -177,6 +193,15 @@ export const OverviewScreen = React.memo(function OverviewScreen({
   const year = data.today.slice(0, 4);
   const openCards = data.cards.filter((c) => !c.closed);
   const firstName = data.user.name.trim().split(/\s+/)[0] || "there";
+  const capturePct =
+    data.overview.availableCents > 0
+      ? Math.min(
+          100,
+          Math.round((data.overview.capturedCents / data.overview.availableCents) * 100),
+        )
+      : 0;
+  const fees = data.overview.annualFeesCents;
+  const captured = data.overview.capturedCents;
 
   const trimmedPick = pickQuery.trim();
   const valueByProgram = new Map(data.points.programs.map((p) => [p.program, p.centsPerPoint]));
@@ -200,13 +225,20 @@ export const OverviewScreen = React.memo(function OverviewScreen({
   return (
     <ScrollView
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+      }
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.topHeader}>
-        <View style={styles.flexShrink}>
-          <Text style={styles.screenTitle}>Hi, {firstName}</Text>
-          <Text style={styles.screenSub}>{formatDate(data.today)}</Text>
+        <View style={styles.brandRow}>
+          <View style={styles.brandBadge}>
+            <Text style={styles.brandBadgeText}>P</Text>
+          </View>
+          <View style={styles.flexShrink}>
+            <Text style={styles.screenTitle}>Hi, {firstName}</Text>
+            <Text style={styles.screenSub}>{formatDate(data.today)}</Text>
+          </View>
         </View>
         <View style={styles.headerButtons}>
           <Button label="Catch up" size="sm" variant="secondary" onPress={onOpenCatchUp} />
@@ -214,36 +246,67 @@ export const OverviewScreen = React.memo(function OverviewScreen({
         </View>
       </View>
 
-      <View style={styles.statGrid}>
-        <SectionCard style={styles.statTile}>
-          <Text style={styles.statLabel}>Expiring this month</Text>
-          <Text style={[styles.statValue, NUM_STYLE]}>
-            {formatCents(data.overview.expiringThisMonthCents)}
-          </Text>
-          <Text style={styles.statFoot}>
-            {data.overview.expiringThisMonthCount === 0
-              ? "All clear"
-              : `${data.overview.expiringThisMonthCount} left`}
-          </Text>
-        </SectionCard>
+      {/* Sapphire Concierge Portfolio Hero */}
+      <View style={styles.heroCard}>
+        <View style={styles.heroTopRow}>
+          <View style={styles.flexShrink}>
+            <Text style={styles.heroEyebrow}>{year} CAPTURED</Text>
+            <View style={styles.heroValueRow}>
+              <Text style={[styles.heroValue, NUM_STYLE]}>{formatCents(captured)}</Text>
+              {data.overview.availableCents > 0 ? (
+                <View style={styles.heroPctPill}>
+                  <Text style={[styles.heroPctText, NUM_STYLE]}>{capturePct}%</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+          <View style={styles.heroStatPill}>
+            <Text style={styles.heroPillLabel}>Expiring soon</Text>
+            <Text style={[styles.heroPillGold, NUM_STYLE]}>
+              {formatCents(data.overview.expiringThisMonthCents)}
+            </Text>
+            <Text style={styles.heroPillSub}>
+              {data.overview.expiringThisMonthCount === 0
+                ? "All clear"
+                : `${data.overview.expiringThisMonthCount} left`}
+            </Text>
+          </View>
+        </View>
 
-        <SectionCard style={styles.statTile}>
-          <Text style={styles.statLabel}>Used in {year}</Text>
-          <Text style={[styles.statValue, NUM_STYLE]}>
-            {formatCents(data.overview.capturedCents)}
-          </Text>
-          <Text style={[styles.statFoot, NUM_STYLE]}>
-            of {formatCents(data.overview.availableCents)}
-          </Text>
-        </SectionCard>
+        {data.overview.availableCents > 0 ? (
+          <View style={styles.heroTrack}>
+            <View style={[styles.heroFill, { width: `${capturePct}%` }]} />
+          </View>
+        ) : null}
 
-        <SectionCard style={styles.statTile}>
-          <Text style={styles.statLabel}>Annual fees</Text>
-          <Text style={[styles.statValue, NUM_STYLE]}>
-            {formatCents(data.overview.annualFeesCents)}
+        <View style={styles.heroFootRow}>
+          <Text style={[styles.heroFootText, NUM_STYLE]} numberOfLines={1}>
+            of {formatCents(data.overview.availableCents)} tracked
           </Text>
-          <Text style={styles.statFoot}>{openCards.length} open cards</Text>
-        </SectionCard>
+          <Text style={[styles.heroFootText, NUM_STYLE]} numberOfLines={1}>
+            {fees > 0
+              ? captured >= fees
+                ? `+${formatCents(captured - fees)} vs ${formatCents(fees)} fees`
+                : `${formatCents(fees - captured)} to cover ${formatCents(fees)} fees`
+              : `${openCards.length} open cards`}
+          </Text>
+        </View>
+
+        {data.points.totalValueCents > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              tapHaptic();
+              onNavigateTab("points");
+            }}
+            style={styles.heroPointsRow}
+          >
+            <Text style={styles.heroPointsLabel}>Points stash</Text>
+            <Text style={[styles.heroPointsValue, NUM_STYLE]}>
+              {formatCents(data.points.totalValueCents)} →
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {data.yearEnd.inWindow ? (
@@ -345,7 +408,7 @@ export const OverviewScreen = React.memo(function OverviewScreen({
             value={pickQuery}
             onChangeText={setPickQuery}
             placeholder="Whole Foods, Hyatt, dining, gas..."
-            placeholderTextColor={COLORS.faint}
+            placeholderTextColor={colors.faint}
             style={styles.inlineInput}
           />
           <View style={styles.quickCats}>
@@ -538,7 +601,7 @@ export const OverviewScreen = React.memo(function OverviewScreen({
                       value={draft}
                       onChangeText={(v) => setSpentDrafts((prev) => ({ ...prev, [b.cardId]: v }))}
                       placeholder="Spent so far ($)"
-                      placeholderTextColor={COLORS.faint}
+                      placeholderTextColor={colors.faint}
                       keyboardType="decimal-pad"
                       style={styles.inlineInput}
                     />
@@ -627,7 +690,7 @@ export const OverviewScreen = React.memo(function OverviewScreen({
                       value={draft}
                       onChangeText={(v) => setTargetDrafts((prev) => ({ ...prev, [t.id]: v }))}
                       placeholder="Spent in calendar year ($)"
-                      placeholderTextColor={COLORS.faint}
+                      placeholderTextColor={colors.faint}
                       keyboardType="decimal-pad"
                       style={styles.inlineInput}
                     />
@@ -802,254 +865,384 @@ export const OverviewScreen = React.memo(function OverviewScreen({
   );
 });
 
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 28,
-    gap: 18,
-  },
-  topHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  screenTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: COLORS.ink,
-    letterSpacing: -0.3,
-  },
-  screenSub: {
-    fontSize: 13,
-    color: COLORS.muted,
-    marginTop: 2,
-  },
-  headerButtons: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  statGrid: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  statTile: {
-    flex: 1,
-    padding: 11,
-    gap: 3,
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: COLORS.muted,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  statFoot: {
-    fontSize: 11,
-    color: COLORS.muted,
-  },
-  calloutAmber: {
-    backgroundColor: COLORS.amberBg,
-    borderColor: COLORS.amberBorder,
-    gap: 10,
-  },
-  calloutAmberTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.amberInk,
-  },
-  calloutAmberBody: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.amberInk,
-  },
-  calloutDivider: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.amberBorder,
-    paddingTop: 10,
-  },
-  catalogUpdateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  referralCallout: {
-    gap: 8,
-  },
-  emptyCard: {
-    gap: 10,
-  },
-  sectionBlock: {
-    gap: 8,
-  },
-  sectionTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  sectionHeading: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  linkText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.muted,
-  },
-  divideList: {
-    paddingVertical: 6,
-  },
-  laterStack: {
-    gap: 4,
-  },
-  rowDivider: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  creditRow: {
-    paddingVertical: 10,
-    gap: 8,
-  },
-  creditMain: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  creditTitleBlock: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  flexShrink: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  itemMeta: {
-    fontSize: 13,
-    color: COLORS.muted,
-    marginTop: 1,
-  },
-  creditAmount: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  badgeRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  noteText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.muted,
-  },
-  actionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 8,
-  },
-  inlineEditor: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  inlineInput: {
-    flex: 1,
-    minHeight: 40,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    borderRadius: 9,
-    paddingHorizontal: 10,
-    fontSize: 14,
-    color: COLORS.ink,
-    backgroundColor: COLORS.bg,
-  },
-  bonusCard: {
-    gap: 10,
-  },
-  bonusMetaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  simpleRow: {
-    minHeight: 52,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  rightNumbers: {
-    alignItems: "flex-end",
-  },
-  pickerCard: {
-    gap: 8,
-  },
-  quickCats: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  catChip: {
-    minHeight: 32,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.card,
-    justifyContent: "center",
-  },
-  catChipActive: {
-    backgroundColor: COLORS.ink,
-    borderColor: COLORS.ink,
-  },
-  catChipText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  catChipTextActive: {
-    color: "#ffffff",
-  },
-  pickList: {
-    marginTop: 4,
-    gap: 4,
-  },
-  offerBanner: {
-    backgroundColor: COLORS.greenBg,
-    borderColor: COLORS.greenBorder,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  offerBannerText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.greenInk,
-  },
-  yearEndFooterLink: {
-    alignItems: "center",
-    paddingVertical: 4,
-  },
-});
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    content: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 28,
+      gap: 16,
+    },
+    topHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    brandRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      flex: 1,
+    },
+    brandBadge: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      backgroundColor: COLORS.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    },
+    brandBadgeText: {
+      color: COLORS.primaryInk,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+    screenTitle: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: COLORS.ink,
+      letterSpacing: -0.3,
+    },
+    screenSub: {
+      fontSize: 12,
+      color: COLORS.muted,
+      marginTop: 1,
+    },
+    headerButtons: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    heroCard: {
+      backgroundColor: COLORS.heroBg,
+      borderRadius: 18,
+      padding: 16,
+      gap: 12,
+      shadowColor: "#0f1f3d",
+      shadowOpacity: 0.16,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4,
+    },
+    heroTopRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    heroEyebrow: {
+      fontSize: 10.5,
+      fontWeight: "700",
+      letterSpacing: 0.9,
+      color: COLORS.heroMuted,
+    },
+    heroValueRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 2,
+    },
+    heroValue: {
+      fontSize: 30,
+      fontWeight: "800",
+      color: COLORS.heroInk,
+      letterSpacing: -0.6,
+    },
+    heroPctPill: {
+      backgroundColor: COLORS.heroSurface,
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    heroPctText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: COLORS.heroGold,
+    },
+    heroStatPill: {
+      backgroundColor: COLORS.heroSurface,
+      borderRadius: 12,
+      paddingHorizontal: 11,
+      paddingVertical: 8,
+      alignItems: "flex-end",
+      minWidth: 102,
+    },
+    heroPillLabel: {
+      fontSize: 10,
+      fontWeight: "600",
+      color: COLORS.heroMuted,
+    },
+    heroPillGold: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: COLORS.heroGold,
+      marginTop: 1,
+    },
+    heroPillSub: {
+      fontSize: 10,
+      color: COLORS.heroMuted,
+    },
+    heroTrack: {
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: "rgba(255,255,255,0.18)",
+      overflow: "hidden",
+    },
+    heroFill: {
+      height: "100%",
+      borderRadius: 999,
+      backgroundColor: COLORS.heroGold,
+    },
+    heroFootRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    heroFootText: {
+      fontSize: 11.5,
+      color: COLORS.heroMuted,
+      flexShrink: 1,
+    },
+    heroPointsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderTopWidth: 1,
+      borderTopColor: "rgba(255,255,255,0.14)",
+      paddingTop: 10,
+    },
+    heroPointsLabel: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.heroMuted,
+    },
+    heroPointsValue: {
+      fontSize: 13.5,
+      fontWeight: "700",
+      color: COLORS.heroInk,
+    },
+    calloutAmber: {
+      backgroundColor: COLORS.amberBg,
+      borderColor: COLORS.amberBorder,
+      gap: 10,
+    },
+    calloutAmberTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.amberInk,
+    },
+    calloutAmberBody: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: COLORS.amberInk,
+    },
+    calloutDivider: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.amberBorder,
+      paddingTop: 10,
+    },
+    catalogUpdateRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    referralCallout: {
+      gap: 8,
+    },
+    emptyCard: {
+      gap: 10,
+    },
+    sectionBlock: {
+      gap: 8,
+    },
+    sectionTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    sectionHeading: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    linkText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.primary,
+    },
+    divideList: {
+      paddingVertical: 6,
+    },
+    laterStack: {
+      gap: 4,
+    },
+    rowDivider: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+    },
+    creditRow: {
+      paddingVertical: 11,
+      paddingLeft: 10,
+      borderLeftWidth: 3.5,
+      borderLeftColor: "transparent",
+      gap: 8,
+    },
+    creditRowUrgent: {
+      borderLeftColor: COLORS.redFill,
+    },
+    creditRowSoon: {
+      borderLeftColor: COLORS.amberFill,
+    },
+    creditRowNormal: {
+      borderLeftColor: COLORS.border,
+    },
+    creditMain: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    creditTitleBlock: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      flex: 1,
+    },
+    flexShrink: {
+      flex: 1,
+    },
+    itemTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    itemMeta: {
+      fontSize: 13,
+      color: COLORS.muted,
+      marginTop: 1,
+    },
+    amountPill: {
+      backgroundColor: COLORS.primarySoft,
+      borderRadius: 9,
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+    },
+    amountPillUrgent: {
+      backgroundColor: COLORS.redBg,
+    },
+    creditAmount: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: COLORS.primary,
+    },
+    creditAmountUrgent: {
+      color: COLORS.redInk,
+    },
+    badgeRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    noteText: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: COLORS.muted,
+    },
+    actionRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 8,
+    },
+    inlineEditor: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    inlineInput: {
+      flex: 1,
+      minHeight: 40,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      fontSize: 14,
+      color: COLORS.ink,
+      backgroundColor: COLORS.bg,
+    },
+    bonusCard: {
+      gap: 10,
+    },
+    bonusMetaRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    simpleRow: {
+      minHeight: 52,
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    rightNumbers: {
+      alignItems: "flex-end",
+    },
+    pickerCard: {
+      gap: 8,
+    },
+    quickCats: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    catChip: {
+      minHeight: 32,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      backgroundColor: COLORS.card,
+      justifyContent: "center",
+    },
+    catChipActive: {
+      backgroundColor: COLORS.primary,
+      borderColor: COLORS.primary,
+    },
+    catChipText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    catChipTextActive: {
+      color: COLORS.primaryInk,
+    },
+    pickList: {
+      marginTop: 4,
+      gap: 4,
+    },
+    offerBanner: {
+      backgroundColor: COLORS.greenBg,
+      borderColor: COLORS.greenBorder,
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    offerBannerText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.greenInk,
+    },
+    yearEndFooterLink: {
+      alignItems: "center",
+      paddingVertical: 4,
+    },
+  });
