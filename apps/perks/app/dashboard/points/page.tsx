@@ -23,6 +23,17 @@ import {
 
 export const metadata: Metadata = { title: "Points" };
 
+const PROGRAM_COLORS = [
+  "#1e3a8a",
+  "#0d9488",
+  "#d97706",
+  "#2563eb",
+  "#7c3aed",
+  "#db2777",
+  "#059669",
+  "#64748b",
+] as const;
+
 export default async function PointsPage() {
   const { user } = await requireSession();
   const [points, redemptions] = await Promise.all([listPoints(user.id), listRedemptions(user.id)]);
@@ -45,10 +56,10 @@ export default async function PointsPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       <div>
-        <h1 className="text-2xl font-bold">Points</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-bold tracking-tight">Points</h1>
+        <p className="text-sm text-muted-foreground">
           {rows.length === 0
             ? "Add your points and miles to see what they are worth at your own values."
             : `${totalPoints.toLocaleString("en-US")} points and miles across ${rows.length} program${rows.length === 1 ? "" : "s"}, worth about ${formatCents(total)}.`}
@@ -56,12 +67,50 @@ export default async function PointsPage() {
       </div>
 
       {rows.length > 0 && (
-        <Card className="py-2">
-          <ul className="divide-y">
-            {rows.map((r) => (
-              <li key={r.id} className="py-3">
+        <Card className="space-y-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Estimated portfolio value
+              </p>
+              <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums">
+                {formatCents(total)}
+              </p>
+            </div>
+            <p className="text-sm font-medium tabular-nums text-muted-foreground">
+              {totalPoints.toLocaleString("en-US")} total pts
+            </p>
+          </div>
+          {total > 0 && (
+            <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted gap-0.5">
+              {rows.map((r, idx) => {
+                const pct = (r.valueCents / total) * 100;
+                if (pct <= 0) return null;
+                return (
+                  <div
+                    key={r.id}
+                    title={`${r.program}: ${formatCents(r.valueCents)} (${Math.round(pct)}%)`}
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: PROGRAM_COLORS[idx % PROGRAM_COLORS.length],
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
+          <ul className="divide-y pt-1">
+            {rows.map((r, idx) => (
+              <li key={r.id} className="py-3 first:pt-1 last:pb-0">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="min-w-0 truncate font-medium">{r.program}</p>
+                  <p className="flex min-w-0 items-center gap-2 font-medium">
+                    <span
+                      aria-hidden
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: PROGRAM_COLORS[idx % PROGRAM_COLORS.length] }}
+                    />
+                    <span className="truncate">{r.program}</span>
+                  </p>
                   <p className="shrink-0 font-semibold tabular-nums">{formatCents(r.valueCents)}</p>
                 </div>
                 <details className="group">

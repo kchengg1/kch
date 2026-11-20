@@ -7,12 +7,12 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "backgroundColor": "#fbfbfb",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#f2f5fa",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#fbfbfb"
+      "backgroundColor": "#f2f5fa"
     },
     "ios": {
       "bundleIdentifier": "com.kchengg1.perks",

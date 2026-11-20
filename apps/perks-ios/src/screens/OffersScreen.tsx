@@ -6,10 +6,11 @@ import {
   Button,
   CardSwatch,
   CollapsibleSection,
-  COLORS,
   FieldInput,
   NUM_STYLE,
   SectionCard,
+  useThemedStyles,
+  type ThemeColors,
 } from "../components/ui";
 import { dueLabel, formatCents, formatDate, sortOfferGroups } from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
@@ -32,6 +33,7 @@ const OfferGroupCard = React.memo(function OfferGroupCard({
   onAction: (payload: MobileActionPayload, key: string) => Promise<void>;
   onRecordUndo: (label: string, items: { id: string; status: OfferStatus }[]) => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const ids = group.items.map((i) => i.id);
   const due = dueLabel(group.daysLeft);
 
@@ -157,6 +159,7 @@ export const OffersScreen = React.memo(function OffersScreen({
   onRefresh: () => void;
   onAction: (payload: MobileActionPayload, key: string) => Promise<void>;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const openCards = useMemo(() => data.cards.filter((c) => !c.closed), [data.cards]);
   const [showPaste, setShowPaste] = useState(false);
   const [pasteCardId, setPasteCardId] = useState<string>(openCards[0]?.id ?? "");
@@ -485,209 +488,210 @@ export const OffersScreen = React.memo(function OffersScreen({
   );
 });
 
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 28,
-  },
-  sectionStack: {
-    gap: 14,
-  },
-  footerStack: {
-    marginTop: 14,
-    gap: 14,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  flexShrink: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: COLORS.ink,
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: COLORS.muted,
-    marginTop: 2,
-  },
-  undoBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    paddingVertical: 10,
-  },
-  undoText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.ink,
-    flex: 1,
-  },
-  rowGap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  pastePanel: {
-    gap: 10,
-  },
-  smallLabel: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: COLORS.muted,
-  },
-  sortRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  sortPill: {
-    minHeight: 36,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.card,
-    justifyContent: "center",
-  },
-  sortPillActive: {
-    backgroundColor: COLORS.ink,
-    borderColor: COLORS.ink,
-  },
-  sortPillText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  sortPillTextActive: {
-    color: "#ffffff",
-  },
-  offerListCell: {
-    backgroundColor: COLORS.card,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: 14,
-  },
-  offerListCellFirst: {
-    marginTop: 14,
-    borderTopWidth: 1,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    paddingTop: 6,
-  },
-  offerListCellLast: {
-    borderBottomWidth: 1,
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
-    paddingBottom: 6,
-  },
-  rowDivider: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  offerBlock: {
-    paddingVertical: 10,
-    gap: 8,
-  },
-  offerHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  merchantName: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  offerDetails: {
-    fontSize: 13,
-    color: COLORS.muted,
-    marginTop: 2,
-    lineHeight: 18,
-  },
-  offerValue: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  badgeWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  cardChipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  cardChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 36,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.card,
-  },
-  cardChipSelected: {
-    borderColor: COLORS.ink,
-    backgroundColor: COLORS.subtle,
-  },
-  cardChipAdded: {
-    backgroundColor: COLORS.greenBg,
-    borderColor: COLORS.greenBorder,
-  },
-  cardChipLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.ink,
-    maxWidth: 175,
-  },
-  cardChipLabelAdded: {
-    color: COLORS.greenInk,
-  },
-  actionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  noteText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.muted,
-  },
-  simpleRow: {
-    minHeight: 44,
-    paddingVertical: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  rowIdentity: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flex: 1,
-  },
-  simpleTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.ink,
-    flexShrink: 1,
-  },
-});
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    content: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 28,
+    },
+    sectionStack: {
+      gap: 14,
+    },
+    footerStack: {
+      marginTop: 14,
+      gap: 14,
+    },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    flexShrink: {
+      flex: 1,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: COLORS.ink,
+      letterSpacing: -0.3,
+    },
+    subtitle: {
+      fontSize: 13,
+      color: COLORS.muted,
+      marginTop: 2,
+    },
+    undoBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+      paddingVertical: 10,
+    },
+    undoText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.ink,
+      flex: 1,
+    },
+    rowGap: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    pastePanel: {
+      gap: 10,
+    },
+    smallLabel: {
+      fontSize: 13,
+      fontWeight: "500",
+      color: COLORS.muted,
+    },
+    sortRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    sortPill: {
+      minHeight: 36,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      backgroundColor: COLORS.card,
+      justifyContent: "center",
+    },
+    sortPillActive: {
+      backgroundColor: COLORS.primary,
+      borderColor: COLORS.primary,
+    },
+    sortPillText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    sortPillTextActive: {
+      color: COLORS.primaryInk,
+    },
+    offerListCell: {
+      backgroundColor: COLORS.card,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderColor: COLORS.border,
+      paddingHorizontal: 14,
+    },
+    offerListCellFirst: {
+      marginTop: 14,
+      borderTopWidth: 1,
+      borderTopLeftRadius: 14,
+      borderTopRightRadius: 14,
+      paddingTop: 6,
+    },
+    offerListCellLast: {
+      borderBottomWidth: 1,
+      borderBottomLeftRadius: 14,
+      borderBottomRightRadius: 14,
+      paddingBottom: 6,
+    },
+    rowDivider: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+    },
+    offerBlock: {
+      paddingVertical: 10,
+      gap: 8,
+    },
+    offerHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    merchantName: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    offerDetails: {
+      fontSize: 13,
+      color: COLORS.muted,
+      marginTop: 2,
+      lineHeight: 18,
+    },
+    offerValue: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    badgeWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    cardChipRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    cardChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      minHeight: 36,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 9,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      backgroundColor: COLORS.card,
+    },
+    cardChipSelected: {
+      borderColor: COLORS.ink,
+      backgroundColor: COLORS.subtle,
+    },
+    cardChipAdded: {
+      backgroundColor: COLORS.greenBg,
+      borderColor: COLORS.greenBorder,
+    },
+    cardChipLabel: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.ink,
+      maxWidth: 175,
+    },
+    cardChipLabelAdded: {
+      color: COLORS.greenInk,
+    },
+    actionRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    noteText: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: COLORS.muted,
+    },
+    simpleRow: {
+      minHeight: 44,
+      paddingVertical: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    rowIdentity: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      flex: 1,
+    },
+    simpleTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: COLORS.ink,
+      flexShrink: 1,
+    },
+  });

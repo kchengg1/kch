@@ -1,10 +1,24 @@
 import React, { useState } from "react";
 import { Modal, Platform, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, COLORS, SectionCard } from "../components/ui";
+import {
+  Button,
+  SectionCard,
+  SegmentedBar,
+  useTheme,
+  useThemedStyles,
+  type ThemeColors,
+  type ThemeMode,
+} from "../components/ui";
 import { formatDate } from "../lib/format";
 import { formatLastActive } from "../lib/last-active";
 import type { MobileActionPayload, MobileActionResponse, MobileBootstrap } from "../types";
+
+const APPEARANCE_OPTIONS: { key: ThemeMode; label: string }[] = [
+  { key: "system", label: "System" },
+  { key: "light", label: "Light" },
+  { key: "dark", label: "Dark" },
+];
 
 export function SettingsModal({
   visible,
@@ -24,6 +38,8 @@ export function SettingsModal({
   onSignOut: () => Promise<void>;
 }) {
   const insets = useSafeAreaInsets();
+  const { mode, setMode } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [digestFeedback, setDigestFeedback] = useState<string | null>(null);
 
   return (
@@ -45,6 +61,14 @@ export function SettingsModal({
             { paddingBottom: Math.max(insets.bottom + 24, 32) },
           ]}
         >
+          <SectionCard style={styles.cardGap}>
+            <Text style={styles.sectionTitle}>Appearance</Text>
+            <Text style={styles.noteText}>
+              Choose Light, Dark, or match your iPhone&rsquo;s system appearance automatically.
+            </Text>
+            <SegmentedBar options={APPEARANCE_OPTIONS} value={mode} onChange={setMode} />
+          </SectionCard>
+
           <SectionCard style={styles.cardGap}>
             <Text style={styles.sectionTitle}>Email digest</Text>
             <Text style={styles.noteText}>
@@ -147,78 +171,79 @@ export function SettingsModal({
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.card,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    gap: 14,
-  },
-  cardGap: {
-    gap: 10,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  noteText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.muted,
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    minHeight: 40,
-  },
-  switchLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.ink,
-  },
-  metaText: {
-    fontSize: 12,
-    color: COLORS.muted,
-  },
-  feedbackText: {
-    fontSize: 13,
-    color: COLORS.greenInk,
-    fontWeight: "500",
-  },
-  kvRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  kvLabel: {
-    fontSize: 13,
-    color: COLORS.muted,
-  },
-  kvValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.ink,
-    flexShrink: 1,
-  },
-});
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: COLORS.bg,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+      backgroundColor: COLORS.card,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    content: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      gap: 14,
+    },
+    cardGap: {
+      gap: 10,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    noteText: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: COLORS.muted,
+    },
+    switchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      minHeight: 40,
+    },
+    switchLabel: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: COLORS.ink,
+    },
+    metaText: {
+      fontSize: 12,
+      color: COLORS.muted,
+    },
+    feedbackText: {
+      fontSize: 13,
+      color: COLORS.greenInk,
+      fontWeight: "500",
+    },
+    kvRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    kvLabel: {
+      fontSize: 13,
+      color: COLORS.muted,
+    },
+    kvValue: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.ink,
+      flexShrink: 1,
+    },
+  });

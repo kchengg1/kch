@@ -13,13 +13,16 @@ import {
   Badge,
   Button,
   CardSwatch,
+  CardWalletHeader,
   CollapsibleSection,
-  COLORS,
   FieldInput,
   Meter,
   NUM_STYLE,
   SectionCard,
   SegmentedBar,
+  useTheme,
+  useThemedStyles,
+  type ThemeColors,
 } from "../components/ui";
 import { CATEGORIES, classify, EARN_REVIEWED, rankCards } from "../lib/earn";
 import {
@@ -48,12 +51,18 @@ const SUB_TABS: { key: CardsSubTabKey; label: string }[] = [
 const CardListItem = React.memo(function CardListItem({
   card,
   today,
+  walletCard = false,
   onOpenCard,
 }: {
   card: MobileCard;
   today: string;
+  walletCard?: boolean;
   onOpenCard: (cardId: string) => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
+  const feeLabel = card.annualFeeCents > 0 ? `${formatCents(card.annualFeeCents)}/yr` : "$0/yr";
+  const issuerLine = `${card.issuer || "Card"}${card.business ? " · Business" : ""}`;
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -61,63 +70,73 @@ const CardListItem = React.memo(function CardListItem({
         tapHaptic();
         onOpenCard(card.id);
       }}
-      style={styles.cardItem}
+      style={walletCard ? styles.walletItem : styles.cardItem}
     >
-      <View style={styles.cardTopRow}>
-        <View style={styles.cardIdentity}>
-          <CardSwatch style={card.style} size="md" />
-          <View style={styles.flexShrink}>
-            <Text style={styles.cardName}>{card.name}</Text>
-            <Text style={styles.cardSub}>
-              {card.issuer || "Card"}
-              {card.business ? " · Business" : ""}
-              {card.openedOn ? ` · Opened ${formatDate(card.openedOn, today)}` : ""}
-            </Text>
+      {walletCard ? (
+        <CardWalletHeader
+          cardStyle={card.style}
+          issuer={issuerLine}
+          name={card.name}
+          feeLabel={feeLabel}
+          closed={card.closed}
+        />
+      ) : (
+        <View style={styles.cardTopRow}>
+          <View style={styles.cardIdentity}>
+            <CardSwatch style={card.style} size="md" />
+            <View style={styles.flexShrink}>
+              <Text style={styles.cardName}>{card.name}</Text>
+              <Text style={styles.cardSub}>
+                {issuerLine}
+                {card.openedOn ? ` · Opened ${formatDate(card.openedOn, today)}` : ""}
+              </Text>
+            </View>
           </View>
+          <Text style={[styles.feeLabel, NUM_STYLE]}>{feeLabel}</Text>
         </View>
-        <Text style={[styles.feeLabel, NUM_STYLE]}>
-          {card.annualFeeCents > 0 ? `${formatCents(card.annualFeeCents)}/yr` : "$0/yr"}
-        </Text>
-      </View>
+      )}
 
-      {!card.closed && card.availableCents > 0 ? (
-        <View style={styles.meterWrap}>
-          <Meter
-            value={card.capturedCents}
-            max={card.availableCents}
-            tone={card.capturedCents >= card.availableCents ? "green" : "dark"}
-          />
-          <View style={styles.meterFoot}>
-            <Text style={[styles.cardSub, NUM_STYLE]}>
-              {formatCents(card.capturedCents)} of {formatCents(card.availableCents)} used
-            </Text>
-            {card.annualFeeCents > 0 ? (
-              <Badge
-                label={`Worth ${formatSignedCents(card.worth.netCents)}/yr`}
-                tone={card.worth.netCents >= 0 ? "green" : "amber"}
-              />
-            ) : null}
+      <View style={walletCard ? styles.walletBody : styles.cardBodyFlat}>
+        {!card.closed && card.availableCents > 0 ? (
+          <View style={styles.meterWrap}>
+            <View style={styles.meterFoot}>
+              <Text style={[styles.cardSub, NUM_STYLE]}>
+                <Text style={styles.capturedStrong}>{formatCents(card.capturedCents)}</Text> of{" "}
+                {formatCents(card.availableCents)} used
+              </Text>
+              {card.annualFeeCents > 0 ? (
+                <Badge
+                  label={`Worth ${formatSignedCents(card.worth.netCents)}/yr`}
+                  tone={card.worth.netCents >= 0 ? "green" : "amber"}
+                />
+              ) : null}
+            </View>
+            <Meter
+              value={card.capturedCents}
+              max={card.availableCents}
+              tone={card.capturedCents >= card.availableCents ? "green" : "dark"}
+            />
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      <View style={styles.badgeWrap}>
-        {!card.closed && card.catalogUpdates.count > 0 ? (
-          <Badge
-            label={`${card.catalogUpdates.count} catalog update${card.catalogUpdates.count === 1 ? "" : "s"}`}
-            tone="amber"
-          />
-        ) : null}
-        {card.msr && card.msr.state === "active" ? (
-          <Badge label={`Bonus: ${formatCents(card.msr.leftCents)} left`} tone="amber" />
-        ) : null}
-        {card.msr && card.msr.state === "met" ? (
-          <Badge label="Bonus spend met" tone="green" />
-        ) : null}
-        {card.nextFeeOn && !card.closed ? (
-          <Badge label={`Fee ${formatDate(card.nextFeeOn, today)}`} tone="neutral" />
-        ) : null}
-        {card.closed ? <Badge label="Closed" tone="neutral" /> : null}
+        <View style={styles.badgeWrap}>
+          {!card.closed && card.catalogUpdates.count > 0 ? (
+            <Badge
+              label={`${card.catalogUpdates.count} catalog update${card.catalogUpdates.count === 1 ? "" : "s"}`}
+              tone="amber"
+            />
+          ) : null}
+          {card.msr && card.msr.state === "active" ? (
+            <Badge label={`Bonus: ${formatCents(card.msr.leftCents)} left`} tone="amber" />
+          ) : null}
+          {card.msr && card.msr.state === "met" ? (
+            <Badge label="Bonus spend met" tone="green" />
+          ) : null}
+          {card.nextFeeOn && !card.closed ? (
+            <Badge label={`Fee ${formatDate(card.nextFeeOn, today)}`} tone="neutral" />
+          ) : null}
+          {card.closed ? <Badge label="Closed" tone="neutral" /> : null}
+        </View>
       </View>
     </Pressable>
   );
@@ -140,6 +159,8 @@ const WhichCardPane = React.memo(function WhichCardPane({
   onNavigateTab: (tab: TabKey) => void;
   onAddFirstCard: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [query, setQuery] = useState("Dining");
   const openCards = useMemo(() => data.cards.filter((c) => !c.closed), [data.cards]);
   const cardById = useMemo(() => new Map(openCards.map((c) => [c.id, c])), [openCards]);
@@ -203,7 +224,7 @@ const WhichCardPane = React.memo(function WhichCardPane({
               value={query}
               onChangeText={setQuery}
               placeholder="Whole Foods, Hyatt, Costco, dining, flights..."
-              placeholderTextColor={COLORS.faint}
+              placeholderTextColor={colors.faint}
               style={styles.searchInput}
             />
             <View style={styles.catGrid}>
@@ -336,6 +357,7 @@ export const CardsScreen = React.memo(function CardsScreen({
   onOpenCatchUp: () => void;
   onNavigateTab: (tab: TabKey) => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const [panel, setPanel] = useState<"none" | "add" | "import">("none");
   const [addMode, setAddMode] = useState<"catalog" | "custom">("catalog");
   const [catalogFilter, setCatalogFilter] = useState("");
@@ -598,8 +620,8 @@ export const CardsScreen = React.memo(function CardsScreen({
       ) : (
         <View style={styles.cardStack}>
           {openCards.map((card) => (
-            <SectionCard key={card.id}>
-              <CardListItem card={card} today={data.today} onOpenCard={onOpenCard} />
+            <SectionCard key={card.id} style={styles.walletSectionCard}>
+              <CardListItem card={card} today={data.today} walletCard onOpenCard={onOpenCard} />
             </SectionCard>
           ))}
         </View>
@@ -626,267 +648,286 @@ export const CardsScreen = React.memo(function CardsScreen({
   );
 });
 
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 28,
-    gap: 14,
-  },
-  headerBlock: {
-    gap: 3,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: COLORS.ink,
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: COLORS.muted,
-    marginTop: 2,
-    lineHeight: 18,
-  },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  panelGap: {
-    gap: 12,
-  },
-  modeSwitch: {
-    flexDirection: "row",
-    backgroundColor: COLORS.subtle,
-    borderRadius: 10,
-    padding: 3,
-  },
-  modeBtn: {
-    flex: 1,
-    minHeight: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
-  },
-  modeBtnActive: {
-    backgroundColor: COLORS.card,
-  },
-  modeText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.muted,
-  },
-  modeTextActive: {
-    color: COLORS.ink,
-  },
-  templateList: {
-    maxHeight: 280,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  templateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.card,
-  },
-  templateRowActive: {
-    backgroundColor: COLORS.subtle,
-  },
-  templateName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  radioMark: {
-    fontSize: 15,
-    color: COLORS.ink,
-  },
-  twoCol: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    minHeight: 40,
-  },
-  switchLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.ink,
-  },
-  cardStack: {
-    gap: 10,
-  },
-  closedStack: {
-    gap: 10,
-  },
-  rowDivider: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: 10,
-  },
-  cardItem: {
-    gap: 10,
-  },
-  cardTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  cardIdentity: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  flexShrink: {
-    flex: 1,
-  },
-  cardName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  cardSub: {
-    fontSize: 13,
-    color: COLORS.muted,
-    marginTop: 1,
-  },
-  feeLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  meterWrap: {
-    gap: 6,
-  },
-  meterFoot: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  badgeWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  searchHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  searchLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.muted,
-  },
-  clearLink: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.muted,
-  },
-  searchInput: {
-    minHeight: 42,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    fontSize: 15,
-    color: COLORS.ink,
-    backgroundColor: COLORS.bg,
-  },
-  catGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  catChip: {
-    minHeight: 32,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.card,
-    justifyContent: "center",
-  },
-  catChipActive: {
-    backgroundColor: COLORS.ink,
-    borderColor: COLORS.ink,
-  },
-  catChipText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  catChipTextActive: {
-    color: "#ffffff",
-  },
-  offerAlertCard: {
-    backgroundColor: COLORS.greenBg,
-    borderColor: COLORS.greenBorder,
-    gap: 6,
-  },
-  offerAlertTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.greenInk,
-  },
-  offerAlertRow: {
-    paddingVertical: 2,
-  },
-  offerAlertText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.greenInk,
-  },
-  pickCard: {
-    gap: 8,
-  },
-  pickNote: {
-    fontSize: 13,
-    color: COLORS.muted,
-    lineHeight: 18,
-  },
-  portalNote: {
-    fontSize: 12,
-    color: COLORS.faint,
-    lineHeight: 17,
-  },
-  footNote: {
-    fontSize: 12,
-    color: COLORS.faint,
-    textAlign: "center",
-    marginTop: 4,
-  },
-});
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    content: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 28,
+      gap: 14,
+    },
+    headerBlock: {
+      gap: 3,
+    },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: COLORS.ink,
+      letterSpacing: -0.3,
+    },
+    subtitle: {
+      fontSize: 13,
+      color: COLORS.muted,
+      marginTop: 2,
+      lineHeight: 18,
+    },
+    sectionHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    buttonRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    panelGap: {
+      gap: 12,
+    },
+    modeSwitch: {
+      flexDirection: "row",
+      backgroundColor: COLORS.subtle,
+      borderRadius: 10,
+      padding: 3,
+    },
+    modeBtn: {
+      flex: 1,
+      minHeight: 36,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 8,
+    },
+    modeBtnActive: {
+      backgroundColor: COLORS.card,
+    },
+    modeText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.muted,
+    },
+    modeTextActive: {
+      color: COLORS.ink,
+    },
+    templateList: {
+      maxHeight: 280,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      borderRadius: 12,
+      overflow: "hidden",
+    },
+    templateRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 9,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+      backgroundColor: COLORS.card,
+    },
+    templateRowActive: {
+      backgroundColor: COLORS.primarySoft,
+    },
+    templateName: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    radioMark: {
+      fontSize: 15,
+      color: COLORS.primary,
+    },
+    twoCol: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    switchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      minHeight: 40,
+    },
+    switchLabel: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: COLORS.ink,
+    },
+    cardStack: {
+      gap: 12,
+    },
+    walletSectionCard: {
+      padding: 0,
+      overflow: "hidden",
+    },
+    walletItem: {
+      gap: 0,
+    },
+    walletBody: {
+      padding: 13,
+      gap: 9,
+    },
+    cardBodyFlat: {
+      gap: 9,
+    },
+    capturedStrong: {
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    closedStack: {
+      gap: 10,
+    },
+    rowDivider: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+      paddingTop: 10,
+    },
+    cardItem: {
+      gap: 10,
+    },
+    cardTopRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    cardIdentity: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      flex: 1,
+    },
+    flexShrink: {
+      flex: 1,
+    },
+    cardName: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    cardSub: {
+      fontSize: 13,
+      color: COLORS.muted,
+      marginTop: 1,
+    },
+    feeLabel: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    meterWrap: {
+      gap: 7,
+    },
+    meterFoot: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    badgeWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    searchHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    searchLabel: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.muted,
+    },
+    clearLink: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.primary,
+    },
+    searchInput: {
+      minHeight: 42,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      borderRadius: 11,
+      paddingHorizontal: 12,
+      fontSize: 15,
+      color: COLORS.ink,
+      backgroundColor: COLORS.bg,
+    },
+    catGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    catChip: {
+      minHeight: 32,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      backgroundColor: COLORS.card,
+      justifyContent: "center",
+    },
+    catChipActive: {
+      backgroundColor: COLORS.primary,
+      borderColor: COLORS.primary,
+    },
+    catChipText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    catChipTextActive: {
+      color: COLORS.primaryInk,
+    },
+    offerAlertCard: {
+      backgroundColor: COLORS.greenBg,
+      borderColor: COLORS.greenBorder,
+      gap: 6,
+    },
+    offerAlertTitle: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: COLORS.greenInk,
+    },
+    offerAlertRow: {
+      paddingVertical: 2,
+    },
+    offerAlertText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.greenInk,
+    },
+    pickCard: {
+      gap: 8,
+    },
+    pickNote: {
+      fontSize: 13,
+      color: COLORS.muted,
+      lineHeight: 18,
+    },
+    portalNote: {
+      fontSize: 12,
+      color: COLORS.faint,
+      lineHeight: 17,
+    },
+    footNote: {
+      fontSize: 12,
+      color: COLORS.faint,
+      textAlign: "center",
+      marginTop: 4,
+    },
+  });

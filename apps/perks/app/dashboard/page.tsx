@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { Badge, Button, Card, CardDescription, CardTitle, Input } from "@kch/ui";
 import { CardIcon } from "@/components/card-icon";
 import { CreditRow, dueLabel } from "@/components/credit-row";
 import { Meter } from "@/components/meter";
+import { QuickCardPicker } from "@/components/quick-card-picker";
 import { formatCents } from "@/lib/money";
 import { msrStatus } from "@/lib/msr";
 import { cardWorth } from "@/lib/worth";
@@ -12,11 +14,13 @@ import {
   ensureSpendTargets,
   listHiddenMerchants,
   listOffers,
+  listPoints,
   listReferrals,
   listSpendTargets,
   loadPortfolio,
   today as getToday,
 } from "@/lib/perks";
+import { balanceValueCents } from "@/lib/points";
 import { spentThisYear } from "@/lib/spend-targets";
 import { daysBetween, formatDate } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
@@ -38,11 +42,12 @@ const FEE_DAYS = 60;
 export default async function DashboardPage() {
   const { user } = await requireSession();
   const today = getToday();
-  const [{ cards, benefits, usage }, offers, hidden, referrals] = await Promise.all([
+  const [{ cards, benefits, usage }, offers, hidden, referrals, points] = await Promise.all([
     loadPortfolio(user.id),
     listOffers(user.id),
     listHiddenMerchants(user.id),
     listReferrals(),
+    listPoints(user.id),
   ]);
   const shareable = shareableCards(cards, referrals, user.id);
   const sharedAny = referrals.some((r) => r.userId === user.id);
@@ -76,12 +81,20 @@ export default async function DashboardPage() {
   const soon = todo.filter((s) => (s.daysLeft ?? 0) <= SOON_DAYS);
   const later = todo.filter((s) => (s.daysLeft ?? 0) > SOON_DAYS);
   const thisMonth = todo.filter((s) => s.deadline && s.deadline.slice(0, 7) === today.slice(0, 7));
+  const urgentCount = soon.filter((s) => (s.daysLeft ?? 99) <= 7).length;
   const sum = (list: typeof todo) => list.reduce((n, s) => n + s.remainingCents, 0);
 
   const summaries = summarizeCards(cards, benefits, usage, today);
   const captured = summaries.reduce((n, s) => n + s.capturedCents, 0);
   const available = summaries.reduce((n, s) => n + s.availableCents, 0);
   const fees = open.reduce((n, c) => n + c.annualFeeCents, 0);
+  const capturePct = available > 0 ? Math.min(100, Math.round((captured / available) * 100)) : 0;
+
+  const pointsValueCents = points.reduce(
+    (n, p) => n + Math.round(balanceValueCents(p.balance, p.centsPerPointX100) / 100) * 100,
+    0,
+  );
+  const pointValues = Object.fromEntries(points.map((p) => [p.program, p.centsPerPointX100 / 100]));
 
   const cardById = new Map(cards.map((c) => [c.id, c]));
   const expiringOffers = offers.filter(
@@ -119,394 +132,484 @@ export default async function DashboardPage() {
     .filter((s) => s.nextFeeOn && daysBetween(today, s.nextFeeOn) <= FEE_DAYS)
     .sort((a, b) => a.nextFeeOn!.localeCompare(b.nextFeeOn!));
 
+  const cardHealth = summaries
+    .filter((s) => s.availableCents > 0 || s.card.annualFeeCents > 0)
+    .sort((a, b) => b.availableCents - a.availableCents);
+
+  const year = today.slice(0, 4);
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="space-y-6">
+      {/* Greeting & Quick Action */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Hi {user.name.split(" ")[0] || "there"}</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight">
+            Hi {user.name.split(" ")[0] || "there"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
             {todo.length === 0
               ? "Every tracked credit is used for its current period."
               : `${formatCents(sum(thisMonth))} in credits expires this month.`}
           </p>
         </div>
         <Link href="/dashboard/catch-up">
-          <Button variant="outline">
-            {captured === 0 ? `Catch up on ${today.slice(0, 4)}` : "Import or catch up"}
+          <Button variant="outline" size="sm">
+            {captured === 0 ? `Catch up on ${year}` : "Import or catch up"}
           </Button>
         </Link>
       </div>
 
-      {yearEnd && (
-        <Link
-          href="/dashboard/year-end"
-          className="flex items-center justify-between gap-3 rounded-[var(--radius)] border border-primary/40 bg-primary/5 px-4 py-3 hover:bg-primary/10"
-        >
-          <span className="min-w-0">
-            <span className="block font-medium">Year-end checklist</span>
-            <span className="block text-sm text-muted-foreground">
-              {yearEnd.length
-                ? `${formatCents(sum(yearEnd))} in ${yearEnd.length} credit${yearEnd.length === 1 ? "" : "s"} resets by Dec 31`
-                : "Calendar-year credits are used"}
-              {` · spend caps, referral limits and when to apply`}
-            </span>
-          </span>
-          <span aria-hidden className="text-primary">
-            →
-          </span>
-        </Link>
-      )}
-
-      {!sharedAny && shareable.length > 0 && (
-        <Link
-          href="/dashboard/bonuses#referrals"
-          className="flex items-center justify-between gap-3 rounded-[var(--radius)] border px-4 py-3 hover:bg-muted"
-        >
-          <span className="min-w-0">
-            <span className="block font-medium">Share your referral links</span>
-            <span className="block text-sm text-muted-foreground">
-              Friends who apply through your link get the bonus and you earn one too.{" "}
-              {friendLinks > 0
-                ? `${friendLinks} link${friendLinks === 1 ? " is" : "s are"} already shared in the group.`
-                : `You have ${shareable.length} card${shareable.length === 1 ? "" : "s"} to share.`}
-            </span>
-          </span>
-          <span aria-hidden className="text-primary">
-            →
-          </span>
-        </Link>
-      )}
-
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <Stat
-          label="Expiring this month"
-          value={formatCents(sum(thisMonth))}
-          detail={`${thisMonth.length} credit${thisMonth.length === 1 ? "" : "s"} still unused`}
-        />
-        <Stat
-          label={`Used in ${today.slice(0, 4)}`}
-          value={formatCents(captured)}
-          detail={`of ${formatCents(available)} in yearly credits you track`}
-          meter={{ value: captured, max: available }}
-        />
-        <Stat
-          label="Annual fees"
-          value={formatCents(fees)}
-          detail={
-            captured >= fees
-              ? `Credits used cover them by ${formatCents(captured - fees)}`
-              : `${formatCents(fees - captured)} more in credits to break even`
-          }
-        />
-      </div>
-
-      <section>
-        <h2 className="text-lg font-semibold">Use these next</h2>
-        <Card className="mt-3 py-2">
-          {soon.length === 0 ? (
-            <p className="py-4 text-sm text-muted-foreground">
-              Nothing is due in the next {SOON_DAYS} days.
+      {/* Sapphire Concierge Portfolio Value Hero */}
+      <section
+        aria-label="Portfolio summary"
+        className="sapphire-hero relative overflow-hidden rounded-[calc(var(--radius)+6px)] p-5 sm:p-6"
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/70">
+              {year} Portfolio Value
             </p>
-          ) : (
-            <ul className="divide-y">
-              {soon.map((s) => (
-                <CreditRow key={s.benefit.id} status={s} today={today} />
-              ))}
-            </ul>
-          )}
-        </Card>
-        {later.length > 0 && (
-          <details className="mt-3">
-            <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-              {later.length} more with later deadlines, worth {formatCents(sum(later))}
-            </summary>
-            <Card className="mt-3 py-2">
-              <ul className="divide-y">
-                {later.map((s) => (
-                  <CreditRow key={s.benefit.id} status={s} today={today} />
-                ))}
-              </ul>
-            </Card>
-          </details>
+            <div className="mt-1 flex flex-wrap items-baseline gap-2.5">
+              <span className="text-3xl font-bold tracking-tight tabular-nums sm:text-4xl">
+                {formatCents(captured)}
+              </span>
+              {available > 0 && (
+                <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-amber-300">
+                  {capturePct}% captured
+                </span>
+              )}
+            </div>
+            <p className="mt-1.5 text-sm text-white/75">
+              {available > 0 ? `of ${formatCents(available)} in tracked credits · ` : ""}
+              {fees > 0
+                ? captured >= fees
+                  ? `${formatCents(captured - fees)} ahead of ${formatCents(fees)} annual fees`
+                  : `${formatCents(fees - captured)} away from covering ${formatCents(fees)} annual fees`
+                : `${open.length} open card${open.length === 1 ? "" : "s"}`}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5 sm:flex sm:shrink-0">
+            <div className="rounded-xl bg-white/10 px-3.5 py-2.5 backdrop-blur-xs sm:min-w-[132px] sm:text-right">
+              <p className="text-[11px] font-medium text-white/70">Expiring this month</p>
+              <p className="mt-0.5 text-lg font-bold tabular-nums text-amber-300">
+                {formatCents(sum(thisMonth))}
+              </p>
+              <p className="text-[11px] text-white/65">
+                {thisMonth.length === 0
+                  ? "All clear"
+                  : `${thisMonth.length} credit${thisMonth.length === 1 ? "" : "s"} left`}
+              </p>
+            </div>
+            <Link
+              href="/dashboard/points"
+              className="rounded-xl bg-white/10 px-3.5 py-2.5 transition-colors hover:bg-white/16 backdrop-blur-xs sm:min-w-[132px] sm:text-right"
+            >
+              <p className="text-[11px] font-medium text-white/70">Points stash</p>
+              <p className="mt-0.5 text-lg font-bold tabular-nums">
+                {formatCents(pointsValueCents)}
+              </p>
+              <p className="text-[11px] text-white/65">
+                {points.length > 0
+                  ? `${points.length} program${points.length === 1 ? "" : "s"}`
+                  : "Add balances →"}
+              </p>
+            </Link>
+          </div>
+        </div>
+
+        {available > 0 && (
+          <div className="mt-4">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-white/15">
+              <div
+                className="h-full rounded-full bg-amber-300 transition-all"
+                style={{ width: `${capturePct}%` }}
+              />
+            </div>
+            <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-white/65">
+              <span>$0</span>
+              {fees > 0 && <span>Annual fees: {formatCents(fees)}</span>}
+              <span>Tracked: {formatCents(available)}</span>
+            </div>
+          </div>
         )}
       </section>
 
-      {bonuses.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold">Sign-up bonuses in progress</h2>
-          <Card className="mt-3 py-2">
-            <ul className="divide-y">
-              {bonuses.map(({ card, msr }) => (
-                <li key={card.id} className="space-y-2 py-4">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <Link
-                      href={`/dashboard/cards/${card.id}`}
-                      className="inline-flex items-center gap-2 font-medium hover:underline"
-                    >
-                      <CardIcon templateKey={card.templateKey} issuer={card.issuer} />
-                      {card.name}
-                    </Link>
-                    <span className="text-sm text-muted-foreground">
-                      {card.bonusText || "Bonus"}
-                      {msr.daysLeft !== null && msr.state === "active" && (
-                        <span
-                          className={
-                            msr.daysLeft <= 14 ? "font-medium text-destructive" : undefined
-                          }
-                        >
-                          {" · "}
-                          {dueLabel(msr.daysLeft)}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <Meter value={msr.spentCents} max={msr.requiredCents} />
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                    <span className="text-muted-foreground">
-                      {formatCents(msr.spentCents)} of {formatCents(msr.requiredCents)}
-                      {msr.state === "active"
-                        ? ` · ${formatCents(msr.leftCents)} to go${msr.perDayCents ? `, about ${formatCents(msr.perDayCents)} a day` : ""}`
-                        : " · requirement met"}
-                    </span>
-                    {msr.state === "active" ? (
-                      <form
-                        action={setMsrSpentAction.bind(null, card.id)}
-                        className="flex items-center gap-2"
-                      >
-                        <Input
-                          name="spent"
-                          inputMode="decimal"
-                          aria-label={`Total spent so far on ${card.name}`}
-                          placeholder="Total spent, $"
-                          className="h-8 w-32"
-                          required
-                        />
-                        <Button type="submit" size="sm" variant="outline">
-                          Update
-                        </Button>
-                      </form>
-                    ) : (
-                      <form action={markBonusReceivedAction.bind(null, card.id)}>
-                        <Button type="submit" size="sm">
-                          Bonus posted
-                        </Button>
-                      </form>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </section>
-      )}
-
-      {expiringOffers.length > 0 && (
-        <section>
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold">Offers expiring soon</h2>
-            <Link href="/dashboard/offers" className="text-sm text-primary hover:underline">
-              All offers
+      {/* Contextual Alerts */}
+      {(yearEnd || (!sharedAny && shareable.length > 0)) && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {yearEnd && (
+            <Link
+              href="/dashboard/year-end"
+              className="flex items-center justify-between gap-3 rounded-[var(--radius)] border border-primary/30 bg-primary/6 px-4 py-3 transition-colors hover:bg-primary/10"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">Year-end checklist</span>
+                <span className="block text-xs text-muted-foreground">
+                  {yearEnd.length
+                    ? `${formatCents(sum(yearEnd))} in ${yearEnd.length} credit${yearEnd.length === 1 ? "" : "s"} resets by Dec 31`
+                    : "Calendar-year credits are used"}
+                  {" · spend caps & timing"}
+                </span>
+              </span>
+              <ArrowRight aria-hidden className="h-4 w-4 shrink-0 text-primary" />
             </Link>
-          </div>
-          <Card className="mt-3 py-2">
-            <ul className="divide-y">
-              {groupOffers(expiringOffers).map((g) => (
-                <li key={g.key} className="flex items-center justify-between gap-4 py-3">
-                  <div className="min-w-0">
-                    <p className="font-medium">
-                      {g.merchant}{" "}
-                      {g.items.every((o) => o.status === "available") && (
-                        <Badge variant="outline">Not added yet</Badge>
-                      )}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{g.details || "Added to card"}</p>
-                    <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      {g.items.map((o) => {
-                        const card = o.cardId ? cardById.get(o.cardId) : undefined;
-                        return card ? (
-                          <span key={o.id} className="inline-flex items-center gap-1">
-                            <CardIcon
-                              templateKey={card.templateKey}
-                              issuer={card.issuer}
-                              className="h-3 w-[19px]"
-                            />
-                            {card.name}
-                            {o.status === "added" && " ✓"}
-                          </span>
-                        ) : null;
-                      })}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-sm text-muted-foreground">
-                    {dueLabel(daysBetween(today, g.expiresOn!))}
+          )}
+
+          {!sharedAny && shareable.length > 0 && (
+            <Link
+              href="/dashboard/bonuses#referrals"
+              className="flex items-center justify-between gap-3 rounded-[var(--radius)] border bg-card px-4 py-3 transition-colors hover:bg-muted/60"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">Share your referral links</span>
+                <span className="block text-xs text-muted-foreground">
+                  {friendLinks > 0
+                    ? `${friendLinks} link${friendLinks === 1 ? " is" : "s are"} already shared in the group.`
+                    : `You have ${shareable.length} card${shareable.length === 1 ? "" : "s"} to share with friends.`}
+                </span>
+              </span>
+              <ArrowRight aria-hidden className="h-4 w-4 shrink-0 text-primary" />
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* 2-Column Asymmetric Overview */}
+      <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
+        {/* Primary Stream (8 cols) */}
+        <div className="space-y-6 lg:col-span-8">
+          <section>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">Use these next</h2>
+                {urgentCount > 0 && (
+                  <span className="rounded-full bg-destructive/12 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-destructive">
+                    {urgentCount} urgent
                   </span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </section>
-      )}
+                )}
+              </div>
+              {soon.length > 0 && (
+                <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                  {formatCents(sum(soon))} due in {SOON_DAYS}d
+                </span>
+              )}
+            </div>
+            <Card className="mt-3 py-2">
+              {soon.length === 0 ? (
+                <p className="py-5 text-center text-sm text-muted-foreground">
+                  Nothing is due in the next {SOON_DAYS} days.
+                </p>
+              ) : (
+                <ul className="divide-y">
+                  {soon.map((s) => (
+                    <CreditRow key={s.benefit.id} status={s} today={today} />
+                  ))}
+                </ul>
+              )}
+            </Card>
+            {later.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+                  {later.length} more with later deadlines, worth {formatCents(sum(later))}
+                </summary>
+                <Card className="mt-3 py-2">
+                  <ul className="divide-y">
+                    {later.map((s) => (
+                      <CreditRow key={s.benefit.id} status={s} today={today} />
+                    ))}
+                  </ul>
+                </Card>
+              </details>
+            )}
+          </section>
 
-      {goals.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold">Spending goals for {today.slice(0, 4)}</h2>
-          <Card className="mt-3 py-2">
-            <ul className="divide-y">
-              {goals.map((g) => (
-                <li key={g.id} className="space-y-2 py-4">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="inline-flex items-center gap-2 font-medium">
-                      <CardIcon templateKey={g.card.templateKey} issuer={g.card.issuer} />
-                      {g.card.name}: {g.name}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {formatCents(g.spent)} of {formatCents(g.targetCents)}
-                    </span>
-                  </div>
-                  <Meter value={g.spent} max={g.targetCents} />
-                  <p className="text-sm text-muted-foreground">
-                    {g.spent >= g.targetCents
-                      ? "Reached: "
-                      : `${formatCents(g.targetCents - g.spent)} more for `}
-                    {g.reward}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <form
-                      action={setSpendTargetAction.bind(null, g.id)}
-                      className="flex items-center gap-2"
-                    >
-                      <Input
-                        name="spent"
-                        inputMode="decimal"
-                        aria-label={`Total spent on ${g.card.name} this year`}
-                        placeholder="Spent this year, $"
-                        className="h-8 w-36"
-                        required
-                      />
-                      <Button type="submit" size="sm" variant="outline">
-                        Update
-                      </Button>
-                    </form>
-                    <form action={setSpendTargetTrackedAction.bind(null, g.id, false)}>
-                      <Button
-                        type="submit"
-                        size="sm"
-                        variant="ghost"
-                        className="text-muted-foreground"
-                      >
-                        Not chasing this
-                      </Button>
-                    </form>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </section>
-      )}
+          {bonuses.length > 0 && (
+            <section>
+              <h2 className="text-lg font-semibold">Sign-up bonuses in progress</h2>
+              <Card className="mt-3 py-2">
+                <ul className="divide-y">
+                  {bonuses.map(({ card, msr }) => (
+                    <li key={card.id} className="space-y-2.5 py-4">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <Link
+                          href={`/dashboard/cards/${card.id}`}
+                          className="inline-flex items-center gap-2 font-semibold hover:underline"
+                        >
+                          <CardIcon templateKey={card.templateKey} issuer={card.issuer} />
+                          {card.name}
+                        </Link>
+                        <span className="text-sm text-muted-foreground">
+                          {card.bonusText || "Bonus"}
+                          {msr.daysLeft !== null && msr.state === "active" && (
+                            <span
+                              className={
+                                msr.daysLeft <= 14 ? "font-semibold text-destructive" : undefined
+                              }
+                            >
+                              {" · "}
+                              {dueLabel(msr.daysLeft)}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <Meter value={msr.spentCents} max={msr.requiredCents} tone="accent" />
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="tabular-nums text-muted-foreground">
+                          {formatCents(msr.spentCents)} of {formatCents(msr.requiredCents)}
+                          {msr.state === "active"
+                            ? ` · ${formatCents(msr.leftCents)} to go${msr.perDayCents ? `, about ${formatCents(msr.perDayCents)} a day` : ""}`
+                            : " · requirement met"}
+                        </span>
+                        {msr.state === "active" ? (
+                          <form
+                            action={setMsrSpentAction.bind(null, card.id)}
+                            className="flex items-center gap-2"
+                          >
+                            <Input
+                              name="spent"
+                              inputMode="decimal"
+                              aria-label={`Total spent so far on ${card.name}`}
+                              placeholder="Total spent, $"
+                              className="h-8 w-32"
+                              required
+                            />
+                            <Button type="submit" size="sm" variant="outline">
+                              Update
+                            </Button>
+                          </form>
+                        ) : (
+                          <form action={markBonusReceivedAction.bind(null, card.id)}>
+                            <Button type="submit" size="sm">
+                              Bonus posted
+                            </Button>
+                          </form>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </section>
+          )}
 
-      {feesDue.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold">Annual fees coming up</h2>
-          <Card className="mt-3 py-2">
-            <ul className="divide-y">
-              {feesDue.map((s) => (
-                <li key={s.card.id} className="flex items-center justify-between gap-4 py-3">
-                  <div>
+          {expiringOffers.length > 0 && (
+            <section>
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-lg font-semibold">Offers expiring soon</h2>
+                <Link
+                  href="/dashboard/offers"
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  All offers →
+                </Link>
+              </div>
+              <Card className="mt-3 py-2">
+                <ul className="divide-y">
+                  {groupOffers(expiringOffers).map((g) => (
+                    <li key={g.key} className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <p className="flex flex-wrap items-center gap-2 font-medium">
+                          {g.merchant}
+                          {g.items.every((o) => o.status === "available") && (
+                            <Badge variant="outline">Not added yet</Badge>
+                          )}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {g.details || "Added to card"}
+                        </p>
+                        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          {g.items.map((o) => {
+                            const card = o.cardId ? cardById.get(o.cardId) : undefined;
+                            return card ? (
+                              <span key={o.id} className="inline-flex items-center gap-1">
+                                <CardIcon
+                                  templateKey={card.templateKey}
+                                  issuer={card.issuer}
+                                  className="h-3 w-[19px]"
+                                />
+                                {card.name}
+                                {o.status === "added" && " ✓"}
+                              </span>
+                            ) : null;
+                          })}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                        {dueLabel(daysBetween(today, g.expiresOn!))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </section>
+          )}
+
+          {goals.length > 0 && (
+            <section>
+              <h2 className="text-lg font-semibold">Spending goals for {year}</h2>
+              <Card className="mt-3 py-2">
+                <ul className="divide-y">
+                  {goals.map((g) => (
+                    <li key={g.id} className="space-y-2 py-4">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="inline-flex items-center gap-2 font-medium">
+                          <CardIcon templateKey={g.card.templateKey} issuer={g.card.issuer} />
+                          {g.card.name}: {g.name}
+                        </span>
+                        <span className="text-sm tabular-nums text-muted-foreground">
+                          {formatCents(g.spent)} of {formatCents(g.targetCents)}
+                        </span>
+                      </div>
+                      <Meter value={g.spent} max={g.targetCents} tone="primary" />
+                      <p className="text-sm text-muted-foreground">
+                        {g.spent >= g.targetCents
+                          ? "Reached: "
+                          : `${formatCents(g.targetCents - g.spent)} more for `}
+                        {g.reward}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <form
+                          action={setSpendTargetAction.bind(null, g.id)}
+                          className="flex items-center gap-2"
+                        >
+                          <Input
+                            name="spent"
+                            inputMode="decimal"
+                            aria-label={`Total spent on ${g.card.name} this year`}
+                            placeholder="Spent this year, $"
+                            className="h-8 w-36"
+                            required
+                          />
+                          <Button type="submit" size="sm" variant="outline">
+                            Update
+                          </Button>
+                        </form>
+                        <form action={setSpendTargetTrackedAction.bind(null, g.id, false)}>
+                          <Button
+                            type="submit"
+                            size="sm"
+                            variant="ghost"
+                            className="text-muted-foreground"
+                          >
+                            Not chasing this
+                          </Button>
+                        </form>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </section>
+          )}
+        </div>
+
+        {/* Sticky Utility Rail (4 cols) */}
+        <aside className="space-y-5 lg:sticky lg:top-20 lg:col-span-4">
+          <QuickCardPicker
+            cards={open.map((c) => ({
+              id: c.id,
+              name: c.name,
+              templateKey: c.templateKey,
+              issuer: c.issuer,
+              closed: c.closed,
+            }))}
+            pointValues={pointValues}
+          />
+
+          {feesDue.length > 0 && (
+            <Card className="p-4">
+              <h2 className="text-sm font-semibold">Annual fees coming up</h2>
+              <ul className="mt-3 divide-y">
+                {feesDue.map((s) => {
+                  const worth = worthOf(s.card.id, s.card.annualFeeCents);
+                  return (
+                    <li key={s.card.id} className="space-y-1.5 py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <Link
+                          href={`/dashboard/cards/${s.card.id}`}
+                          className="inline-flex min-w-0 items-center gap-2 text-sm font-medium hover:underline"
+                        >
+                          <CardIcon
+                            templateKey={s.card.templateKey}
+                            issuer={s.card.issuer}
+                            className="h-4 w-6"
+                          />
+                          <span className="truncate">{s.card.name}</span>
+                        </Link>
+                        <Badge variant={worth.netCents >= 0 ? "success" : "secondary"}>
+                          {worth.netCents >= 0 ? "Keep" : "Review"}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {formatCents(s.card.annualFeeCents)} around{" "}
+                        {formatDate(s.nextFeeOn!, today)} · worth {formatCents(worth.worthCents)}/yr
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          )}
+
+          {cardHealth.length > 0 && (
+            <Card className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold">Card health</h2>
+                <Link
+                  href="/dashboard/cards"
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  All {open.length} →
+                </Link>
+              </div>
+              <ul className="mt-3 space-y-3">
+                {cardHealth.map((s) => (
+                  <li key={s.card.id}>
                     <Link
                       href={`/dashboard/cards/${s.card.id}`}
-                      className="inline-flex items-center gap-2 font-medium hover:underline"
+                      className="group block rounded-lg p-1 -m-1 transition-colors hover:bg-muted/60"
                     >
-                      <CardIcon templateKey={s.card.templateKey} issuer={s.card.issuer} />
-                      {s.card.name}
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="inline-flex min-w-0 items-center gap-2 font-medium">
+                          <CardIcon
+                            templateKey={s.card.templateKey}
+                            issuer={s.card.issuer}
+                            className="h-3.5 w-[22px]"
+                          />
+                          <span className="truncate group-hover:text-primary">{s.card.name}</span>
+                        </span>
+                        <span className="shrink-0 font-semibold tabular-nums">
+                          {s.availableCents > 0 ? (
+                            <>
+                              {formatCents(s.capturedCents)}
+                              <span className="font-normal text-muted-foreground">
+                                /{formatCents(s.availableCents)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="font-normal text-muted-foreground">
+                              {formatCents(s.card.annualFeeCents)} fee
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      {s.availableCents > 0 && (
+                        <Meter
+                          value={s.capturedCents}
+                          max={s.availableCents}
+                          tone={s.capturedCents >= s.availableCents ? "success" : "primary"}
+                          className="mt-1.5 h-1.5"
+                        />
+                      )}
                     </Link>
-                    <p className="text-sm text-muted-foreground">
-                      {formatCents(s.card.annualFeeCents)} fee around{" "}
-                      {formatDate(s.nextFeeOn!, today)} · {formatCents(s.capturedCents)} in credits
-                      used this year · worth{" "}
-                      {formatCents(worthOf(s.card.id, s.card.annualFeeCents).worthCents)} a year to
-                      you
-                    </p>
-                  </div>
-                  <Badge
-                    variant={
-                      worthOf(s.card.id, s.card.annualFeeCents).netCents >= 0
-                        ? "success"
-                        : "secondary"
-                    }
-                  >
-                    {worthOf(s.card.id, s.card.annualFeeCents).netCents >= 0
-                      ? "Worth keeping"
-                      : "Review before renewal"}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </section>
-      )}
-
-      <section>
-        <h2 className="text-lg font-semibold">By card</h2>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          {summaries
-            .filter((s) => s.availableCents > 0 || s.card.annualFeeCents > 0)
-            .sort((a, b) => b.availableCents - a.availableCents)
-            .map((s) => (
-              <Link key={s.card.id} href={`/dashboard/cards/${s.card.id}`}>
-                <Card className="h-full transition-colors hover:bg-muted/50">
-                  <div className="flex items-center justify-between gap-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <CardIcon templateKey={s.card.templateKey} issuer={s.card.issuer} />
-                      {s.card.name}
-                    </CardTitle>
-                    <span className="shrink-0 text-sm text-muted-foreground">
-                      {formatCents(s.card.annualFeeCents)} fee
-                    </span>
-                  </div>
-                  {s.availableCents > 0 ? (
-                    <>
-                      <p className="mt-3 text-sm">
-                        <span className="font-semibold tabular-nums">
-                          {formatCents(s.capturedCents)}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {" "}
-                          of {formatCents(s.availableCents)} used
-                        </span>
-                      </p>
-                      <Meter value={s.capturedCents} max={s.availableCents} className="mt-2" />
-                    </>
-                  ) : (
-                    <p className="mt-3 text-sm text-muted-foreground">No credits to track</p>
-                  )}
-                </Card>
-              </Link>
-            ))}
-        </div>
-      </section>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </aside>
+      </div>
     </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  detail,
-  meter,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  meter?: { value: number; max: number };
-}) {
-  return (
-    // Three across even on a phone: compact padding and type, details from tablet width up.
-    <Card className="p-3 sm:p-6">
-      <p className="text-xs leading-tight text-muted-foreground sm:text-sm">{label}</p>
-      <p className="mt-1 text-xl font-bold tabular-nums tracking-tight sm:text-3xl">{value}</p>
-      {meter && <Meter {...meter} className="mt-2 sm:mt-3" />}
-      <p className="mt-2 hidden text-sm text-muted-foreground sm:block">{detail}</p>
-    </Card>
   );
 }

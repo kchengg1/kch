@@ -11,7 +11,15 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, CardSwatch, COLORS, FieldInput, NUM_STYLE, SectionCard } from "../components/ui";
+import {
+  Button,
+  CardSwatch,
+  FieldInput,
+  NUM_STYLE,
+  SectionCard,
+  useThemedStyles,
+  type ThemeColors,
+} from "../components/ui";
 import { formatCents } from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
 import type {
@@ -35,6 +43,7 @@ export function CatchUpModal({
   onRunRawAction: (payload: MobileActionPayload, key: string) => Promise<MobileActionResponse>;
 }) {
   const insets = useSafeAreaInsets();
+  const styles = useThemedStyles(makeStyles);
   const openCards = data.cards.filter((c) => !c.closed);
   const [selectedCardId, setSelectedCardId] = useState<string>(openCards[0]?.id ?? "");
   const [csvText, setCsvText] = useState("");
@@ -317,189 +326,190 @@ export function CatchUpModal({
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.card,
-  },
-  flexShrink: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginTop: 1,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    gap: 14,
-  },
-  noticeBox: {
-    fontSize: 13,
-    color: COLORS.greenInk,
-    backgroundColor: COLORS.greenBg,
-    borderColor: COLORS.greenBorder,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  cardGap: {
-    gap: 10,
-  },
-  sectionHeading: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  noteText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.muted,
-  },
-  cardPills: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  cardPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 38,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.card,
-  },
-  cardPillActive: {
-    borderColor: COLORS.ink,
-    backgroundColor: COLORS.subtle,
-  },
-  cardPillText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: COLORS.muted,
-    maxWidth: 190,
-  },
-  cardPillTextActive: {
-    color: COLORS.ink,
-    fontWeight: "700",
-  },
-  rowActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  previewWrap: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: 10,
-    gap: 10,
-  },
-  previewSummary: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  previewRow: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 10,
-    padding: 10,
-    gap: 8,
-    backgroundColor: COLORS.bg,
-  },
-  previewTop: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  rowDesc: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  rowDate: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginTop: 1,
-  },
-  rowAmount: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.greenInk,
-  },
-  benefitSelectorWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  miniPill: {
-    minHeight: 34,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.card,
-    justifyContent: "center",
-  },
-  miniPillActive: {
-    backgroundColor: COLORS.ink,
-    borderColor: COLORS.ink,
-  },
-  miniPillDone: {
-    backgroundColor: COLORS.greenBg,
-    borderColor: COLORS.greenBorder,
-  },
-  miniPillText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  miniPillTextActive: {
-    color: "#ffffff",
-  },
-  miniPillTextDone: {
-    color: COLORS.greenInk,
-  },
-  inAppBlock: {
-    gap: 8,
-    paddingTop: 4,
-  },
-  divider: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: 10,
-  },
-  inAppHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  chipWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-});
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: COLORS.bg,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+      backgroundColor: COLORS.card,
+    },
+    flexShrink: {
+      flex: 1,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    subtitle: {
+      fontSize: 12,
+      color: COLORS.muted,
+      marginTop: 1,
+    },
+    content: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      gap: 14,
+    },
+    noticeBox: {
+      fontSize: 13,
+      color: COLORS.greenInk,
+      backgroundColor: COLORS.greenBg,
+      borderColor: COLORS.greenBorder,
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+    },
+    cardGap: {
+      gap: 10,
+    },
+    sectionHeading: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    noteText: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: COLORS.muted,
+    },
+    cardPills: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    cardPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      minHeight: 38,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      backgroundColor: COLORS.card,
+    },
+    cardPillActive: {
+      borderColor: COLORS.ink,
+      backgroundColor: COLORS.subtle,
+    },
+    cardPillText: {
+      fontSize: 13,
+      fontWeight: "500",
+      color: COLORS.muted,
+      maxWidth: 190,
+    },
+    cardPillTextActive: {
+      color: COLORS.ink,
+      fontWeight: "700",
+    },
+    rowActions: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    previewWrap: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+      paddingTop: 10,
+      gap: 10,
+    },
+    previewSummary: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    previewRow: {
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      borderRadius: 10,
+      padding: 10,
+      gap: 8,
+      backgroundColor: COLORS.bg,
+    },
+    previewTop: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    rowDesc: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    rowDate: {
+      fontSize: 12,
+      color: COLORS.muted,
+      marginTop: 1,
+    },
+    rowAmount: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: COLORS.greenInk,
+    },
+    benefitSelectorWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    miniPill: {
+      minHeight: 34,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      backgroundColor: COLORS.card,
+      justifyContent: "center",
+    },
+    miniPillActive: {
+      backgroundColor: COLORS.primary,
+      borderColor: COLORS.primary,
+    },
+    miniPillDone: {
+      backgroundColor: COLORS.greenBg,
+      borderColor: COLORS.greenBorder,
+    },
+    miniPillText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    miniPillTextActive: {
+      color: COLORS.primaryInk,
+    },
+    miniPillTextDone: {
+      color: COLORS.greenInk,
+    },
+    inAppBlock: {
+      gap: 8,
+      paddingTop: 4,
+    },
+    divider: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+      paddingTop: 10,
+    },
+    inAppHead: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    chipWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+  });

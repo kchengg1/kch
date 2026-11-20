@@ -70,3 +70,17 @@ export async function setStoredServerUrl(url: string | null): Promise<string> {
 export function getDefaultServerUrl(): string {
   return DEFAULT_API_URL;
 }
+
+export type StoredThemeMode = "system" | "light" | "dark";
+
+const THEME_MODE_KEY = "perks_theme_mode";
+
+export async function getStoredThemeMode(): Promise<StoredThemeMode> {
+  const raw = await readItem(THEME_MODE_KEY);
+  if (raw === "light" || raw === "dark" || raw === "system") return raw;
+  return "system";
+}
+
+export async function setStoredThemeMode(mode: StoredThemeMode): Promise<void> {
+  await writeItem(THEME_MODE_KEY, mode);
+}

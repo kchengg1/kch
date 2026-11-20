@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, COLORS, TabBar } from "./src/components/ui";
+import { Button, TabBar, useTheme, useThemedStyles, type ThemeColors } from "./src/components/ui";
+import { ThemeProvider } from "./src/lib/theme";
 import {
   ApiError,
   fetchBootstrap,
@@ -54,6 +55,7 @@ function TabPane({
   mounted: boolean;
   children: React.ReactNode;
 }) {
+  const styles = useThemedStyles(makeStyles);
   if (!mounted && !active) return null;
   return (
     <View
@@ -69,6 +71,8 @@ function TabPane({
 
 function PerksShell() {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [initializing, setInitializing] = useState(true);
   const [serverUrl, setServerUrl] = useState<string>(getDefaultServerUrl());
   const [token, setToken] = useState<string | null>(null);
@@ -319,7 +323,8 @@ function PerksShell() {
   if (initializing) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={COLORS.ink} />
+        <StatusBar style={isDark ? "light" : "dark"} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -327,6 +332,7 @@ function PerksShell() {
   if (!token) {
     return (
       <View style={[styles.flex, { paddingTop: insets.top }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
         <AuthScreen
           initialServerUrl={serverUrl}
           defaultServerUrl={getDefaultServerUrl()}
@@ -366,6 +372,7 @@ function PerksShell() {
   if (!bootstrap) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top, paddingHorizontal: 24 }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
         {bootError ? (
           <>
             <Text style={styles.errorHeading}>Could not connect to Perks</Text>
@@ -376,7 +383,7 @@ function PerksShell() {
             </View>
           </>
         ) : (
-          <ActivityIndicator size="large" color={COLORS.ink} />
+          <ActivityIndicator size="large" color={colors.primary} />
         )}
       </View>
     );
@@ -388,6 +395,7 @@ function PerksShell() {
 
   return (
     <View style={[styles.flex, { paddingTop: insets.top }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
       {banner ? (
         <Pressable
           onPress={() => setBanner(null)}
@@ -517,83 +525,85 @@ function PerksShell() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <PerksShell />
+      <ThemeProvider>
+        <PerksShell />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  tabPaneActive: {
-    flex: 1,
-    display: "flex",
-  },
-  tabPaneHidden: {
-    flex: 1,
-    display: "none",
-  },
-  centered: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  errorHeading: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.ink,
-    textAlign: "center",
-  },
-  errorDetail: {
-    fontSize: 14,
-    color: COLORS.muted,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  retryRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 6,
-  },
-  banner: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 10,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  bannerInfo: {
-    backgroundColor: COLORS.greenBg,
-    borderColor: COLORS.greenBorder,
-  },
-  bannerError: {
-    backgroundColor: COLORS.redBg,
-    borderColor: COLORS.redBorder,
-  },
-  bannerText: {
-    fontSize: 13,
-    fontWeight: "500",
-    flex: 1,
-  },
-  bannerTextInfo: {
-    color: COLORS.greenInk,
-  },
-  bannerTextError: {
-    color: COLORS.redInk,
-  },
-  bannerDismiss: {
-    fontSize: 13,
-    color: COLORS.muted,
-    paddingHorizontal: 4,
-  },
-});
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    flex: {
+      flex: 1,
+      backgroundColor: COLORS.bg,
+    },
+    tabPaneActive: {
+      flex: 1,
+      display: "flex",
+    },
+    tabPaneHidden: {
+      flex: 1,
+      display: "none",
+    },
+    centered: {
+      flex: 1,
+      backgroundColor: COLORS.bg,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+    },
+    errorHeading: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: COLORS.ink,
+      textAlign: "center",
+    },
+    errorDetail: {
+      fontSize: 14,
+      color: COLORS.muted,
+      textAlign: "center",
+      lineHeight: 20,
+    },
+    retryRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginTop: 6,
+    },
+    banner: {
+      marginHorizontal: 16,
+      marginTop: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      borderRadius: 12,
+      borderWidth: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    bannerInfo: {
+      backgroundColor: COLORS.greenBg,
+      borderColor: COLORS.greenBorder,
+    },
+    bannerError: {
+      backgroundColor: COLORS.redBg,
+      borderColor: COLORS.redBorder,
+    },
+    bannerText: {
+      fontSize: 13,
+      fontWeight: "500",
+      flex: 1,
+    },
+    bannerTextInfo: {
+      color: COLORS.greenInk,
+    },
+    bannerTextError: {
+      color: COLORS.redInk,
+    },
+    bannerDismiss: {
+      fontSize: 13,
+      color: COLORS.muted,
+      paddingHorizontal: 4,
+    },
+  });

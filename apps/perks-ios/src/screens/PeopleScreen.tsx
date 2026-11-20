@@ -1,6 +1,14 @@
 import React, { useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Badge, CardSwatch, COLORS, Meter, NUM_STYLE, SectionCard } from "../components/ui";
+import {
+  Badge,
+  CardSwatch,
+  Meter,
+  NUM_STYLE,
+  SectionCard,
+  useThemedStyles,
+  type ThemeColors,
+} from "../components/ui";
 import { dueLabel, formatCents, formatDate, ordinal } from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
 import { formatLastActive } from "../lib/last-active";
@@ -13,6 +21,7 @@ const PersonCardItem = React.memo(function PersonCardItem({
   card: MobilePersonCard;
   year: string;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const [expanded, setExpanded] = useState(false);
   const hasBreakdown = card.credits.used.length > 0 || card.credits.unused.length > 0;
 
@@ -108,6 +117,7 @@ const SharedOfferItem = React.memo(function SharedOfferItem({
   group: MobilePersonOfferGroup;
   today: string;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const due = dueLabel(group.daysLeft);
 
   return (
@@ -166,6 +176,7 @@ export const PeopleScreen = React.memo(function PeopleScreen({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const { leaderboard, others } = data.people;
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const year = data.today.slice(0, 4);
@@ -337,250 +348,251 @@ export const PeopleScreen = React.memo(function PeopleScreen({
   );
 });
 
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 28,
-    gap: 16,
-  },
-  headerBlock: {
-    gap: 3,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: COLORS.ink,
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.muted,
-  },
-  leaderboardCard: {
-    gap: 12,
-  },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.muted,
-  },
-  leaderList: {
-    gap: 12,
-  },
-  leaderRow: {
-    gap: 6,
-  },
-  leaderTop: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  leaderNameRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
-  },
-  rankLabel: {
-    width: 28,
-    fontSize: 13,
-    color: COLORS.muted,
-  },
-  leaderName: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.ink,
-  },
-  leaderNameMe: {
-    fontWeight: "700",
-  },
-  leaderStats: {
-    fontSize: 13,
-    color: COLORS.muted,
-  },
-  leaderAmount: {
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  footHint: {
-    fontSize: 12,
-    color: COLORS.faint,
-  },
-  personPills: {
-    flexDirection: "row",
-    gap: 8,
-    paddingVertical: 2,
-  },
-  personPill: {
-    minHeight: 36,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.card,
-    justifyContent: "center",
-  },
-  personPillActive: {
-    backgroundColor: COLORS.ink,
-    borderColor: COLORS.ink,
-  },
-  personPillText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  personPillTextActive: {
-    color: "#ffffff",
-  },
-  sectionBlock: {
-    gap: 8,
-  },
-  sectionHeading: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  countText: {
-    fontWeight: "400",
-    color: COLORS.muted,
-  },
-  cardStack: {
-    gap: 10,
-  },
-  personCard: {
-    gap: 10,
-  },
-  cardHeaderPress: {
-    gap: 8,
-  },
-  cardTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  cardIdentity: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  flexShrink: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-  metaText: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginTop: 1,
-  },
-  rightCluster: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  chevronText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.muted,
-  },
-  breakdownWrap: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: 10,
-    gap: 10,
-  },
-  breakdownCol: {
-    gap: 4,
-  },
-  breakdownHeading: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: COLORS.muted,
-  },
-  breakdownRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  breakdownName: {
-    fontSize: 13,
-    color: COLORS.ink,
-    flex: 1,
-  },
-  breakdownVal: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  breakdownValMuted: {
-    fontSize: 13,
-    color: COLORS.muted,
-  },
-  freshnessText: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  freshnessFresh: {
-    color: COLORS.muted,
-  },
-  freshnessStale: {
-    color: COLORS.redInk,
-  },
-  divideCard: {
-    paddingVertical: 4,
-  },
-  rowDivider: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  offerRow: {
-    paddingVertical: 11,
-    gap: 4,
-  },
-  offerTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  offerMerchant: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-  badgeWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 5,
-  },
-  offerDetails: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.muted,
-  },
-  offerCardChips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 4,
-  },
-  offerCardChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  offerCardName: {
-    fontSize: 12,
-    color: COLORS.muted,
-  },
-});
+const makeStyles = (COLORS: ThemeColors) =>
+  StyleSheet.create({
+    content: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 28,
+      gap: 16,
+    },
+    headerBlock: {
+      gap: 3,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: COLORS.ink,
+      letterSpacing: -0.3,
+    },
+    subtitle: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: COLORS.muted,
+    },
+    leaderboardCard: {
+      gap: 12,
+    },
+    sectionLabel: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.muted,
+    },
+    leaderList: {
+      gap: 12,
+    },
+    leaderRow: {
+      gap: 6,
+    },
+    leaderTop: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    leaderNameRow: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      gap: 8,
+    },
+    rankLabel: {
+      width: 28,
+      fontSize: 13,
+      color: COLORS.muted,
+    },
+    leaderName: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: COLORS.ink,
+    },
+    leaderNameMe: {
+      fontWeight: "700",
+    },
+    leaderStats: {
+      fontSize: 13,
+      color: COLORS.muted,
+    },
+    leaderAmount: {
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    footHint: {
+      fontSize: 12,
+      color: COLORS.faint,
+    },
+    personPills: {
+      flexDirection: "row",
+      gap: 8,
+      paddingVertical: 2,
+    },
+    personPill: {
+      minHeight: 36,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: COLORS.borderStrong,
+      backgroundColor: COLORS.card,
+      justifyContent: "center",
+    },
+    personPillActive: {
+      backgroundColor: COLORS.primary,
+      borderColor: COLORS.primary,
+    },
+    personPillText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    personPillTextActive: {
+      color: COLORS.primaryInk,
+    },
+    sectionBlock: {
+      gap: 8,
+    },
+    sectionHeading: {
+      fontSize: 17,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    countText: {
+      fontWeight: "400",
+      color: COLORS.muted,
+    },
+    cardStack: {
+      gap: 10,
+    },
+    personCard: {
+      gap: 10,
+    },
+    cardHeaderPress: {
+      gap: 8,
+    },
+    cardTopRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    cardIdentity: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      flex: 1,
+    },
+    flexShrink: {
+      flex: 1,
+    },
+    cardTitle: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: COLORS.ink,
+    },
+    metaText: {
+      fontSize: 12,
+      color: COLORS.muted,
+      marginTop: 1,
+    },
+    rightCluster: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    chevronText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.muted,
+    },
+    breakdownWrap: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+      paddingTop: 10,
+      gap: 10,
+    },
+    breakdownCol: {
+      gap: 4,
+    },
+    breakdownHeading: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: COLORS.muted,
+    },
+    breakdownRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    breakdownName: {
+      fontSize: 13,
+      color: COLORS.ink,
+      flex: 1,
+    },
+    breakdownVal: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    breakdownValMuted: {
+      fontSize: 13,
+      color: COLORS.muted,
+    },
+    freshnessText: {
+      fontSize: 12,
+      lineHeight: 17,
+    },
+    freshnessFresh: {
+      color: COLORS.muted,
+    },
+    freshnessStale: {
+      color: COLORS.redInk,
+    },
+    divideCard: {
+      paddingVertical: 4,
+    },
+    rowDivider: {
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+    },
+    offerRow: {
+      paddingVertical: 11,
+      gap: 4,
+    },
+    offerTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    offerMerchant: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: COLORS.ink,
+    },
+    badgeWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 5,
+    },
+    offerDetails: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: COLORS.muted,
+    },
+    offerCardChips: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 4,
+    },
+    offerCardChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+    offerCardName: {
+      fontSize: 12,
+      color: COLORS.muted,
+    },
+  });

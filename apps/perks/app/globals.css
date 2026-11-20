@@ -4,8 +4,107 @@
 /* Tailwind must scan the shared UI package for class names. */
 @source "../../../packages/ui/src";
 
-/* Per-app overrides go here, e.g.
-@theme {
-  --color-primary: oklch(60% 0.2 30);
-}
+/* Support class-based dark mode alongside system preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+  Sapphire Concierge Theme
+  Airy ceramic & deep sapphire navy (light) · deep midnight sapphire & sky (dark)
+  with concierge teal value bars and golden amber points accents.
 */
+@theme {
+  --color-background: var(--perks-background);
+  --color-foreground: var(--perks-foreground);
+  --color-muted: var(--perks-muted);
+  --color-muted-foreground: var(--perks-muted-foreground);
+  --color-border: var(--perks-border);
+  --color-card: var(--perks-card);
+  --color-primary: var(--perks-primary);
+  --color-primary-foreground: var(--perks-primary-foreground);
+  --color-destructive: var(--perks-destructive);
+  --color-destructive-foreground: var(--perks-destructive-foreground);
+  --color-success: var(--perks-success);
+  --color-accent: var(--perks-accent);
+  --radius: 0.75rem;
+}
+
+:root {
+  color-scheme: light;
+  --perks-background: #f2f5fa;
+  --perks-foreground: #0f1f3d;
+  --perks-muted: #e8eef7;
+  --perks-muted-foreground: #506484;
+  --perks-border: #dce4f0;
+  --perks-card: #ffffff;
+  --perks-primary: #1e3a8a;
+  --perks-primary-foreground: #f8faff;
+  --perks-destructive: #e11d48;
+  --perks-destructive-foreground: #ffffff;
+  --perks-success: #0d9488;
+  --perks-accent: #d97706;
+
+  --perks-hero-bg: linear-gradient(135deg, #10244e 0%, #1e3a8a 58%, #1b4d89 100%);
+  --perks-hero-ink: #f8faff;
+  --perks-hero-muted: rgba(248, 250, 255, 0.76);
+  --perks-hero-gold: #fcd34d;
+  --perks-card-shadow: 0 4px 14px -2px rgba(15, 31, 61, 0.05), 0 1px 3px rgba(15, 31, 61, 0.04);
+}
+
+.dark {
+  color-scheme: dark;
+  --perks-background: #0a1020;
+  --perks-foreground: #f0f5ff;
+  --perks-muted: #192542;
+  --perks-muted-foreground: #93a6cc;
+  --perks-border: #223154;
+  --perks-card: #111a30;
+  --perks-primary: #60a5fa;
+  --perks-primary-foreground: #071226;
+  --perks-destructive: #fb7185;
+  --perks-destructive-foreground: #1a060b;
+  --perks-success: #2dd4bf;
+  --perks-accent: #fbbf24;
+
+  --perks-hero-bg: linear-gradient(135deg, #13254d 0%, #1b3670 58%, #12364c 100%);
+  --perks-hero-ink: #f0f5ff;
+  --perks-hero-muted: rgba(240, 245, 255, 0.74);
+  --perks-hero-gold: #fcd34d;
+  --perks-card-shadow: 0 6px 22px -4px rgba(0, 0, 0, 0.42);
+}
+
+@layer base {
+  body {
+    font-family:
+      "Plus Jakarta Sans",
+      "DM Sans",
+      -apple-system,
+      BlinkMacSystemFont,
+      "SF Pro Text",
+      "Segoe UI",
+      system-ui,
+      sans-serif;
+    background: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
+}
+
+.sapphire-hero {
+  background: var(--perks-hero-bg);
+  color: var(--perks-hero-ink);
+  box-shadow: var(--perks-card-shadow);
+}
+
+.sapphire-card-gloss {
+  background-image: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.24) 0%,
+    rgba(255, 255, 255, 0) 52%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
+}

@@ -8,7 +8,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   // Lets the page run under the iPhone notch and home bar; layouts pad with safe-area insets.
   viewportFit: "cover",
-  themeColor: "#fbfbfb",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f2f5fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a1020" },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -32,10 +35,16 @@ export const metadata: Metadata = {
   },
 };
 
+/** Applies the saved or system theme before first paint to avoid light/dark flicker. */
+const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('perks-theme');var m=window.matchMedia('(prefers-color-scheme: dark)').matches;var d=s==='dark'||(s!=='light'&&m);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-dvh flex flex-col">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body className="min-h-dvh flex flex-col bg-background text-foreground antialiased">
         <AnalyticsProvider>{children}</AnalyticsProvider>
       </body>
     </html>
