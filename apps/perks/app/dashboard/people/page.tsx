@@ -131,7 +131,7 @@ export default async function PeoplePage({
                     </div>
                     <Meter
                       value={s.capturedCents}
-                      max={leaderboard[0]!.capturedCents || 1}
+                      max={s.availableCents}
                       tone={i === 0 ? "success" : "primary"}
                       className="mt-1.5"
                     />

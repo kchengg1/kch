@@ -32,22 +32,33 @@ const summary = (
 });
 
 describe("groupStandings", () => {
-  it("ranks people by credits used across their cards", () => {
+  it("ranks people by percentage of credits used, breaking ties by dollars", () => {
     const { leaderboard } = groupStandings(
       [
-        summary("me", "gold", 10000, 42400),
-        summary("ann", "gold", 30000, 42400),
+        summary("me", "gold", 10000, 42400), // 24%
+        summary("ann", "gold", 30000, 42400), // combined 80000 / 192400 = 42%
         summary("ann", "plat", 50000, 150000),
-        summary("bob", "gold", 20000, 42400),
+        summary("bob", "gold", 20000, 42400), // 47%
       ],
       people,
       new Set(),
       "me",
     );
     expect(leaderboard.map((s) => [s.firstName, s.capturedCents])).toEqual([
-      ["Ann", 80000],
       ["Bob", 20000],
+      ["Ann", 80000],
       ["Kevin", 10000],
+    ]);
+
+    const { leaderboard: tied } = groupStandings(
+      [summary("me", "gold", 20000, 40000), summary("ann", "plat", 50000, 100000)],
+      people,
+      new Set(),
+      "me",
+    );
+    expect(tied.map((s) => [s.firstName, s.capturedCents])).toEqual([
+      ["Ann", 50000],
+      ["Kevin", 20000],
     ]);
   });
 
