@@ -186,8 +186,6 @@ export const PeopleScreen = React.memo(function PeopleScreen({
     [others, selectedPersonId],
   );
 
-  const topCaptured = leaderboard[0]?.capturedCents || 1;
-
   return (
     <ScrollView
       contentContainerStyle={styles.content}
@@ -233,7 +231,7 @@ export const PeopleScreen = React.memo(function PeopleScreen({
                   </View>
                   <Meter
                     value={row.capturedCents}
-                    max={topCaptured}
+                    max={row.availableCents}
                     tone={idx === 0 ? "green" : "dark"}
                   />
                 </Pressable>

@@ -49,6 +49,10 @@ const byCaptured = (
   a: { capturedCents: number; share: number },
   b: { capturedCents: number; share: number },
 ) => b.capturedCents - a.capturedCents || b.share - a.share;
+const byShare = (
+  a: { capturedCents: number; share: number },
+  b: { capturedCents: number; share: number },
+) => b.share - a.share || b.capturedCents - a.capturedCents;
 
 export function groupStandings<C extends GroupCard>(
   summaries: CardSummary<C>[],
@@ -111,7 +115,7 @@ export function groupStandings<C extends GroupCard>(
       };
     })
     .filter((s) => s.availableCents > 0 || s.capturedCents > 0)
-    .sort(byCaptured);
+    .sort(byShare);
 
   return { leaderboard, cardsByPerson };
 }
