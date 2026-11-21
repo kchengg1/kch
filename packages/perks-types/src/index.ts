@@ -11,7 +11,10 @@ export type Cadence =
 
 export type OfferStatus = "available" | "added" | "used" | "dismissed";
 
-export type OfferSortKey = "return" | "value" | "expiry";
+export type OfferCategory =
+  "travel" | "dining" | "shopping" | "entertainment" | "health" | "home" | "services" | "other";
+
+export type OfferSortKey = "return" | "value" | "expiry" | "category";
 
 export type TabKey = "overview" | "cards" | "offers" | "points" | "people";
 
@@ -169,6 +172,7 @@ export type MobileOfferGroup = {
   key: string;
   merchant: string;
   details: string;
+  category: OfferCategory;
   valueCents: number | null;
   maxCents: number | null;
   rate: number | null;
