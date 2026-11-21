@@ -1,5 +1,13 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import * as Clipboard from "expo-clipboard";
 import {
   Badge,
@@ -12,12 +20,20 @@ import {
   useThemedStyles,
   type ThemeColors,
 } from "../components/ui";
-import { dueLabel, formatCents, formatDate, sortOfferGroups } from "../lib/format";
+import {
+  dueLabel,
+  formatCents,
+  formatDate,
+  OFFER_CATEGORIES,
+  OFFER_CATEGORY_LABEL,
+  sortOfferGroups,
+} from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
 import type {
   MobileActionPayload,
   MobileBootstrap,
   MobileOfferGroup,
+  OfferCategory,
   OfferSortKey,
   OfferStatus,
 } from "../types";
@@ -57,6 +73,9 @@ const OfferGroupCard = React.memo(function OfferGroupCard({
       </View>
 
       <View style={styles.badgeWrap}>
+        {group.category && group.category !== "other" ? (
+          <Badge label={OFFER_CATEGORY_LABEL[group.category]} tone="neutral" />
+        ) : null}
         {group.rateLabel ? (
           <Badge label={group.rateLabel} tone={group.weak ? "neutral" : "green"} />
         ) : null}
@@ -160,11 +179,13 @@ export const OffersScreen = React.memo(function OffersScreen({
   onAction: (payload: MobileActionPayload, key: string) => Promise<void>;
 }) {
   const styles = useThemedStyles(makeStyles);
+  const listRef = useRef<FlatList<MobileOfferGroup>>(null);
   const openCards = useMemo(() => data.cards.filter((c) => !c.closed), [data.cards]);
   const [showPaste, setShowPaste] = useState(false);
   const [pasteCardId, setPasteCardId] = useState<string>(openCards[0]?.id ?? "");
   const [pasteText, setPasteText] = useState("");
   const [sortBy, setSortBy] = useState<OfferSortKey>("return");
+  const [selectedCategory, setSelectedCategory] = useState<OfferCategory | null>(null);
   const [undoState, setUndoState] = useState<{
     label: string;
     items: { id: string; status: OfferStatus }[];
@@ -177,14 +198,35 @@ export const OffersScreen = React.memo(function OffersScreen({
     [],
   );
 
-  const sortedStrong = useMemo(
-    () => sortOfferGroups(data.offers.strong, sortBy),
-    [data.offers.strong, sortBy],
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<OfferCategory, number>();
+    for (const g of data.offers.strong) {
+      counts.set(g.category, (counts.get(g.category) ?? 0) + 1);
+    }
+    for (const g of data.offers.weak) {
+      counts.set(g.category, (counts.get(g.category) ?? 0) + 1);
+    }
+    return counts;
+  }, [data.offers.strong, data.offers.weak]);
+
+  const visibleCategories = useMemo(
+    () => OFFER_CATEGORIES.filter((c) => (categoryCounts.get(c.id) ?? 0) > 0),
+    [categoryCounts],
   );
-  const sortedWeak = useMemo(
-    () => sortOfferGroups(data.offers.weak, sortBy),
-    [data.offers.weak, sortBy],
-  );
+  const totalOfferCount = data.offers.strong.length + data.offers.weak.length;
+
+  const sortedStrong = useMemo(() => {
+    const list = selectedCategory
+      ? data.offers.strong.filter((g) => g.category === selectedCategory)
+      : data.offers.strong;
+    return sortOfferGroups(list, sortBy);
+  }, [data.offers.strong, selectedCategory, sortBy]);
+  const sortedWeak = useMemo(() => {
+    const list = selectedCategory
+      ? data.offers.weak.filter((g) => g.category === selectedCategory)
+      : data.offers.weak;
+    return sortOfferGroups(list, sortBy);
+  }, [data.offers.weak, selectedCategory, sortBy]);
 
   async function handleClipboardPaste() {
     const text = await Clipboard.getStringAsync();
@@ -201,6 +243,7 @@ export const OffersScreen = React.memo(function OffersScreen({
 
   return (
     <FlatList
+      ref={listRef}
       data={sortedStrong}
       keyExtractor={(item) => item.key}
       initialNumToRender={8}
@@ -323,6 +366,7 @@ export const OffersScreen = React.memo(function OffersScreen({
                 { key: "return", label: "Best return" },
                 { key: "value", label: "Biggest reward" },
                 { key: "expiry", label: "Expiring soonest" },
+                { key: "category", label: "Category" },
               ] as { key: OfferSortKey; label: string }[]
             ).map((pill) => {
               const active = sortBy === pill.key;
@@ -343,11 +387,57 @@ export const OffersScreen = React.memo(function OffersScreen({
             })}
           </View>
 
+          {visibleCategories.length > 1 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryScroll}
+            >
+              <Pressable
+                onPress={() => {
+                  tapHaptic();
+                  setSelectedCategory(null);
+                }}
+                style={[styles.categoryPill, !selectedCategory && styles.categoryPillActive]}
+              >
+                <Text
+                  style={[
+                    styles.categoryPillText,
+                    !selectedCategory && styles.categoryPillTextActive,
+                  ]}
+                >
+                  All ({totalOfferCount})
+                </Text>
+              </Pressable>
+              {visibleCategories.map((cat) => {
+                const active = selectedCategory === cat.id;
+                const count = categoryCounts.get(cat.id) ?? 0;
+                return (
+                  <Pressable
+                    key={cat.id}
+                    onPress={() => {
+                      tapHaptic();
+                      setSelectedCategory(active ? null : cat.id);
+                    }}
+                    style={[styles.categoryPill, active && styles.categoryPillActive]}
+                  >
+                    <Text
+                      style={[styles.categoryPillText, active && styles.categoryPillTextActive]}
+                    >
+                      {cat.label} ({count})
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          ) : null}
+
           {sortedStrong.length === 0 ? (
             <SectionCard>
               <Text style={styles.noteText}>
-                No strong offers saved right now. Copy your Amex or Chase offers page and tap Paste
-                offers above.
+                {selectedCategory
+                  ? `No strong ${OFFER_CATEGORY_LABEL[selectedCategory].toLowerCase()} offers right now.`
+                  : "No strong offers saved right now. Copy your Amex or Chase offers page and tap Paste offers above."}
               </Text>
             </SectionCard>
           ) : null}
@@ -404,9 +494,21 @@ export const OffersScreen = React.memo(function OffersScreen({
               >
                 {() =>
                   data.offers.cardChecks.map((check, idx) => (
-                    <View
+                    <Pressable
                       key={check.cardId}
-                      style={[styles.simpleRow, idx > 0 && styles.rowDivider]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Paste offers for ${check.cardName}`}
+                      onPress={() => {
+                        tapHaptic();
+                        setPasteCardId(check.cardId);
+                        setShowPaste(true);
+                        listRef.current?.scrollToOffset({ offset: 0, animated: true });
+                      }}
+                      style={({ pressed }) => [
+                        styles.simpleRow,
+                        idx > 0 && styles.rowDivider,
+                        pressed && styles.rowPressed,
+                      ]}
                     >
                       <View style={styles.rowIdentity}>
                         <CardSwatch style={check.cardStyle} />
@@ -414,13 +516,18 @@ export const OffersScreen = React.memo(function OffersScreen({
                           {check.cardName}
                         </Text>
                       </View>
-                      <Badge
-                        label={
-                          check.checkedOn ? formatDate(check.checkedOn, data.today) : "Never pasted"
-                        }
-                        tone={check.stale ? "amber" : "green"}
-                      />
-                    </View>
+                      <View style={styles.rowGap}>
+                        <Badge
+                          label={
+                            check.checkedOn
+                              ? formatDate(check.checkedOn, data.today)
+                              : "Never pasted"
+                          }
+                          tone={check.stale ? "amber" : "green"}
+                        />
+                        <Text style={styles.rowChevron}>›</Text>
+                      </View>
+                    </Pressable>
                   ))
                 }
               </CollapsibleSection>
@@ -575,6 +682,32 @@ const makeStyles = (COLORS: ThemeColors) =>
     sortPillTextActive: {
       color: COLORS.primaryInk,
     },
+    categoryScroll: {
+      gap: 6,
+      paddingRight: 8,
+    },
+    categoryPill: {
+      minHeight: 32,
+      paddingHorizontal: 11,
+      paddingVertical: 5,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      backgroundColor: COLORS.card,
+      justifyContent: "center",
+    },
+    categoryPillActive: {
+      borderColor: COLORS.primary,
+      backgroundColor: COLORS.subtle,
+    },
+    categoryPillText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.muted,
+    },
+    categoryPillTextActive: {
+      color: COLORS.primary,
+    },
     offerListCell: {
       backgroundColor: COLORS.card,
       borderLeftWidth: 1,
@@ -693,5 +826,13 @@ const makeStyles = (COLORS: ThemeColors) =>
       fontWeight: "600",
       color: COLORS.ink,
       flexShrink: 1,
+    },
+    rowPressed: {
+      opacity: 0.7,
+    },
+    rowChevron: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: COLORS.muted,
     },
   });

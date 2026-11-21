@@ -1,4 +1,29 @@
-import type { Cadence, MobileOfferGroup, OfferSortKey, RedemptionCheck } from "../types";
+import type {
+  Cadence,
+  MobileOfferGroup,
+  OfferCategory,
+  OfferSortKey,
+  RedemptionCheck,
+} from "../types";
+
+export const OFFER_CATEGORIES: { id: OfferCategory; label: string }[] = [
+  { id: "travel", label: "Travel" },
+  { id: "dining", label: "Food & dining" },
+  { id: "shopping", label: "Shopping" },
+  { id: "entertainment", label: "Entertainment" },
+  { id: "health", label: "Health & beauty" },
+  { id: "home", label: "Home & pets" },
+  { id: "services", label: "Services" },
+  { id: "other", label: "Other" },
+];
+
+export const OFFER_CATEGORY_LABEL: Record<OfferCategory, string> = Object.fromEntries(
+  OFFER_CATEGORIES.map((c) => [c.id, c.label]),
+) as Record<OfferCategory, string>;
+
+const OFFER_CATEGORY_ORDER: Record<OfferCategory, number> = Object.fromEntries(
+  OFFER_CATEGORIES.map((c, i) => [c.id, i]),
+) as Record<OfferCategory, number>;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -116,13 +141,22 @@ export function checkRedemptionClient(input: {
   return { centsPerPoint, verdict, gainCents };
 }
 
-/** Sort offer groups by best return %, biggest dollar reward, or soonest expiry. */
+/** Sort offer groups by best return %, biggest dollar reward, soonest expiry, or category. */
 export function sortOfferGroups(
   groups: MobileOfferGroup[],
   sortBy: OfferSortKey,
 ): MobileOfferGroup[] {
   const copy = [...groups];
   copy.sort((a, b) => {
+    if (sortBy === "category") {
+      const ca = OFFER_CATEGORY_ORDER[a.category] ?? 99;
+      const cb = OFFER_CATEGORY_ORDER[b.category] ?? 99;
+      if (ca !== cb) return ca - cb;
+      const ra = a.rate ?? -1;
+      const rb = b.rate ?? -1;
+      if (rb !== ra) return rb - ra;
+      return (b.maxCents ?? 0) - (a.maxCents ?? 0);
+    }
     if (sortBy === "return") {
       const ra = a.rate ?? -1;
       const rb = b.rate ?? -1;

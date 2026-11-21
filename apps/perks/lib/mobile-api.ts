@@ -33,6 +33,7 @@ import { checkEligibility, fiveTwentyFour } from "./eligibility";
 import { creditBreakdown, groupStandings } from "./group-standings";
 import { formatCents, parseDollars } from "./money";
 import { msrStatus } from "./msr";
+import { offerCategory } from "./offer-category";
 import { groupOffers, merchantKey } from "./offer-groups";
 import { isWeakOffer, offerReturn, rateLabel, WEAK_RATE } from "./offer-value";
 import {
@@ -479,6 +480,7 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
       key: g.key,
       merchant: g.merchant,
       details: g.details,
+      category: offerCategory(g.merchant, g.details),
       valueCents: g.valueCents,
       maxCents,
       rate,

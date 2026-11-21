@@ -102,6 +102,7 @@ describe("offer group sorting and server URL normalization", () => {
       key: "a",
       merchant: "Airline",
       details: "Spend $500, get $100 back",
+      category: "travel",
       valueCents: 10000,
       maxCents: 10000,
       rate: 0.2,
@@ -115,6 +116,7 @@ describe("offer group sorting and server URL normalization", () => {
       key: "b",
       merchant: "Coffee",
       details: "Spend $20, get $10 back",
+      category: "dining",
       valueCents: 1000,
       maxCents: 1000,
       rate: 0.5,
@@ -126,10 +128,11 @@ describe("offer group sorting and server URL normalization", () => {
     },
   ];
 
-  it("sorts offers by return, value, or expiry", () => {
+  it("sorts offers by return, value, expiry, or category", () => {
     expect(sortOfferGroups(sample, "return").map((g) => g.key)).toEqual(["b", "a"]);
     expect(sortOfferGroups(sample, "value").map((g) => g.key)).toEqual(["a", "b"]);
     expect(sortOfferGroups(sample, "expiry").map((g) => g.key)).toEqual(["b", "a"]);
+    expect(sortOfferGroups(sample, "category").map((g) => g.key)).toEqual(["a", "b"]);
   });
 
   it("normalizes server URLs and rejects invalid schemes", () => {

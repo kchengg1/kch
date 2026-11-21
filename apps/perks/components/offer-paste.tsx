@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Alert, Badge, Button, Label } from "@kch/ui";
 import type { FormState } from "@/app/dashboard/actions";
 import { formatCents } from "@/lib/money";
@@ -11,6 +11,44 @@ import { formatDate } from "@/lib/periods";
 
 const field =
   "w-full rounded-[var(--radius)] border bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50";
+
+const SELECT_PASTE_CARD_EVENT = "perks:select-paste-card";
+
+/** Link that jumps to the "Add offers" box with a specific card pre-selected. */
+export function PasteJumpLink({
+  cardId,
+  cardName,
+  className,
+  children,
+}: {
+  cardId: string;
+  cardName: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <a
+      href="#add-offers"
+      title={`Jump to paste offers for ${cardName}`}
+      onClick={(e) => {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent<string>(SELECT_PASTE_CARD_EVENT, { detail: cardId }));
+        const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        document
+          .getElementById("add-offers")
+          ?.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "start" });
+        window.history.replaceState(null, "", "#add-offers");
+        const textarea = document.getElementById("paste");
+        if (textarea instanceof HTMLTextAreaElement) {
+          textarea.focus({ preventScroll: true });
+        }
+      }}
+      className={className}
+    >
+      {children}
+    </a>
+  );
+}
 
 /** Paste an offers page, check what was read from it, then save. */
 export function OfferPaste({
@@ -29,6 +67,16 @@ export function OfferPaste({
   const [text, setText] = useState("");
   const hidden = useMemo(() => new Set(hiddenKeys), [hiddenKeys]);
   const [cardId, setCardId] = useState(cards[0]?.id ?? "");
+  useEffect(() => {
+    const onSelect = (event: Event) => {
+      const nextId = (event as CustomEvent<string>).detail;
+      if (typeof nextId === "string" && cards.some((c) => c.id === nextId)) {
+        setCardId(nextId);
+      }
+    };
+    window.addEventListener(SELECT_PASTE_CARD_EVENT, onSelect);
+    return () => window.removeEventListener(SELECT_PASTE_CARD_EVENT, onSelect);
+  }, [cards]);
   const lastChecked = cards.find((c) => c.id === cardId)?.checked;
   const [removed, setRemoved] = useState<Set<number>>(new Set());
   const [state, formAction, pending] = useActionState(async (prev: FormState, form: FormData) => {

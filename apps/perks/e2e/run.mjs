@@ -581,7 +581,12 @@ check(
 await page.goto(`${BASE}/dashboard/offers`);
 // The same offer on a second card is shown once, with a chip per card.
 const csrCard = sql(`select id from perks_card where name='Chase Sapphire Reserve'`);
-await page.selectOption("#cardId", csrCard);
+await page.locator('a[href="#add-offers"]', { hasText: "Chase Sapphire Reserve" }).click();
+check(
+  "clicking a card in Last pasted selects it and focuses the paste box",
+  (await page.locator("#cardId").inputValue()) === csrCard &&
+    (await page.evaluate(() => document.activeElement?.id)) === "paste",
+);
 await page.fill("#paste", `lululemon\nSpend $150 or more, get $30 back\nExpires in 5 days`);
 await page.click('button:has-text("Save 1 offer")');
 await page.waitForSelector("text=Saved 1 offer");
@@ -589,6 +594,15 @@ check(
   "same offer saved for the second card",
   sql(`select count(*) from perks_offer where merchant='lululemon'`) === "2",
 );
+await page.locator('nav[aria-label="Filter offers by category"] a', { hasText: "Travel" }).click();
+await page.waitForURL(/cat=travel/);
+check(
+  "category filter shows Travel offers only",
+  (await page.locator("li", { hasText: "Hilton" }).count()) === 1 &&
+    (await page.locator("li", { hasText: "lululemon" }).count()) === 0,
+);
+await page.locator('nav[aria-label="Filter offers by category"] a', { hasText: "All" }).click();
+await page.waitForURL((u) => !u.searchParams.has("cat"));
 const lulu = page
   .locator("li", { hasText: "lululemon" })
   .filter({ has: page.locator('button:has-text("Used")') });
