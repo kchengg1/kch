@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
     "@kch/payments",
     "@kch/analytics",
   ],
-  serverExternalPackages: ["postgres"],
+  serverExternalPackages: ["postgres", "nodemailer"],
   typedRoutes: true,
 };
 
