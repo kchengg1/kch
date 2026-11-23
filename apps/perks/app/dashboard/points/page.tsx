@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
 import { Button, Card, CardDescription, CardTitle, Input } from "@kch/ui";
 import { ActionForm } from "@/components/action-form";
+import { PointsBalanceForm } from "@/components/points-balance-form";
 import { RedemptionCalc } from "@/components/redemption-calc";
 import { formatCents } from "@/lib/money";
 import { listPoints, listRedemptions } from "@/lib/perks";
 import { formatDate } from "@/lib/periods";
 import {
   PROGRAMS,
+  VALUATION_SOURCE,
   balanceValueCents,
   checkRedemption,
   defaultCentsPerPoint,
+  defaultCentsPerPointX100,
+  effectiveCentsPerPointX100,
   formatCpp,
 } from "@/lib/points";
 import { requireSession } from "@/lib/session";
@@ -18,6 +22,7 @@ import {
   deletePointsAction,
   deleteRedemptionAction,
   importBalancesAction,
+  resetPointsValueAction,
   savePointsAction,
 } from "../actions";
 
@@ -39,16 +44,22 @@ export default async function PointsPage() {
   const [points, redemptions] = await Promise.all([listPoints(user.id), listRedemptions(user.id)]);
   const rows = points
     // Estimates, so shown to the dollar.
-    .map((p) => ({
-      ...p,
-      valueCents: Math.round(balanceValueCents(p.balance, p.centsPerPointX100) / 100) * 100,
-    }))
+    .map((p) => {
+      const effectiveCppX100 = effectiveCentsPerPointX100(p);
+      const defaultCppX100 = defaultCentsPerPointX100(p.program);
+      return {
+        ...p,
+        effectiveCppX100,
+        defaultCppX100,
+        valueCents: Math.round(balanceValueCents(p.balance, effectiveCppX100) / 100) * 100,
+      };
+    })
     .sort((a, b) => b.valueCents - a.valueCents);
   const total = rows.reduce((n, r) => n + r.valueCents, 0);
   const totalPoints = rows.reduce((n, r) => n + r.balance, 0);
-  const valueOf = new Map(points.map((p) => [p.program, p.centsPerPointX100 / 100]));
+  const valueOf = new Map(rows.map((p) => [p.program, p.effectiveCppX100 / 100]));
   const calcPrograms = [
-    ...rows.map((r) => ({ program: r.program, centsPerPoint: r.centsPerPointX100 / 100 })),
+    ...rows.map((r) => ({ program: r.program, centsPerPoint: r.effectiveCppX100 / 100 })),
     ...PROGRAMS.filter((p) => !valueOf.has(p)).map((p) => ({
       program: p,
       centsPerPoint: defaultCentsPerPoint(p),
@@ -60,9 +71,34 @@ export default async function PointsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Points</h1>
         <p className="text-sm text-muted-foreground">
-          {rows.length === 0
-            ? "Add your points and miles to see what they are worth at your own values."
-            : `${totalPoints.toLocaleString("en-US")} points and miles across ${rows.length} program${rows.length === 1 ? "" : "s"}, worth about ${formatCents(total)}.`}
+          {rows.length === 0 ? (
+            <>
+              Add your points and miles to see what they are worth using{" "}
+              <a
+                href={VALUATION_SOURCE.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                {VALUATION_SOURCE.label}
+              </a>
+              .
+            </>
+          ) : (
+            <>
+              {totalPoints.toLocaleString("en-US")} points and miles across {rows.length} program
+              {rows.length === 1 ? "" : "s"}, worth about {formatCents(total)} (based on{" "}
+              <a
+                href={VALUATION_SOURCE.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                {VALUATION_SOURCE.label}
+              </a>
+              ).
+            </>
+          )}
         </p>
       </div>
 
@@ -115,7 +151,8 @@ export default async function PointsPage() {
                 </div>
                 <details className="group">
                   <summary className="cursor-pointer list-none text-sm text-muted-foreground">
-                    {r.balance.toLocaleString("en-US")} at {formatCpp(r.centsPerPointX100 / 100)} ·{" "}
+                    {r.balance.toLocaleString("en-US")} at {formatCpp(r.effectiveCppX100 / 100)}
+                    {r.customValue ? " (custom)" : ""} ·{" "}
                     <span className="underline-offset-2 group-hover:underline">Edit</span>
                   </summary>
                   <ActionForm
@@ -139,21 +176,31 @@ export default async function PointsPage() {
                       <Input
                         name="cpp"
                         inputMode="decimal"
-                        defaultValue={String(r.centsPerPointX100 / 100)}
+                        defaultValue={String(r.effectiveCppX100 / 100)}
+                        placeholder={String(r.defaultCppX100 / 100)}
                         className="mt-1 h-9 w-24"
                       />
                     </label>
                   </ActionForm>
-                  <form action={deletePointsAction.bind(null, r.id)}>
-                    <Button
-                      type="submit"
-                      size="sm"
-                      variant="link"
-                      className="px-0 text-destructive"
-                    >
-                      Remove {r.program}
-                    </Button>
-                  </form>
+                  <div className="mt-1 flex flex-wrap items-center gap-4">
+                    {r.customValue && (
+                      <form action={resetPointsValueAction.bind(null, r.id)}>
+                        <Button type="submit" size="sm" variant="link" className="px-0">
+                          Reset to auto ({formatCpp(r.defaultCppX100 / 100)})
+                        </Button>
+                      </form>
+                    )}
+                    <form action={deletePointsAction.bind(null, r.id)}>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="link"
+                        className="px-0 text-destructive"
+                      >
+                        Remove {r.program}
+                      </Button>
+                    </form>
+                  </div>
                 </details>
               </li>
             ))}
@@ -165,47 +212,17 @@ export default async function PointsPage() {
         <Card>
           <CardTitle>Add or update a balance</CardTitle>
           <CardDescription className="mt-1">
-            Values start from your spreadsheet&rsquo;s Point Values tab; change any of them.
+            Point values auto-fill from {VALUATION_SOURCE.label} and update automatically unless you
+            enter a custom value.
           </CardDescription>
-          <ActionForm action={savePointsAction} submit="Save balance" className="mt-4 space-y-4">
-            <div className="space-y-1.5">
-              <label htmlFor="pts-program" className="text-sm font-medium">
-                Program
-              </label>
-              <Input
-                id="pts-program"
-                name="program"
-                list="programs"
-                placeholder="American Express Membership Rewards"
-                required
-              />
-              <datalist id="programs">
-                {PROGRAMS.map((p) => (
-                  <option key={p} value={p} />
-                ))}
-              </datalist>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label htmlFor="pts-balance" className="text-sm font-medium">
-                  Balance
-                </label>
-                <Input
-                  id="pts-balance"
-                  name="balance"
-                  inputMode="numeric"
-                  placeholder="270520"
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="pts-cpp" className="text-sm font-medium">
-                  ¢ per point (optional)
-                </label>
-                <Input id="pts-cpp" name="cpp" inputMode="decimal" placeholder="2.0" />
-              </div>
-            </div>
-          </ActionForm>
+          <PointsBalanceForm
+            action={savePointsAction}
+            existing={rows.map((r) => ({
+              program: r.program,
+              centsPerPoint: r.effectiveCppX100 / 100,
+              customValue: r.customValue,
+            }))}
+          />
         </Card>
 
         <Card>

@@ -1,40 +1,49 @@
 /**
  * Points and miles: balances, what they are worth, and whether a redemption
- * beats paying cash. Default values come from the owner's own spreadsheet
- * ("Point Values" tab), in cents per point; everyone can change their own.
+ * beats paying cash. Default values come from Frequent Miler's Reasonable
+ * Redemption Values (RRVs), in cents per point; balances track these live
+ * estimates automatically unless overridden with a custom value.
  */
+export const VALUATION_SOURCE = {
+  name: "Frequent Miler",
+  label: "Frequent Miler RRVs",
+  url: "https://frequentmiler.com/reasonable-redemption-values-rrvs/",
+  reviewed: "2026-11",
+} as const;
+
 export const DEFAULT_CENTS_PER_POINT: Record<string, number> = {
-  "American Express Membership Rewards": 2.0,
-  "Chase Ultimate Rewards": 2.0,
-  "Capital One Venture Rewards": 1.4,
-  "Citi ThankYou": 1.7,
-  "Bilt Rewards": 1.8,
-  Hyatt: 1.7,
-  "Marriott Bonvoy": 0.85,
-  "Hilton Honors": 0.6,
-  "IHG One Rewards": 0.5,
-  Wyndham: 1.2,
-  "Choice Privileges": 0.6,
-  "Alaska / Hawaiian Atmos Rewards": 1.8,
+  "American Express Membership Rewards": 1.5,
+  "Chase Ultimate Rewards": 1.5,
+  "Capital One Venture Rewards": 1.45,
+  "Citi ThankYou": 1.5,
+  "Bilt Rewards": 1.55,
+  "Wells Fargo Rewards": 1.4,
+  Hyatt: 1.5,
+  "Marriott Bonvoy": 0.73,
+  "Hilton Honors": 0.35,
+  "IHG One Rewards": 0.59,
+  Wyndham: 0.57,
+  "Choice Privileges": 0.75,
+  "Alaska / Hawaiian Atmos Rewards": 1.5,
   "American AAdvantage": 1.4,
-  "Delta SkyMiles": 1.2,
-  "United MileagePlus": 1.4,
-  "Southwest Rapid Rewards": 1.5,
+  "Delta SkyMiles": 1.1,
+  "United MileagePlus": 1.3,
+  "Southwest Rapid Rewards": 1.3,
   "JetBlue TrueBlue": 1.3,
-  Aeroplan: 1.5,
-  "British Airways Avios": 1.5,
-  "Flying Blue": 1.2,
-  "Avianca LifeMiles": 1.7,
+  Aeroplan: 1.4,
+  "British Airways Avios": 1.1,
+  "Flying Blue": 1.3,
+  "Avianca LifeMiles": 1.3,
   "Virgin Atlantic": 1.5,
   "ANA Mileage Club": 1.4,
   "Singapore KrisFlyer": 1.3,
-  "Cathay Pacific Asia Miles": 1.3,
+  "Cathay Pacific Asia Miles": 1.1,
   "Turkish Miles&Smiles": 1.3,
   "Emirates Skywards": 1.2,
   "Etihad Guest": 1.4,
-  "Qatar Privilege Club": 0.8,
-  "Korean Air SKYPASS": 1.7,
-  "Amtrak Guest Rewards": 2.5,
+  "Qatar Privilege Club": 1.1,
+  "Korean Air SKYPASS": 1.3,
+  "Amtrak Guest Rewards": 2.56,
   "Discover Cashback": 1.0,
   "Cash back": 1.0,
 };
@@ -46,6 +55,7 @@ const ALIASES: [RegExp, string][] = [
   [/capital one|venture/i, "Capital One Venture Rewards"],
   [/thank ?you/i, "Citi ThankYou"],
   [/bilt/i, "Bilt Rewards"],
+  [/wells ?fargo/i, "Wells Fargo Rewards"],
   [/hyatt/i, "Hyatt"],
   [/marriott|bonvoy/i, "Marriott Bonvoy"],
   [/hilton/i, "Hilton Honors"],
@@ -88,6 +98,42 @@ export function normalizeProgram(name: string): string {
 
 export function defaultCentsPerPoint(program: string): number {
   return DEFAULT_CENTS_PER_POINT[normalizeProgram(program)] ?? 1;
+}
+
+export function defaultCentsPerPointX100(program: string): number {
+  return Math.round(defaultCentsPerPoint(program) * 100);
+}
+
+/**
+ * Active valuation for a saved balance in hundredths of a cent.
+ * Auto-tracked rows (`customValue !== true`) always follow the current
+ * Frequent Miler RRV so portfolio estimates stay up to date automatically.
+ */
+export function effectiveCentsPerPointX100(row: {
+  program: string;
+  centsPerPointX100: number;
+  customValue?: boolean;
+}): number {
+  return row.customValue ? row.centsPerPointX100 : defaultCentsPerPointX100(row.program);
+}
+
+/**
+ * Parse a user-supplied cents-per-point string and decide whether it is an
+ * explicit custom override or matches the automatic Frequent Miler estimate.
+ * Blank input resets to automatic tracking.
+ */
+export function resolvePointValuation(
+  program: string,
+  cppInput: string | undefined,
+): { centsPerPointX100: number; customValue: boolean } | null {
+  const autoCppX100 = defaultCentsPerPointX100(program);
+  const cleaned = cppInput?.trim() ?? "";
+  if (!cleaned) return { centsPerPointX100: autoCppX100, customValue: false };
+  const n = Number(cleaned.replace(/[¢\s]/g, ""));
+  if (!Number.isFinite(n) || n < 0 || n > 1000) return null;
+  const parsed = Math.round(n * 100);
+  if (parsed === autoCppX100) return { centsPerPointX100: autoCppX100, customValue: false };
+  return { centsPerPointX100: parsed, customValue: true };
 }
 
 /** Dollar value of a balance, in cents. `centsPerPointX100` is cents per point times 100. */

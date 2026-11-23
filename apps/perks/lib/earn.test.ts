@@ -49,14 +49,14 @@ describe("rankCards", () => {
 
   it("puts Amex Gold first for dining and groceries", () => {
     const dining = rankCards(wallet, { category: "dining" }, value);
-    expect(dining[0]).toMatchObject({ cardId: "amex-gold", x: 4, returnPct: 8 });
+    expect(dining[0]).toMatchObject({ cardId: "amex-gold", x: 4, returnPct: 6 });
     expect(names(dining)).not.toContain("amex-platinum");
   });
 
   it("prefers the hotel's own card at that chain", () => {
     const hyatt = rankCards(wallet, classify("Hyatt Regency"), value);
     expect(hyatt[0]).toMatchObject({ cardId: "chase-sapphire-reserve", x: 4 });
-    expect(hyatt.find((p) => p.cardId === "chase-hyatt")).toMatchObject({ x: 4, returnPct: 6.8 });
+    expect(hyatt.find((p) => p.cardId === "chase-hyatt")).toMatchObject({ x: 4, returnPct: 6 });
     // Not a Hyatt, so the Hyatt card's 4x does not apply.
     expect(
       rankCards(wallet, classify("Marriott"), value).find((p) => p.cardId === "chase-hyatt")?.x,
@@ -65,7 +65,7 @@ describe("rankCards", () => {
 
   it("uses Venture X's 2x for everyday spending and keeps portal rates as tips", () => {
     const other = rankCards(wallet, { category: "other" }, value);
-    expect(other[0]).toMatchObject({ cardId: "capital-one-venture-x", x: 2, returnPct: 2.8 });
+    expect(other[0]).toMatchObject({ cardId: "capital-one-venture-x", x: 2, returnPct: 2.9 });
     expect(other[0]?.portal).toMatch(/Capital One Travel/);
     expect(other.find((p) => p.cardId === "discover-it")?.rotating).toBe(true);
   });
@@ -78,7 +78,7 @@ describe("rankCards", () => {
       { category: "drugstores" },
       value,
     );
-    expect(pooled[0]).toMatchObject({ cardId: "chase-freedom-unlimited", returnPct: 6 });
+    expect(pooled[0]).toMatchObject({ cardId: "chase-freedom-unlimited", returnPct: 4.5 });
   });
 
   it("uses the owner's own point values", () => {

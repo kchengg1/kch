@@ -1,0 +1,1 @@
+ALTER TABLE "perks_points" ADD COLUMN "custom_value" boolean DEFAULT false NOT NULL;

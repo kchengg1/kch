@@ -203,6 +203,8 @@ export type MobilePointsBalance = {
   program: string;
   balance: number;
   centsPerPointX100: number;
+  defaultCentsPerPointX100: number;
+  customValue: boolean;
   valueCents: number;
 };
 
@@ -455,9 +457,15 @@ export type MobileBootstrap = {
   points: {
     totalPoints: number;
     totalValueCents: number;
+    valuationSource: {
+      name: string;
+      label: string;
+      url: string;
+      reviewed: string;
+    };
     balances: MobilePointsBalance[];
     redemptions: MobileRedemption[];
-    programs: { program: string; centsPerPoint: number }[];
+    programs: { program: string; centsPerPoint: number; defaultCentsPerPoint: number }[];
   };
   bonuses: {
     asOf: string;

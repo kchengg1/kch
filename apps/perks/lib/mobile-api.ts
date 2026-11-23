@@ -46,10 +46,14 @@ import {
 } from "./periods";
 import {
   PROGRAMS,
+  VALUATION_SOURCE,
   balanceValueCents,
   checkRedemption,
   defaultCentsPerPoint,
+  defaultCentsPerPointX100,
+  effectiveCentsPerPointX100,
   normalizeProgram,
+  resolvePointValuation,
 } from "./points";
 import { shareableCards } from "./referrals";
 import { applicationRules } from "./rules";
@@ -150,6 +154,7 @@ export type MobilePointsInput = {
   program: string;
   balance: number;
   centsPerPointX100: number;
+  customValue?: boolean;
 };
 
 export type MobileRedemptionInput = {
@@ -573,19 +578,33 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
 
   // Points & Redemptions
   const pointRows = points
-    .map((p) => ({
-      ...p,
-      valueCents: Math.round(balanceValueCents(p.balance, p.centsPerPointX100) / 100) * 100,
-    }))
+    .map((p) => {
+      const effectiveCppX100 = effectiveCentsPerPointX100(p);
+      const defaultCppX100 = defaultCentsPerPointX100(p.program);
+      return {
+        id: p.id,
+        program: p.program,
+        balance: p.balance,
+        centsPerPointX100: effectiveCppX100,
+        defaultCentsPerPointX100: defaultCppX100,
+        customValue: Boolean(p.customValue),
+        valueCents: Math.round(balanceValueCents(p.balance, effectiveCppX100) / 100) * 100,
+      };
+    })
     .sort((a, b) => b.valueCents - a.valueCents);
   const totalValueCents = pointRows.reduce((n, r) => n + r.valueCents, 0);
   const totalPoints = pointRows.reduce((n, r) => n + r.balance, 0);
-  const valueByProgram = new Map(points.map((p) => [p.program, p.centsPerPointX100 / 100]));
+  const valueByProgram = new Map(pointRows.map((p) => [p.program, p.centsPerPointX100 / 100]));
   const programOptions = [
-    ...pointRows.map((r) => ({ program: r.program, centsPerPoint: r.centsPerPointX100 / 100 })),
+    ...pointRows.map((r) => ({
+      program: r.program,
+      centsPerPoint: r.centsPerPointX100 / 100,
+      defaultCentsPerPoint: r.defaultCentsPerPointX100 / 100,
+    })),
     ...PROGRAMS.filter((p) => !valueByProgram.has(p)).map((p) => ({
       program: p,
       centsPerPoint: defaultCentsPerPoint(p),
+      defaultCentsPerPoint: defaultCentsPerPoint(p),
     })),
   ];
   const mappedRedemptions: (MobileRedemptionInput & {
@@ -857,6 +876,7 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
     points: {
       totalPoints,
       totalValueCents,
+      valuationSource: VALUATION_SOURCE,
       balances: pointRows,
       redemptions: mappedRedemptions,
       programs: programOptions,
@@ -966,6 +986,7 @@ export type MobileAction =
       program: string;
       balance: number;
       centsPerPointX100: number;
+      customValue: boolean;
     }
   | { type: "points.importBalances"; balances: string }
   | { type: "points.delete"; id: string }
@@ -1008,11 +1029,6 @@ const OFFER_STATUSES = new Set<OfferStatus>(["available", "added", "used", "dism
 
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
-}
-
-function parseCpp(value: string): number | null {
-  const n = Number(value.replace(/[¢\s]/g, ""));
-  return Number.isFinite(n) && n >= 0 && n <= 1000 ? Math.round(n * 100) : null;
 }
 
 function parseBenefitBody(body: Record<string, unknown>):
@@ -1319,14 +1335,21 @@ export function parseMobileAction(raw: unknown): { action: MobileAction } | { er
     case "points.save": {
       const program = normalizeProgram(str(body.program)).slice(0, 80);
       const balance = Math.round(Number(str(body.balance).replace(/[,\s]/g, "")));
-      const cppInput = str(body.cpp);
-      const cpp = cppInput ? parseCpp(cppInput) : Math.round(defaultCentsPerPoint(program) * 100);
+      const valuation = resolvePointValuation(program, str(body.cpp));
       if (!program) return { error: "Choose a program." };
       if (!Number.isFinite(balance) || balance < 0) {
         return { error: "Balance should be a number of points." };
       }
-      if (cpp === null) return { error: "Value should be cents per point, like 1.7." };
-      return { action: { type, program, balance, centsPerPointX100: cpp } };
+      if (!valuation) return { error: "Value should be cents per point, like 1.5." };
+      return {
+        action: {
+          type,
+          program,
+          balance,
+          centsPerPointX100: valuation.centsPerPointX100,
+          customValue: valuation.customValue,
+        },
+      };
     }
     case "points.importBalances": {
       const balances = typeof body.balances === "string" ? body.balances.trim() : "";

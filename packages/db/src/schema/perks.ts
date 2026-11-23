@@ -127,8 +127,10 @@ export const perksPoints = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     program: text("program").notNull(),
     balance: integer("balance").notNull().default(0),
-    /** Cents per point in hundredths, so 1.7 cents is stored as 170. */
+    /** Cents per point in hundredths, so 1.5 cents is stored as 150. */
     centsPerPointX100: integer("cents_per_point_x100").notNull().default(100),
+    /** True when the user explicitly overrode the automatic valuation estimate. */
+    customValue: boolean("custom_value").notNull().default(false),
     updatedAt: timestamp("updated_at")
       .notNull()
       .defaultNow()

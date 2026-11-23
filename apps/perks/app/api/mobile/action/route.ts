@@ -617,12 +617,14 @@ async function runAction(
           program: action.program,
           balance: action.balance,
           centsPerPointX100: action.centsPerPointX100,
+          customValue: action.customValue,
         })
         .onConflictDoUpdate({
           target: [perksPoints.userId, perksPoints.program],
           set: {
             balance: action.balance,
             centsPerPointX100: action.centsPerPointX100,
+            customValue: action.customValue,
             updatedAt: new Date(),
           },
         });
@@ -636,9 +638,11 @@ async function runAction(
       }
       const existing = new Map((await listPoints(user.id)).map((p) => [p.program, p]));
       for (const { program, balance } of rows) {
-        const cpp =
-          existing.get(program)?.centsPerPointX100 ??
-          Math.round(defaultCentsPerPoint(program) * 100);
+        const prev = existing.get(program);
+        const keepCustom = Boolean(prev?.customValue);
+        const cpp = keepCustom
+          ? prev!.centsPerPointX100
+          : Math.round(defaultCentsPerPoint(program) * 100);
         await db
           .insert(perksPoints)
           .values({
@@ -647,10 +651,16 @@ async function runAction(
             program,
             balance,
             centsPerPointX100: cpp,
+            customValue: keepCustom,
           })
           .onConflictDoUpdate({
             target: [perksPoints.userId, perksPoints.program],
-            set: { balance, updatedAt: new Date() },
+            set: {
+              balance,
+              centsPerPointX100: cpp,
+              customValue: keepCustom,
+              updatedAt: new Date(),
+            },
           });
       }
       return { message: `Updated ${rows.length} balance${rows.length === 1 ? "" : "s"}.` };

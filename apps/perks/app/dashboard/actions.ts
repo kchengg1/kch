@@ -25,7 +25,12 @@ import { sendDigest } from "@/lib/digest";
 import { sendPush } from "@/lib/push";
 import { parseDollars } from "@/lib/money";
 import { merchantKey } from "@/lib/offer-groups";
-import { defaultCentsPerPoint, normalizeProgram, parseBalances } from "@/lib/points";
+import {
+  defaultCentsPerPointX100,
+  normalizeProgram,
+  parseBalances,
+  resolvePointValuation,
+} from "@/lib/points";
 import { offerKey, type ParsedOffer } from "@/lib/offer-parse";
 import {
   addTemplateBenefits,
@@ -705,34 +710,39 @@ export async function saveWorthAction(_prev: FormState, form: FormData): Promise
 
 /* ---- Points ------------------------------------------------------------ */
 
-/** Cents per point as typed ("1.7") to hundredths (170). */
-function parseCpp(value: string): number | null {
-  const n = Number(value.replace(/[¢\s]/g, ""));
-  return Number.isFinite(n) && n >= 0 && n <= 1000 ? Math.round(n * 100) : null;
-}
-
 export async function savePointsAction(_prev: FormState, form: FormData): Promise<FormState> {
   const { user } = await requireSession();
   const program = normalizeProgram(text(form, "program")).slice(0, 80);
   const balance = Math.round(Number(text(form, "balance").replace(/[,\s]/g, "")));
-  const cppInput = text(form, "cpp");
-  const cpp = cppInput ? parseCpp(cppInput) : Math.round(defaultCentsPerPoint(program) * 100);
+  const valuation = resolvePointValuation(program, text(form, "cpp"));
   if (!program) return { error: "Choose a program." };
   if (!Number.isFinite(balance) || balance < 0)
     return { error: "Balance should be a number of points." };
-  if (cpp === null) return { error: "Value should be cents per point, like 1.7." };
+  if (!valuation) return { error: "Value should be cents per point, like 1.5." };
   await db
     .insert(perksPoints)
-    .values({ id: crypto.randomUUID(), userId: user.id, program, balance, centsPerPointX100: cpp })
+    .values({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      program,
+      balance,
+      centsPerPointX100: valuation.centsPerPointX100,
+      customValue: valuation.customValue,
+    })
     .onConflictDoUpdate({
       target: [perksPoints.userId, perksPoints.program],
-      set: { balance, centsPerPointX100: cpp, updatedAt: new Date() },
+      set: {
+        balance,
+        centsPerPointX100: valuation.centsPerPointX100,
+        customValue: valuation.customValue,
+        updatedAt: new Date(),
+      },
     });
   refresh();
   return { message: `Saved ${program}.` };
 }
 
-/** Paste the balances block from a sheet: each program's balance is set, values kept. */
+/** Paste the balances block from a sheet: balances update, custom overrides stay, auto rows follow live estimates. */
 export async function importBalancesAction(_prev: FormState, form: FormData): Promise<FormState> {
   const { user } = await requireSession();
   const rows = parseBalances(text(form, "balances"));
@@ -740,8 +750,9 @@ export async function importBalancesAction(_prev: FormState, form: FormData): Pr
     return { error: 'Paste lines like "Amex MR, 270520", one program per line.' };
   const existing = new Map((await listPoints(user.id)).map((p) => [p.program, p]));
   for (const { program, balance } of rows) {
-    const cpp =
-      existing.get(program)?.centsPerPointX100 ?? Math.round(defaultCentsPerPoint(program) * 100);
+    const prev = existing.get(program);
+    const keepCustom = Boolean(prev?.customValue);
+    const cpp = keepCustom ? prev!.centsPerPointX100 : defaultCentsPerPointX100(program);
     await db
       .insert(perksPoints)
       .values({
@@ -750,14 +761,38 @@ export async function importBalancesAction(_prev: FormState, form: FormData): Pr
         program,
         balance,
         centsPerPointX100: cpp,
+        customValue: keepCustom,
       })
       .onConflictDoUpdate({
         target: [perksPoints.userId, perksPoints.program],
-        set: { balance, updatedAt: new Date() },
+        set: {
+          balance,
+          centsPerPointX100: cpp,
+          customValue: keepCustom,
+          updatedAt: new Date(),
+        },
       });
   }
   refresh();
   return { message: `Updated ${rows.length} balance${rows.length === 1 ? "" : "s"}.` };
+}
+
+export async function resetPointsValueAction(id: string) {
+  const { user } = await requireSession();
+  const [row] = await db
+    .select()
+    .from(perksPoints)
+    .where(and(eq(perksPoints.id, id), eq(perksPoints.userId, user.id)));
+  if (!row) return;
+  await db
+    .update(perksPoints)
+    .set({
+      centsPerPointX100: defaultCentsPerPointX100(row.program),
+      customValue: false,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(perksPoints.id, id), eq(perksPoints.userId, user.id)));
+  refresh();
 }
 
 export async function deletePointsAction(id: string) {
