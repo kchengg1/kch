@@ -29,6 +29,7 @@ import {
   sortOfferGroups,
 } from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
+import { detectCardFromOffersText } from "../lib/offer-card-detect";
 import type {
   MobileActionPayload,
   MobileBootstrap,
@@ -183,6 +184,7 @@ export const OffersScreen = React.memo(function OffersScreen({
   const openCards = useMemo(() => data.cards.filter((c) => !c.closed), [data.cards]);
   const [showPaste, setShowPaste] = useState(false);
   const [pasteCardId, setPasteCardId] = useState<string>(openCards[0]?.id ?? "");
+  const [autoDetectedName, setAutoDetectedName] = useState<string | null>(null);
   const [pasteText, setPasteText] = useState("");
   const [sortBy, setSortBy] = useState<OfferSortKey>("return");
   const [selectedCategory, setSelectedCategory] = useState<OfferCategory | null>(null);
@@ -190,6 +192,11 @@ export const OffersScreen = React.memo(function OffersScreen({
     label: string;
     items: { id: string; status: OfferStatus }[];
   } | null>(null);
+
+  const selectedPasteCard = useMemo(
+    () => openCards.find((c) => c.id === pasteCardId) ?? null,
+    [openCards, pasteCardId],
+  );
 
   const handleRecordUndo = useCallback(
     (label: string, items: { id: string; status: OfferStatus }[]) => {
@@ -228,10 +235,21 @@ export const OffersScreen = React.memo(function OffersScreen({
     return sortOfferGroups(list, sortBy);
   }, [data.offers.weak, selectedCategory, sortBy]);
 
+  function handlePasteTextChange(nextText: string) {
+    setPasteText(nextText);
+    const detectedId = detectCardFromOffersText(nextText, openCards);
+    if (detectedId) {
+      setPasteCardId(detectedId);
+      setAutoDetectedName(openCards.find((c) => c.id === detectedId)?.name ?? null);
+    } else {
+      setAutoDetectedName(null);
+    }
+  }
+
   async function handleClipboardPaste() {
     const text = await Clipboard.getStringAsync();
     if (text.trim()) {
-      setPasteText(text);
+      handlePasteTextChange(text);
     }
   }
 
@@ -303,7 +321,10 @@ export const OffersScreen = React.memo(function OffersScreen({
               <Text style={styles.smallLabel}>Which card are these offers from?</Text>
               <View style={styles.cardChipRow}>
                 <Pressable
-                  onPress={() => setPasteCardId("")}
+                  onPress={() => {
+                    setPasteCardId("");
+                    setAutoDetectedName(null);
+                  }}
                   style={[styles.cardChip, pasteCardId === "" && styles.cardChipSelected]}
                 >
                   <Text style={styles.cardChipLabel}>Any card</Text>
@@ -311,7 +332,10 @@ export const OffersScreen = React.memo(function OffersScreen({
                 {openCards.map((c) => (
                   <Pressable
                     key={c.id}
-                    onPress={() => setPasteCardId(c.id)}
+                    onPress={() => {
+                      setPasteCardId(c.id);
+                      setAutoDetectedName(null);
+                    }}
                     style={[styles.cardChip, pasteCardId === c.id && styles.cardChipSelected]}
                   >
                     <CardSwatch style={c.style} />
@@ -321,6 +345,12 @@ export const OffersScreen = React.memo(function OffersScreen({
                   </Pressable>
                 ))}
               </View>
+
+              {autoDetectedName ? (
+                <Text style={styles.autoDetectedText}>
+                  Auto-selected {autoDetectedName} from pasted text.
+                </Text>
+              ) : null}
 
               <View style={styles.rowGap}>
                 <Button
@@ -334,13 +364,15 @@ export const OffersScreen = React.memo(function OffersScreen({
               <FieldInput
                 label="Copied Amex / Chase offers page text"
                 value={pasteText}
-                onChangeText={setPasteText}
+                onChangeText={handlePasteTextChange}
                 multiline
                 placeholder={"JetBlue\nSpend $250 or more, earn $50 back\nExpires 12/15/2026"}
               />
 
               <Button
-                label="Save offers"
+                label={
+                  selectedPasteCard ? `Save offers to ${selectedPasteCard.name}` : "Save offers"
+                }
                 loading={busyKey === "offers.paste"}
                 disabled={!pasteText.trim()}
                 onPress={() =>
@@ -353,10 +385,32 @@ export const OffersScreen = React.memo(function OffersScreen({
                     "offers.paste",
                   ).then(() => {
                     setPasteText("");
+                    setAutoDetectedName(null);
                     setShowPaste(false);
                   })
                 }
               />
+
+              {selectedPasteCard ? (
+                <Button
+                  label={`Mark ${selectedPasteCard.name} checked (no new offers)`}
+                  variant="secondary"
+                  loading={busyKey === "offers.markChecked"}
+                  onPress={() =>
+                    void onAction(
+                      {
+                        type: "offers.markChecked",
+                        cardId: selectedPasteCard.id,
+                      },
+                      "offers.markChecked",
+                    ).then(() => {
+                      setPasteText("");
+                      setAutoDetectedName(null);
+                      setShowPaste(false);
+                    })
+                  }
+                />
+              ) : null}
             </SectionCard>
           ) : null}
 
@@ -806,6 +860,11 @@ const makeStyles = (COLORS: ThemeColors) =>
       fontSize: 13,
       lineHeight: 18,
       color: COLORS.muted,
+    },
+    autoDetectedText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.greenInk,
     },
     simpleRow: {
       minHeight: 44,

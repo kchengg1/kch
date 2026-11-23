@@ -523,6 +523,20 @@ describe("parseMobileAction", () => {
         url: "http://insecure.example.com",
       }),
     ).toEqual({ error: "Paste the full referral link, starting with https://" });
+    expect(
+      parseMobileAction({
+        type: "offers.markChecked",
+        cardId: "c1",
+      }),
+    ).toEqual({
+      action: { type: "offers.markChecked", cardId: "c1" },
+    });
+    expect(
+      parseMobileAction({
+        type: "offers.markChecked",
+        cardId: "",
+      }),
+    ).toEqual({ error: "Card not found." });
     expect(parseMobileAction({ type: "unknown.op" })).toEqual({
       error: "Unknown action type: unknown.op.",
     });

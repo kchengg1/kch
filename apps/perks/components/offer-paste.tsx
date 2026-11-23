@@ -1,11 +1,12 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Alert, Badge, Button, Label } from "@kch/ui";
 import type { FormState } from "@/app/dashboard/actions";
 import { formatCents } from "@/lib/money";
 import { merchantKey } from "@/lib/offer-groups";
-import { parseOffers } from "@/lib/offer-parse";
+import { detectCardFromOffersText, parseOffers } from "@/lib/offer-parse";
 import { offerReturn, rateLabel } from "@/lib/offer-value";
 import { formatDate } from "@/lib/periods";
 
@@ -64,26 +65,32 @@ export function OfferPaste({
   /** Merchant keys marked not interested; their offers are skipped on save. */
   hiddenKeys: string[];
 }) {
+  const router = useRouter();
   const [text, setText] = useState("");
   const hidden = useMemo(() => new Set(hiddenKeys), [hiddenKeys]);
   const [cardId, setCardId] = useState(cards[0]?.id ?? "");
+  const [autoDetectedName, setAutoDetectedName] = useState<string | null>(null);
   useEffect(() => {
     const onSelect = (event: Event) => {
       const nextId = (event as CustomEvent<string>).detail;
       if (typeof nextId === "string" && cards.some((c) => c.id === nextId)) {
         setCardId(nextId);
+        setAutoDetectedName(null);
       }
     };
     window.addEventListener(SELECT_PASTE_CARD_EVENT, onSelect);
     return () => window.removeEventListener(SELECT_PASTE_CARD_EVENT, onSelect);
   }, [cards]);
-  const lastChecked = cards.find((c) => c.id === cardId)?.checked;
+  const selectedCard = cards.find((c) => c.id === cardId);
+  const lastChecked = selectedCard?.checked;
   const [removed, setRemoved] = useState<Set<number>>(new Set());
   const [state, formAction, pending] = useActionState(async (prev: FormState, form: FormData) => {
     const result = await action(prev, form);
     if (result?.message) {
       setText("");
       setRemoved(new Set());
+      setAutoDetectedName(null);
+      router.refresh();
     }
     return result;
   }, undefined);
@@ -99,7 +106,10 @@ export function OfferPaste({
           name="cardId"
           className={`${field} h-10`}
           value={cardId}
-          onChange={(e) => setCardId(e.target.value)}
+          onChange={(e) => {
+            setCardId(e.target.value);
+            setAutoDetectedName(null);
+          }}
         >
           {cards.map((c) => (
             <option key={c.id} value={c.id}>
@@ -108,6 +118,11 @@ export function OfferPaste({
           ))}
           <option value="">No specific card</option>
         </select>
+        {autoDetectedName && (
+          <p className="text-xs font-medium text-primary">
+            Auto-selected {autoDetectedName} from the pasted page.
+          </p>
+        )}
         {lastChecked && (
           <p className="text-sm text-muted-foreground">Offers for this card were {lastChecked}.</p>
         )}
@@ -118,8 +133,16 @@ export function OfferPaste({
           id="paste"
           value={text}
           onChange={(e) => {
-            setText(e.target.value);
+            const nextText = e.target.value;
+            setText(nextText);
             setRemoved(new Set());
+            const detectedId = detectCardFromOffersText(nextText, cards);
+            if (detectedId) {
+              setCardId(detectedId);
+              setAutoDetectedName(cards.find((c) => c.id === detectedId)?.name ?? null);
+            } else {
+              setAutoDetectedName(null);
+            }
           }}
           rows={7}
           placeholder={"lululemon\nSpend $150 or more, get $30 back\nExpires 12/15/2026"}
@@ -132,6 +155,9 @@ export function OfferPaste({
         <Alert variant="error">
           No offers recognised yet. Each offer needs a merchant line and a deal line such as
           &ldquo;Spend $80 or more, get $15 back&rdquo;.
+          {selectedCard
+            ? ` If ${selectedCard.name} has no new offers, you can mark it checked below.`
+            : ""}
         </Alert>
       )}
       {parsed.length > 0 && (
@@ -176,13 +202,20 @@ export function OfferPaste({
       )}
       {state?.error && <Alert variant="error">{state.error}</Alert>}
       {state?.message && <Alert variant="success">{state.message}</Alert>}
-      <Button type="submit" disabled={pending || kept.length === 0}>
-        {pending
-          ? "Saving…"
-          : kept.length
-            ? `Save ${kept.length} offer${kept.length === 1 ? "" : "s"}`
-            : "Save offers"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" disabled={pending || kept.length === 0}>
+          {pending
+            ? "Saving…"
+            : kept.length
+              ? `Save ${kept.length} offer${kept.length === 1 ? "" : "s"}${selectedCard ? ` to ${selectedCard.name}` : ""}`
+              : "Save offers"}
+        </Button>
+        {selectedCard && kept.length === 0 && (
+          <Button type="submit" name="markChecked" value="1" variant="outline" disabled={pending}>
+            Mark {selectedCard.name} checked (no new offers)
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

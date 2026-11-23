@@ -457,6 +457,16 @@ export async function saveOffersAction(_prev: FormState, form: FormData): Promis
   const card = cardId ? await getCard(cardId, user.id) : null;
   if (cardId && !card) return { error: "Card not found." };
 
+  if (text(form, "markChecked") === "1") {
+    if (!card) return { error: "Choose a card to mark checked." };
+    await db
+      .update(perksCard)
+      .set({ offersCheckedAt: new Date() })
+      .where(and(eq(perksCard.id, card.id), eq(perksCard.userId, user.id)));
+    refresh();
+    return { message: `Marked ${card.name} checked (no new offers).` };
+  }
+
   let parsed: ParsedOffer[];
   try {
     parsed = JSON.parse(text(form, "offers"));
@@ -503,7 +513,7 @@ export async function saveOffersAction(_prev: FormState, form: FormData): Promis
     await db
       .update(perksCard)
       .set({ offersCheckedAt: new Date() })
-      .where(eq(perksCard.id, card.id));
+      .where(and(eq(perksCard.id, card.id), eq(perksCard.userId, user.id)));
   refresh();
   const skipped = parsed.length - rows.length;
   const shown = rows.length - hiddenCount;
@@ -512,7 +522,7 @@ export async function saveOffersAction(_prev: FormState, form: FormData): Promis
     hiddenCount ? `left out ${hiddenCount} from merchants you hid` : "",
   ].filter(Boolean);
   return {
-    message: `Saved ${shown} offer${shown === 1 ? "" : "s"}${notes.length ? `, ${notes.join(", ")}` : ""}.`,
+    message: `Saved ${shown} offer${shown === 1 ? "" : "s"}${card ? ` to ${card.name}` : ""}${notes.length ? `, ${notes.join(", ")}` : ""}.`,
   };
 }
 
