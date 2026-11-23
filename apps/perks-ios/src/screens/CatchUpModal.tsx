@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -32,12 +32,14 @@ import type {
 export function CatchUpModal({
   visible,
   data,
+  initialCardId,
   busyKey,
   onClose,
   onRunRawAction,
 }: {
   visible: boolean;
   data: MobileBootstrap;
+  initialCardId?: string | null;
   busyKey: string | null;
   onClose: () => void;
   onRunRawAction: (payload: MobileActionPayload, key: string) => Promise<MobileActionResponse>;
@@ -50,6 +52,15 @@ export function CatchUpModal({
   const [preview, setPreview] = useState<StatementPreviewPayload | null>(null);
   const [assignedBenefits, setAssignedBenefits] = useState<Record<number, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (initialCardId && data.cards.some((c) => !c.closed && c.id === initialCardId)) {
+      setSelectedCardId(initialCardId);
+      setPreview(null);
+      setNotice(null);
+    }
+  }, [visible, initialCardId, data.cards]);
 
   const activeCardId = openCards.some((c) => c.id === selectedCardId)
     ? selectedCardId

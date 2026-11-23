@@ -88,6 +88,7 @@ function PerksShell() {
   const [mountedTabs, setMountedTabs] = useState<Record<TabKey, boolean>>(INITIAL_MOUNTED_TABS);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [catchUpOpen, setCatchUpOpen] = useState(false);
+  const [catchUpCardId, setCatchUpCardId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [yearEndOpen, setYearEndOpen] = useState(false);
 
@@ -125,12 +126,14 @@ function PerksShell() {
     setSelectedCardId(null);
   }, []);
 
-  const handleOpenCatchUp = useCallback(() => {
+  const handleOpenCatchUp = useCallback((cardId?: string) => {
+    setCatchUpCardId(typeof cardId === "string" ? cardId : null);
     setCatchUpOpen(true);
   }, []);
 
   const handleCloseCatchUp = useCallback(() => {
     setCatchUpOpen(false);
+    setCatchUpCardId(null);
   }, []);
 
   const handleOpenSettings = useCallback(() => {
@@ -483,11 +486,13 @@ function PerksShell() {
         onClose={handleCloseCard}
         onAction={handleAction}
         onOpenReferrals={handleOpenReferrals}
+        onOpenCatchUp={handleOpenCatchUp}
       />
 
       <CatchUpModal
         visible={catchUpOpen}
         data={bootstrap}
+        initialCardId={catchUpCardId}
         busyKey={busyKey}
         onClose={handleCloseCatchUp}
         onRunRawAction={handleRunRawAction}
