@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseOffers } from "./offer-parse";
+import { detectCardFromOffersText, parseOffers } from "./offer-parse";
 
 const TODAY = "2026-11-11";
 
@@ -348,5 +348,53 @@ Expires 12/01/2026`;
     const text = `Nike\nSpend $100 or more, get $20 back\nExpires 12/31/2026\nNike\nSpend $100 or more, get $20 back\nExpires 12/31/2026\nView Details`;
     expect(parseOffers(text, TODAY)).toHaveLength(1);
     expect(parseOffers("Welcome back\nYour account summary", TODAY)).toEqual([]);
+  });
+});
+
+describe("detectCardFromOffersText", () => {
+  const cards = [
+    { id: "bbp", name: "Amex Blue Business Plus" },
+    { id: "gold", name: "Amex Gold" },
+    { id: "biz-gold", name: "Amex Business Gold" },
+    { id: "csr", name: "Chase Sapphire Reserve" },
+  ];
+
+  it("matches Amex Blue Business Plus from a copied Amex offers page", () => {
+    const page = `American Express
+The Blue Business® Plus Credit Card (-21004)
+Amex Offers
+lululemon
+Spend $150 or more, get $30 back`;
+    expect(detectCardFromOffersText(page, cards)).toBe("bbp");
+  });
+
+  it("prefers the more specific Business Gold over personal Gold", () => {
+    const page = `American Express® Business Gold Card
+Amex Offers
+Dell
+Spend $200 or more, get $40 back`;
+    expect(detectCardFromOffersText(page, cards)).toBe("biz-gold");
+  });
+
+  it("matches Chase Sapphire Reserve from a Chase header", () => {
+    const page = `Chase Offers
+Sapphire Reserve (...4321)
+Lululemon 10% back`;
+    expect(detectCardFromOffersText(page, cards)).toBe("csr");
+  });
+
+  it("does not falsely match single-word card names in merchant lines", () => {
+    const page = `Amex Offers
+Gold's Gym
+Spend $50 or more, get $10 back`;
+    expect(detectCardFromOffersText(page, cards)).toBeNull();
+  });
+
+  it("returns null when two cards tie", () => {
+    const dupes = [
+      { id: "p1", name: "Amex Platinum" },
+      { id: "p2", name: "Amex Platinum" },
+    ];
+    expect(detectCardFromOffersText("The Platinum Card®\nAmex Offers", dupes)).toBeNull();
   });
 });

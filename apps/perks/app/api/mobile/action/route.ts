@@ -530,8 +530,18 @@ async function runAction(
         hiddenCount ? `left out ${hiddenCount} from merchants you hid` : "",
       ].filter(Boolean);
       return {
-        message: `Saved ${shown} offer${shown === 1 ? "" : "s"}${notes.length ? `, ${notes.join(", ")}` : ""}.`,
+        message: `Saved ${shown} offer${shown === 1 ? "" : "s"}${card ? ` to ${card.name}` : ""}${notes.length ? `, ${notes.join(", ")}` : ""}.`,
       };
+    }
+
+    case "offers.markChecked": {
+      const card = await getCard(action.cardId, user.id);
+      if (!card) return { error: "Card not found.", status: 404 };
+      await db
+        .update(perksCard)
+        .set({ offersCheckedAt: new Date() })
+        .where(and(eq(perksCard.id, card.id), eq(perksCard.userId, user.id)));
+      return { message: `Marked ${card.name} checked (no new offers).` };
     }
 
     case "offers.setStatus": {

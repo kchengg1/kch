@@ -565,6 +565,7 @@ export type MobileActionPayload =
   | { type: "bonus.setSpent"; cardId: string; spent: string }
   | { type: "bonus.markReceived"; cardId: string }
   | { type: "offers.paste"; cardId?: string; text: string }
+  | { type: "offers.markChecked"; cardId: string }
   | { type: "offers.setStatus"; id: string; status: OfferStatus }
   | { type: "offers.setGroupStatus"; ids: string[]; status: "used" | "dismissed" }
   | { type: "offers.restore"; items: { id: string; status: OfferStatus }[] }

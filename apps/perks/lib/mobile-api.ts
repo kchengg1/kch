@@ -954,6 +954,7 @@ export type MobileAction =
   | { type: "bonus.setSpent"; cardId: string; spentCents: number }
   | { type: "bonus.markReceived"; cardId: string }
   | { type: "offers.paste"; cardId: string | null; text: string }
+  | { type: "offers.markChecked"; cardId: string }
   | { type: "offers.setStatus"; id: string; status: OfferStatus }
   | { type: "offers.setGroupStatus"; ids: string[]; status: "used" | "dismissed" }
   | { type: "offers.restore"; items: { id: string; status: OfferStatus }[] }
@@ -1269,6 +1270,11 @@ export function parseMobileAction(raw: unknown): { action: MobileAction } | { er
       const text = typeof body.text === "string" ? body.text.trim() : "";
       if (!text) return { error: "Paste the offers text first." };
       return { action: { type, cardId, text } };
+    }
+    case "offers.markChecked": {
+      const cardId = str(body.cardId);
+      if (!cardId) return { error: "Card not found." };
+      return { action: { type, cardId } };
     }
     case "offers.setStatus": {
       const id = str(body.id);
