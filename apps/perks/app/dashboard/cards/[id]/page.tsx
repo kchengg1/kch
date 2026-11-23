@@ -7,7 +7,7 @@ import { BenefitFields } from "@/components/benefit-fields";
 import { CardIcon } from "@/components/card-icon";
 import { Meter } from "@/components/meter";
 import { UsageChips } from "@/components/usage-chips";
-import { CATALOG, CATALOG_REVIEWED, getTemplate } from "@/lib/catalog";
+import { CATALOG, CATALOG_REVIEWED, getTemplate, onStatement } from "@/lib/catalog";
 import { catalogUpdates, updateCount as countUpdates } from "@/lib/catalog-sync";
 import { formatCents } from "@/lib/money";
 import { msrStatus } from "@/lib/msr";
@@ -52,6 +52,15 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
   const [summary] = summarizeCards([card], benefits, portfolio.usage, today);
   const template = getTemplate(card.templateKey);
   const credits = benefits.filter((b) => b.cadence !== "perk");
+  const hasStatementCredits =
+    !card.closed &&
+    credits.some(
+      (b) =>
+        b.tracked &&
+        b.amountCents > 0 &&
+        !(b.endsOn && b.endsOn < today) &&
+        onStatement(card.templateKey, b.name),
+    );
   const perks = benefits.filter((b) => b.cadence === "perk");
   const msr = msrStatus(card, today);
   const standings =
@@ -239,13 +248,27 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
 
       {!card.closed && (
         <section>
-          <h2 className="text-lg font-semibold">Credits</h2>
-          <p className="text-sm text-muted-foreground">
-            Tap a period to mark the credit used, tap again to undo. Switch off anything you do not
-            plan to chase so it stops counting against you.
-            {template &&
-              ` Template last checked ${formatDate(CATALOG_REVIEWED)}; edit anything that has changed.`}
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-semibold">Credits</h2>
+              <p className="text-sm text-muted-foreground">
+                Tap a period to mark the credit used, tap again to undo. Switch off anything you do
+                not plan to chase so it stops counting against you.
+                {template &&
+                  ` Template last checked ${formatDate(CATALOG_REVIEWED)}; edit anything that has changed.`}
+              </p>
+            </div>
+            {hasStatementCredits && (
+              <Link
+                href={`/dashboard/catch-up?card=${encodeURIComponent(card.id)}` as never}
+                className="shrink-0"
+              >
+                <Button size="sm" variant="outline">
+                  Import statement
+                </Button>
+              </Link>
+            )}
+          </div>
           {updateCount > 0 && credits.length > 0 && (
             <form
               action={applyCatalogUpdatesAction.bind(null, card.id)}

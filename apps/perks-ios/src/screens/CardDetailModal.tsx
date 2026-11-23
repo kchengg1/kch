@@ -391,6 +391,7 @@ export function CardDetailModal({
   onClose,
   onAction,
   onOpenReferrals,
+  onOpenCatchUp,
 }: {
   card: MobileCard | null;
   today: string;
@@ -400,6 +401,7 @@ export function CardDetailModal({
   onClose: () => void;
   onAction: (payload: MobileActionPayload, key: string) => Promise<void>;
   onOpenReferrals: (templateKey?: string) => void;
+  onOpenCatchUp: (cardId: string) => void;
 }) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -446,6 +448,8 @@ export function CardDetailModal({
 
   const year = today.slice(0, 4);
   const credits = card.benefits.filter((b) => b.cadence !== "perk");
+  const hasStatementCredits =
+    !card.closed && credits.some((b) => b.tracked && !b.expired && !b.inApp && b.amountCents > 0);
   const perks = card.benefits.filter((b) => b.cadence === "perk");
   const matchingCatalog = card.templateKey
     ? catalog.find((t) => t.key === card.templateKey)
@@ -645,7 +649,21 @@ export function CardDetailModal({
           ) : null}
 
           <View style={styles.sectionBlock}>
-            <Text style={styles.sectionTitle}>Credits ({credits.length})</Text>
+            <View style={styles.benefitTopRow}>
+              <Text style={styles.sectionTitle}>Credits ({credits.length})</Text>
+              {hasStatementCredits ? (
+                <Button
+                  label="Import statement"
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => {
+                    const id = card.id;
+                    onClose();
+                    onOpenCatchUp(id);
+                  }}
+                />
+              ) : null}
+            </View>
             {credits.length === 0 ? (
               <SectionCard>
                 <Text style={styles.noteText}>

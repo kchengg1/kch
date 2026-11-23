@@ -16,11 +16,16 @@ type CardOption = { id: string; name: string; benefits: { id: string; name: stri
 export function StatementImport({
   action,
   cards,
+  initialCardId,
 }: {
   action: (prev: FormState, form: FormData) => Promise<FormState>;
   cards: CardOption[];
+  initialCardId?: string;
 }) {
-  const [cardId, setCardId] = useState(cards[0]?.id ?? "");
+  const [cardId, setCardId] = useState(
+    (initialCardId && cards.some((c) => c.id === initialCardId) ? initialCardId : cards[0]?.id) ??
+      "",
+  );
   const [file, setFile] = useState<{ name: string; parse: StatementParse } | null>(null);
   const [choices, setChoices] = useState<Record<number, string>>({});
   // The last save's result, shown until the next file or card is chosen.

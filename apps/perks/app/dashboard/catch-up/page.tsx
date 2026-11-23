@@ -14,7 +14,12 @@ import { saveStatementCreditsAction } from "../actions";
 
 export const metadata: Metadata = { title: "Catch up" };
 
-export default async function CatchUpPage() {
+export default async function CatchUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ card?: string }>;
+}) {
+  const { card: initialCardId } = await searchParams;
   const { user } = await requireSession();
   const today = getToday();
   const { cards, benefits, usage } = await loadPortfolio(user.id);
@@ -65,6 +70,7 @@ export default async function CatchUpPage() {
           ) : (
             <StatementImport
               action={saveStatementCreditsAction}
+              initialCardId={initialCardId}
               cards={importable.map((c) => ({
                 id: c.id,
                 name: c.name,
