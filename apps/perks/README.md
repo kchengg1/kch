@@ -49,7 +49,8 @@ catalog edits do not change cards you already have. Edit those on the card page.
 
 - **Email digest.** `vercel.json` calls `/api/cron/digest` daily; it sends on
   Mondays and on the 25th, and only when something is due. Needs `CRON_SECRET`,
-  `RESEND_API_KEY` and `EMAIL_FROM`. Without Resend the email prints to the log.
+  `EMAIL_FROM`, and either `SMTP_USER` + `SMTP_PASS` (Gmail App Password) or
+  `RESEND_API_KEY`. Without a mail transport the email prints to the log.
 - **Time zone.** `PERKS_TIMEZONE` decides what "today" is (default New York).
 
 ## Limits worth knowing
