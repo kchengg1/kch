@@ -11,7 +11,7 @@ import { CATALOG, CATALOG_REVIEWED, getTemplate } from "@/lib/catalog";
 import { catalogUpdates, updateCount as countUpdates } from "@/lib/catalog-sync";
 import { formatCents } from "@/lib/money";
 import { msrStatus } from "@/lib/msr";
-import { cardWorth, faceValueCents, myValueCents } from "@/lib/worth";
+import { breakEvenStatus, cardWorth, faceValueCents, myValueCents } from "@/lib/worth";
 import {
   cardStandings,
   getCard,
@@ -61,6 +61,9 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
   const myLink = referrals.find((r) => r.userId === user.id && r.templateKey === card.templateKey);
   const friendsLinks = friendsLinksFor(referrals, card.templateKey, user.id);
   const worth = cardWorth(benefits, card.annualFeeCents, today);
+  const breakEven = summary
+    ? breakEvenStatus(summary.capturedCents, card.annualFeeCents, today)
+    : null;
   const worthRows = benefits.filter((b) => !(b.endsOn && b.endsOn < today));
   const updates = catalogUpdates(card.templateKey, benefits);
   const updateCount = countUpdates(updates);
@@ -99,7 +102,27 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
 
       {summary && summary.availableCents > 0 && (
         <Card className="max-w-xl">
-          <p className="text-sm text-muted-foreground">Credits used in {today.slice(0, 4)}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">Credits used in {today.slice(0, 4)}</p>
+            {breakEven && (
+              <span
+                className={
+                  breakEven.state === "covered"
+                    ? "rounded-full bg-success/12 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-success"
+                    : breakEven.state === "on-pace"
+                      ? "rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground"
+                      : "rounded-full bg-amber-500/14 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-amber-800 dark:text-amber-300"
+                }
+              >
+                {breakEven.pct}% of fee ·{" "}
+                {breakEven.state === "covered"
+                  ? "Covered"
+                  : breakEven.state === "on-pace"
+                    ? "On pace"
+                    : "Behind pace"}
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight">
             {formatCents(summary.capturedCents)}
             <span className="text-base font-normal text-muted-foreground">
@@ -107,12 +130,24 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
               of {formatCents(summary.availableCents)} tracked
             </span>
           </p>
-          <Meter value={summary.capturedCents} max={summary.availableCents} className="mt-3" />
-          <p className="mt-2 text-sm text-muted-foreground">
-            {summary.capturedCents >= card.annualFeeCents
-              ? `That covers the ${formatCents(card.annualFeeCents)} fee.`
-              : `${formatCents(card.annualFeeCents - summary.capturedCents)} more to cover the fee.`}
-          </p>
+          <Meter
+            value={summary.capturedCents}
+            max={summary.availableCents}
+            marker={card.annualFeeCents > 0 ? card.annualFeeCents : undefined}
+            markerLabel={
+              card.annualFeeCents > 0
+                ? `Annual fee break-even: ${formatCents(card.annualFeeCents)}`
+                : undefined
+            }
+            className="mt-3"
+          />
+          {card.annualFeeCents > 0 && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {summary.capturedCents >= card.annualFeeCents
+                ? `That covers the ${formatCents(card.annualFeeCents)} fee by ${formatCents(summary.capturedCents - card.annualFeeCents)}.`
+                : `${formatCents(card.annualFeeCents - summary.capturedCents)} more to cover the ${formatCents(card.annualFeeCents)} fee.`}
+            </p>
+          )}
         </Card>
       )}
 

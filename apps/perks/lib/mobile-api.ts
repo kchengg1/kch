@@ -57,7 +57,7 @@ import { firstName, offersByPerson, onCardMerchantKeys } from "./shared-offers";
 import { parseSheetDate } from "./sheet-import";
 import { spentThisYear } from "./spend-targets";
 import { actionable, buildStatuses, indexUsage, summarizeCards, usedIn } from "./summary";
-import { cardWorth, faceValueCents, myValueCents } from "./worth";
+import { breakEvenStatus, cardWorth, faceValueCents, myValueCents } from "./worth";
 import {
   anniversaryUnused,
   APPLY_LATER,
@@ -391,6 +391,7 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
       nextFeeOn: summary?.nextFeeOn ?? null,
       msr: msrStatus(card, today),
       worth: cardWorth(cardBenefits, card.annualFeeCents, today),
+      breakEven: breakEvenStatus(summary?.capturedCents ?? 0, card.annualFeeCents, today),
       catalogUpdates: cardCatalogUpdates,
       standings,
       benefits: mappedBenefits,
@@ -835,6 +836,7 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
       capturedCents,
       availableCents,
       annualFeesCents,
+      breakEven: breakEvenStatus(capturedCents, annualFeesCents, today),
       soon,
       later,
       activeBonuses,

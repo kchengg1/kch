@@ -513,6 +513,43 @@ export function CardDetailModal({
             </View>
           </SectionCard>
 
+          {!card.closed && card.breakEven ? (
+            <SectionCard style={styles.breakEvenCard}>
+              <View style={styles.benefitTopRow}>
+                <Text style={styles.sectionTitle}>Annual fee break-even</Text>
+                <Badge
+                  label={`${card.breakEven.pct}% · ${
+                    card.breakEven.state === "covered"
+                      ? "Covered"
+                      : card.breakEven.state === "on-pace"
+                        ? "On pace"
+                        : "Behind pace"
+                  }`}
+                  tone={
+                    card.breakEven.state === "covered"
+                      ? "green"
+                      : card.breakEven.state === "behind"
+                        ? "amber"
+                        : "neutral"
+                  }
+                />
+              </View>
+              {card.availableCents > 0 ? (
+                <Meter
+                  value={card.capturedCents}
+                  max={card.availableCents}
+                  marker={card.annualFeeCents}
+                  tone={card.breakEven.state === "covered" ? "green" : "dark"}
+                />
+              ) : null}
+              <Text style={[styles.noteText, NUM_STYLE]}>
+                {card.breakEven.state === "covered"
+                  ? `Covers the ${formatCents(card.annualFeeCents)} fee by ${formatCents(card.breakEven.netCents)}.`
+                  : `${formatCents(card.breakEven.remainingCents)} more to cover the ${formatCents(card.annualFeeCents)} fee.`}
+              </Text>
+            </SectionCard>
+          ) : null}
+
           {!card.closed && card.catalogUpdates.count > 0 ? (
             <SectionCard style={styles.catalogUpdateBanner}>
               <Text style={styles.catalogUpdateTitle}>
@@ -922,6 +959,9 @@ const makeStyles = (COLORS: ThemeColors) =>
     summaryStrip: {
       flexDirection: "row",
       justifyContent: "space-between",
+      gap: 8,
+    },
+    breakEvenCard: {
       gap: 8,
     },
     summaryItem: {

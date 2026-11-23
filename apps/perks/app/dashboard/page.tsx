@@ -7,7 +7,7 @@ import { Meter } from "@/components/meter";
 import { QuickCardPicker } from "@/components/quick-card-picker";
 import { formatCents } from "@/lib/money";
 import { msrStatus } from "@/lib/msr";
-import { cardWorth } from "@/lib/worth";
+import { breakEvenStatus, cardWorth } from "@/lib/worth";
 import { groupOffers, merchantKey } from "@/lib/offer-groups";
 import { isWeakOffer } from "@/lib/offer-value";
 import {
@@ -137,6 +137,11 @@ export default async function DashboardPage() {
     .sort((a, b) => b.availableCents - a.availableCents);
 
   const year = today.slice(0, 4);
+  const portfolioBreakEven = breakEvenStatus(captured, fees, today);
+  const heroFeeMarkerPct =
+    available > 0 && fees > 0 && fees <= available
+      ? Math.min(99, Math.max(1, Math.round((fees / available) * 100)))
+      : null;
 
   return (
     <div className="space-y-6">
@@ -176,6 +181,24 @@ export default async function DashboardPage() {
               {available > 0 && (
                 <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-amber-300">
                   {capturePct}% captured
+                </span>
+              )}
+              {portfolioBreakEven && (
+                <span
+                  className={
+                    portfolioBreakEven.state === "covered"
+                      ? "rounded-full bg-emerald-400/20 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-emerald-200"
+                      : portfolioBreakEven.state === "on-pace"
+                        ? "rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-white/90"
+                        : "rounded-full bg-amber-400/20 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-amber-200"
+                  }
+                >
+                  {portfolioBreakEven.pct}% of fees ·{" "}
+                  {portfolioBreakEven.state === "covered"
+                    ? "Covered"
+                    : portfolioBreakEven.state === "on-pace"
+                      ? "On pace"
+                      : "Behind pace"}
                 </span>
               )}
             </div>
@@ -220,11 +243,18 @@ export default async function DashboardPage() {
 
         {available > 0 && (
           <div className="mt-4">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-white/15">
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/15">
               <div
                 className="h-full rounded-full bg-amber-300 transition-all"
                 style={{ width: `${capturePct}%` }}
               />
+              {heroFeeMarkerPct !== null && (
+                <span
+                  title={`Annual fees break-even: ${formatCents(fees)}`}
+                  className="pointer-events-none absolute top-0 bottom-0 w-0.5 -translate-x-1/2 bg-white/80"
+                  style={{ left: `${heroFeeMarkerPct}%` }}
+                />
+              )}
             </div>
             <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-white/65">
               <span>$0</span>
@@ -564,47 +594,70 @@ export default async function DashboardPage() {
                 </Link>
               </div>
               <ul className="mt-3 space-y-3">
-                {cardHealth.map((s) => (
-                  <li key={s.card.id}>
-                    <Link
-                      href={`/dashboard/cards/${s.card.id}`}
-                      className="group block rounded-lg p-1 -m-1 transition-colors hover:bg-muted/60"
-                    >
-                      <div className="flex items-center justify-between gap-2 text-xs">
-                        <span className="inline-flex min-w-0 items-center gap-2 font-medium">
-                          <CardIcon
-                            templateKey={s.card.templateKey}
-                            issuer={s.card.issuer}
-                            className="h-3.5 w-[22px]"
-                          />
-                          <span className="truncate group-hover:text-primary">{s.card.name}</span>
-                        </span>
-                        <span className="shrink-0 font-semibold tabular-nums">
-                          {s.availableCents > 0 ? (
-                            <>
-                              {formatCents(s.capturedCents)}
-                              <span className="font-normal text-muted-foreground">
-                                /{formatCents(s.availableCents)}
+                {cardHealth.map((s) => {
+                  const be = breakEvenStatus(s.capturedCents, s.card.annualFeeCents, today);
+                  return (
+                    <li key={s.card.id}>
+                      <Link
+                        href={`/dashboard/cards/${s.card.id}`}
+                        className="group block rounded-lg p-1 -m-1 transition-colors hover:bg-muted/60"
+                      >
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className="inline-flex min-w-0 items-center gap-2 font-medium">
+                            <CardIcon
+                              templateKey={s.card.templateKey}
+                              issuer={s.card.issuer}
+                              className="h-3.5 w-[22px]"
+                            />
+                            <span className="truncate group-hover:text-primary">{s.card.name}</span>
+                          </span>
+                          <span className="inline-flex shrink-0 items-center gap-1.5 font-semibold tabular-nums">
+                            {s.availableCents > 0 ? (
+                              <span>
+                                {formatCents(s.capturedCents)}
+                                <span className="font-normal text-muted-foreground">
+                                  /{formatCents(s.availableCents)}
+                                </span>
                               </span>
-                            </>
-                          ) : (
-                            <span className="font-normal text-muted-foreground">
-                              {formatCents(s.card.annualFeeCents)} fee
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      {s.availableCents > 0 && (
-                        <Meter
-                          value={s.capturedCents}
-                          max={s.availableCents}
-                          tone={s.capturedCents >= s.availableCents ? "success" : "primary"}
-                          className="mt-1.5 h-1.5"
-                        />
-                      )}
-                    </Link>
-                  </li>
-                ))}
+                            ) : (
+                              <span className="font-normal text-muted-foreground">
+                                {formatCents(s.card.annualFeeCents)} fee
+                              </span>
+                            )}
+                            {be && (
+                              <span
+                                title={`${be.pct}% of ${formatCents(s.card.annualFeeCents)} annual fee`}
+                                className={
+                                  be.state === "covered"
+                                    ? "rounded-full bg-success/14 px-1.5 py-0.5 text-[10px] font-semibold text-success"
+                                    : be.state === "on-pace"
+                                      ? "rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+                                      : "rounded-full bg-amber-500/14 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300"
+                                }
+                              >
+                                {be.pct}%
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        {s.availableCents > 0 && (
+                          <Meter
+                            value={s.capturedCents}
+                            max={s.availableCents}
+                            marker={s.card.annualFeeCents > 0 ? s.card.annualFeeCents : undefined}
+                            markerLabel={
+                              s.card.annualFeeCents > 0
+                                ? `Annual fee break-even: ${formatCents(s.card.annualFeeCents)}`
+                                : undefined
+                            }
+                            tone={s.capturedCents >= s.availableCents ? "success" : "primary"}
+                            className="mt-1.5 h-1.5"
+                          />
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </Card>
           )}
