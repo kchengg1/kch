@@ -446,7 +446,8 @@ export type MobileBootstrap = {
       cardName: string;
       cardStyle: CardStyle;
       annualFeeCents: number;
-      nextFeeOn: string;
+      nextFeeOn: string | null;
+      daysUntilFee: number | null;
       capturedCents: number;
       worthCents: number;
       netCents: number;

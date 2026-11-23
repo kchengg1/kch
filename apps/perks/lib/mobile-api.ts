@@ -60,7 +60,14 @@ import { applicationRules } from "./rules";
 import { firstName, offersByPerson, onCardMerchantKeys } from "./shared-offers";
 import { parseSheetDate } from "./sheet-import";
 import { spentThisYear } from "./spend-targets";
-import { actionable, buildStatuses, indexUsage, summarizeCards, usedIn } from "./summary";
+import {
+  actionable,
+  buildStatuses,
+  compareUpcomingFees,
+  indexUsage,
+  summarizeCards,
+  usedIn,
+} from "./summary";
 import { breakEvenStatus, cardWorth, faceValueCents, myValueCents } from "./worth";
 import {
   anniversaryUnused,
@@ -92,7 +99,6 @@ export type {
 /** Credits ending within this window sit in the main list on Overview. */
 const SOON_DAYS = 45;
 const OFFER_DAYS = 14;
-const FEE_DAYS = 60;
 const STALE_OFFER_DAYS = 14;
 
 export type MobileCardInput = {
@@ -519,16 +525,20 @@ export function buildMobileBootstrap(input: MobileBootstrapInput): MobileBootstr
   const expiringOffers = groupOffers(expiringRaw).map(toOfferGroup);
 
   const feesDue = openCards
-    .filter((c): c is MobileCard & { nextFeeOn: string } =>
-      Boolean(c.nextFeeOn && daysBetween(today, c.nextFeeOn) <= FEE_DAYS),
+    .filter((c) => c.annualFeeCents > 0)
+    .sort((a, b) =>
+      compareUpcomingFees(
+        { nextFeeOn: a.nextFeeOn, annualFeeCents: a.annualFeeCents, name: a.name },
+        { nextFeeOn: b.nextFeeOn, annualFeeCents: b.annualFeeCents, name: b.name },
+      ),
     )
-    .sort((a, b) => a.nextFeeOn.localeCompare(b.nextFeeOn))
     .map((c) => ({
       cardId: c.id,
       cardName: c.name,
       cardStyle: c.style,
       annualFeeCents: c.annualFeeCents,
       nextFeeOn: c.nextFeeOn,
+      daysUntilFee: c.nextFeeOn ? daysBetween(today, c.nextFeeOn) : null,
       capturedCents: c.capturedCents,
       worthCents: c.worth.worthCents,
       netCents: c.worth.netCents,

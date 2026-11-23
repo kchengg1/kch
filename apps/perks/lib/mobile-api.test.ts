@@ -156,6 +156,41 @@ describe("buildMobileBootstrap", () => {
     expect(snap.overview.breakEven).toMatchObject({ pct: 123, state: "covered" });
   });
 
+  it("lists all open annual-fee cards in chronological order with undated cards last", () => {
+    const snap = buildMobileBootstrap(
+      baseInput({
+        cards: [
+          card({ id: "later", name: "CSR", annualFeeCents: 79_500, openedOn: "2024-06-15" }),
+          card({ id: "soon", name: "Venture X", annualFeeCents: 39_500, openedOn: "2023-12-27" }),
+          card({ id: "mid", name: "Amex Plat", annualFeeCents: 69_500, openedOn: "2024-02-10" }),
+          card({ id: "nodate", name: "Bilt", annualFeeCents: 9_500, openedOn: null }),
+          card({ id: "free", name: "Freedom", annualFeeCents: 0, openedOn: "2024-11-20" }),
+          card({
+            id: "closed",
+            name: "Old Gold",
+            annualFeeCents: 32_500,
+            openedOn: "2022-11-25",
+            closed: true,
+          }),
+        ],
+        benefits: [],
+        usage: [],
+      }),
+    );
+    expect(
+      snap.overview.feesDue.map((f) => ({
+        id: f.cardId,
+        nextFeeOn: f.nextFeeOn,
+        daysUntilFee: f.daysUntilFee,
+      })),
+    ).toEqual([
+      { id: "soon", nextFeeOn: "2026-12-27", daysUntilFee: 42 },
+      { id: "mid", nextFeeOn: "2027-02-10", daysUntilFee: 87 },
+      { id: "later", nextFeeOn: "2027-06-15", daysUntilFee: 212 },
+      { id: "nodate", nextFeeOn: null, daysUntilFee: null },
+    ]);
+  });
+
   it("marks in-app credits, period usage chips, and open past counts on card benefits", () => {
     const snap = buildMobileBootstrap(baseInput());
     const goldCard = snap.cards.find((c) => c.id === "gold")!;

@@ -151,3 +151,42 @@ export function summarizeCards<C extends CardRow>(
       };
     });
 }
+
+/** Annual fees within this window are treated as coming up soon. */
+export const UPCOMING_FEE_SOON_DAYS = 60;
+
+/**
+ * Chronological ordering for upcoming annual fees: dated cards soonest first,
+ * followed by annual-fee cards without an opened date, breaking ties by fee
+ * (highest first) then card name.
+ */
+export function compareUpcomingFees(
+  a: { nextFeeOn: string | null; annualFeeCents: number; name: string },
+  b: { nextFeeOn: string | null; annualFeeCents: number; name: string },
+): number {
+  if (a.nextFeeOn && b.nextFeeOn) {
+    return (
+      a.nextFeeOn.localeCompare(b.nextFeeOn) ||
+      b.annualFeeCents - a.annualFeeCents ||
+      a.name.localeCompare(b.name)
+    );
+  }
+  if (a.nextFeeOn) return -1;
+  if (b.nextFeeOn) return 1;
+  return b.annualFeeCents - a.annualFeeCents || a.name.localeCompare(b.name);
+}
+
+/**
+ * How many rows to surface before the "Show more" toggle:
+ * 1 when exactly one fee is due within the soon window, otherwise up to 2.
+ */
+export function featuredFeeCount(
+  items: readonly { daysUntilFee: number | null }[],
+  soonDays: number = UPCOMING_FEE_SOON_DAYS,
+): number {
+  if (items.length <= 1) return items.length;
+  const soonCount = items.filter(
+    (i) => i.daysUntilFee !== null && i.daysUntilFee <= soonDays,
+  ).length;
+  return soonCount === 1 ? 1 : Math.min(2, items.length);
+}

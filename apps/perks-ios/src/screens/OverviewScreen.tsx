@@ -189,6 +189,7 @@ export const OverviewScreen = React.memo(function OverviewScreen({
   const [targetDrafts, setTargetDrafts] = useState<Record<string, string>>({});
   const [editingTargetId, setEditingTargetId] = useState<string | null>(null);
   const [pickQuery, setPickQuery] = useState("");
+  const [showAllFees, setShowAllFees] = useState(false);
 
   const year = data.today.slice(0, 4);
   const openCards = data.cards.filter((c) => !c.closed);
@@ -818,35 +819,73 @@ export const OverviewScreen = React.memo(function OverviewScreen({
         </View>
       ) : null}
 
-      {data.overview.feesDue.length > 0 ? (
-        <View style={styles.sectionBlock}>
-          <Text style={styles.sectionHeading}>Annual fees coming up</Text>
-          <SectionCard style={styles.divideList}>
-            {data.overview.feesDue.map((fee, idx) => (
-              <Pressable
-                key={fee.cardId}
-                onPress={() => onOpenCard(fee.cardId)}
-                style={[styles.simpleRow, idx > 0 && styles.rowDivider]}
-              >
-                <View style={styles.creditTitleBlock}>
-                  <CardSwatch style={fee.cardStyle} />
-                  <View style={styles.flexShrink}>
-                    <Text style={styles.itemTitle}>{fee.cardName}</Text>
-                    <Text style={[styles.itemMeta, NUM_STYLE]}>
-                      {formatCents(fee.annualFeeCents)} around{" "}
-                      {formatDate(fee.nextFeeOn, data.today)}
-                    </Text>
-                  </View>
+      {data.overview.feesDue.length > 0
+        ? (() => {
+            const soonFeeCount = data.overview.feesDue.filter(
+              (f) => f.daysUntilFee !== null && f.daysUntilFee <= 60,
+            ).length;
+            const initialFeeCount =
+              soonFeeCount === 1 ? 1 : Math.min(2, data.overview.feesDue.length);
+            const visibleFees = showAllFees
+              ? data.overview.feesDue
+              : data.overview.feesDue.slice(0, initialFeeCount);
+            const hiddenFeeCount = Math.max(0, data.overview.feesDue.length - initialFeeCount);
+
+            return (
+              <View style={styles.sectionBlock}>
+                <View style={styles.sectionTitleRow}>
+                  <Text style={styles.sectionHeading}>Annual fees coming up</Text>
+                  {data.overview.feesDue.length > 1 ? (
+                    <Text style={styles.sectionMeta}>{data.overview.feesDue.length} cards</Text>
+                  ) : null}
                 </View>
-                <Badge
-                  label={`${formatSignedCents(fee.netCents)}/yr`}
-                  tone={fee.netCents >= 0 ? "green" : "red"}
-                />
-              </Pressable>
-            ))}
-          </SectionCard>
-        </View>
-      ) : null}
+                <SectionCard style={styles.divideList}>
+                  {visibleFees.map((fee, idx) => (
+                    <Pressable
+                      key={fee.cardId}
+                      accessibilityRole="button"
+                      onPress={() => {
+                        tapHaptic();
+                        onOpenCard(fee.cardId);
+                      }}
+                      style={[styles.simpleRow, idx > 0 && styles.rowDivider]}
+                    >
+                      <View style={styles.creditTitleBlock}>
+                        <CardSwatch style={fee.cardStyle} />
+                        <View style={styles.flexShrink}>
+                          <Text style={styles.itemTitle}>{fee.cardName}</Text>
+                          <Text style={[styles.itemMeta, NUM_STYLE]}>
+                            {fee.nextFeeOn
+                              ? `${formatCents(fee.annualFeeCents)} around ${formatDate(fee.nextFeeOn, data.today)}`
+                              : `${formatCents(fee.annualFeeCents)}/yr · Add opened date`}
+                          </Text>
+                        </View>
+                      </View>
+                      <Badge
+                        label={`${formatSignedCents(fee.netCents)}/yr`}
+                        tone={fee.netCents >= 0 ? "green" : "red"}
+                      />
+                    </Pressable>
+                  ))}
+                  {hiddenFeeCount > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => {
+                        tapHaptic();
+                        setShowAllFees((v) => !v);
+                      }}
+                      style={[styles.expandRow, styles.rowDivider]}
+                    >
+                      <Text style={styles.linkText}>
+                        {showAllFees ? "Show less" : `Show ${hiddenFeeCount} more`}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </SectionCard>
+              </View>
+            );
+          })()
+        : null}
 
       {openCards.length > 0 ? (
         <View style={styles.sectionBlock}>
@@ -1153,10 +1192,21 @@ const makeStyles = (COLORS: ThemeColors) =>
       fontWeight: "700",
       color: COLORS.ink,
     },
+    sectionMeta: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: COLORS.muted,
+    },
     linkText: {
       fontSize: 13,
       fontWeight: "600",
       color: COLORS.primary,
+    },
+    expandRow: {
+      minHeight: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 10,
     },
     divideList: {
       paddingVertical: 6,

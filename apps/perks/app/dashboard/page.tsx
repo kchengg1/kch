@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Badge, Button, Card, CardDescription, CardTitle, Input } from "@kch/ui";
+import { AnnualFeesCard } from "@/components/annual-fees-card";
 import { CardIcon } from "@/components/card-icon";
 import { CreditRow, dueLabel } from "@/components/credit-row";
 import { Meter } from "@/components/meter";
@@ -22,7 +23,7 @@ import {
 } from "@/lib/perks";
 import { balanceValueCents } from "@/lib/points";
 import { spentThisYear } from "@/lib/spend-targets";
-import { daysBetween, formatDate } from "@/lib/periods";
+import { daysBetween } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
 import {
   markBonusReceivedAction,
@@ -30,14 +31,19 @@ import {
   setSpendTargetAction,
   setSpendTargetTrackedAction,
 } from "./actions";
-import { actionable, buildStatuses, summarizeCards } from "@/lib/summary";
+import {
+  actionable,
+  buildStatuses,
+  compareUpcomingFees,
+  featuredFeeCount,
+  summarizeCards,
+} from "@/lib/summary";
 import { expiringAtYearEnd, inYearEndWindow } from "@/lib/year-end";
 import { shareableCards } from "@/lib/referrals";
 
 /** Credits ending within this window sit in the main list; the rest are tucked below. */
 const SOON_DAYS = 45;
 const OFFER_DAYS = 14;
-const FEE_DAYS = 60;
 
 export default async function DashboardPage() {
   const { user } = await requireSession();
@@ -129,8 +135,28 @@ export default async function DashboardPage() {
       today,
     );
   const feesDue = summaries
-    .filter((s) => s.nextFeeOn && daysBetween(today, s.nextFeeOn) <= FEE_DAYS)
-    .sort((a, b) => a.nextFeeOn!.localeCompare(b.nextFeeOn!));
+    .filter((s) => s.card.annualFeeCents > 0)
+    .sort((a, b) =>
+      compareUpcomingFees(
+        { nextFeeOn: a.nextFeeOn, annualFeeCents: a.card.annualFeeCents, name: a.card.name },
+        { nextFeeOn: b.nextFeeOn, annualFeeCents: b.card.annualFeeCents, name: b.card.name },
+      ),
+    )
+    .map((s) => {
+      const worth = worthOf(s.card.id, s.card.annualFeeCents);
+      return {
+        cardId: s.card.id,
+        cardName: s.card.name,
+        templateKey: s.card.templateKey,
+        issuer: s.card.issuer,
+        annualFeeCents: s.card.annualFeeCents,
+        nextFeeOn: s.nextFeeOn,
+        daysUntilFee: s.nextFeeOn ? daysBetween(today, s.nextFeeOn) : null,
+        worthCents: worth.worthCents,
+        netCents: worth.netCents,
+      };
+    });
+  const initialFeesCount = featuredFeeCount(feesDue);
 
   const cardHealth = summaries
     .filter((s) => s.availableCents > 0 || s.card.annualFeeCents > 0)
@@ -547,40 +573,7 @@ export default async function DashboardPage() {
             pointValues={pointValues}
           />
 
-          {feesDue.length > 0 && (
-            <Card className="p-4">
-              <h2 className="text-sm font-semibold">Annual fees coming up</h2>
-              <ul className="mt-3 divide-y">
-                {feesDue.map((s) => {
-                  const worth = worthOf(s.card.id, s.card.annualFeeCents);
-                  return (
-                    <li key={s.card.id} className="space-y-1.5 py-3 first:pt-0 last:pb-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <Link
-                          href={`/dashboard/cards/${s.card.id}`}
-                          className="inline-flex min-w-0 items-center gap-2 text-sm font-medium hover:underline"
-                        >
-                          <CardIcon
-                            templateKey={s.card.templateKey}
-                            issuer={s.card.issuer}
-                            className="h-4 w-6"
-                          />
-                          <span className="truncate">{s.card.name}</span>
-                        </Link>
-                        <Badge variant={worth.netCents >= 0 ? "success" : "secondary"}>
-                          {worth.netCents >= 0 ? "Keep" : "Review"}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {formatCents(s.card.annualFeeCents)} around{" "}
-                        {formatDate(s.nextFeeOn!, today)} · worth {formatCents(worth.worthCents)}/yr
-                      </p>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Card>
-          )}
+          <AnnualFeesCard items={feesDue} today={today} initialCount={initialFeesCount} />
 
           {cardHealth.length > 0 && (
             <Card className="p-4">

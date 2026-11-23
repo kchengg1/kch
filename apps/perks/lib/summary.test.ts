@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   actionable,
   buildStatuses,
+  compareUpcomingFees,
+  featuredFeeCount,
   summarizeCards,
   type BenefitRow,
   type CardRow,
@@ -120,5 +122,43 @@ describe("summarizeCards", () => {
       capturedCents: 1000 + 1000 + 30000,
       nextFeeOn: "2027-03-01",
     });
+  });
+});
+
+describe("compareUpcomingFees", () => {
+  it("orders dated cards chronologically, then undated cards by fee desc and name", () => {
+    const items = [
+      { name: "No Date Low", annualFeeCents: 9500, nextFeeOn: null },
+      { name: "Later", annualFeeCents: 69500, nextFeeOn: "2027-04-10" },
+      { name: "Tie Small", annualFeeCents: 9500, nextFeeOn: "2026-12-27" },
+      { name: "No Date High", annualFeeCents: 39500, nextFeeOn: null },
+      { name: "Tie Big", annualFeeCents: 39500, nextFeeOn: "2026-12-27" },
+    ];
+    expect(items.sort(compareUpcomingFees).map((i) => i.name)).toEqual([
+      "Tie Big",
+      "Tie Small",
+      "Later",
+      "No Date High",
+      "No Date Low",
+    ]);
+  });
+});
+
+describe("featuredFeeCount", () => {
+  it("surfaces 1 when exactly one fee is due within 60 days, and up to 2 otherwise", () => {
+    expect(featuredFeeCount([])).toBe(0);
+    expect(featuredFeeCount([{ daysUntilFee: 120 }])).toBe(1);
+    expect(
+      featuredFeeCount([{ daysUntilFee: 30 }, { daysUntilFee: 120 }, { daysUntilFee: 200 }]),
+    ).toBe(1);
+    expect(
+      featuredFeeCount([{ daysUntilFee: 10 }, { daysUntilFee: 45 }, { daysUntilFee: 120 }]),
+    ).toBe(2);
+    expect(
+      featuredFeeCount([{ daysUntilFee: 10 }, { daysUntilFee: 20 }, { daysUntilFee: 30 }]),
+    ).toBe(2);
+    expect(
+      featuredFeeCount([{ daysUntilFee: 90 }, { daysUntilFee: 150 }, { daysUntilFee: null }]),
+    ).toBe(2);
   });
 });
