@@ -25,13 +25,7 @@ import {
   type ThemeColors,
 } from "../components/ui";
 import { CATEGORIES, classify, EARN_REVIEWED, rankCards } from "../lib/earn";
-import {
-  centsToInputDollars,
-  formatCents,
-  formatCpp,
-  formatDate,
-  formatSignedCents,
-} from "../lib/format";
+import { centsToInputDollars, formatCents, formatCpp, formatDate } from "../lib/format";
 import { tapHaptic } from "../lib/haptics";
 import type {
   CardsSubTabKey,
@@ -104,16 +98,29 @@ const CardListItem = React.memo(function CardListItem({
                 <Text style={styles.capturedStrong}>{formatCents(card.capturedCents)}</Text> of{" "}
                 {formatCents(card.availableCents)} used
               </Text>
-              {card.annualFeeCents > 0 ? (
+              {card.breakEven ? (
                 <Badge
-                  label={`Worth ${formatSignedCents(card.worth.netCents)}/yr`}
-                  tone={card.worth.netCents >= 0 ? "green" : "amber"}
+                  label={`${card.breakEven.pct}% · ${
+                    card.breakEven.state === "covered"
+                      ? "Covered"
+                      : card.breakEven.state === "on-pace"
+                        ? "On pace"
+                        : "Behind"
+                  }`}
+                  tone={
+                    card.breakEven.state === "covered"
+                      ? "green"
+                      : card.breakEven.state === "behind"
+                        ? "amber"
+                        : "neutral"
+                  }
                 />
               ) : null}
             </View>
             <Meter
               value={card.capturedCents}
               max={card.availableCents}
+              marker={card.annualFeeCents > 0 ? card.annualFeeCents : undefined}
               tone={card.capturedCents >= card.availableCents ? "green" : "dark"}
             />
           </View>

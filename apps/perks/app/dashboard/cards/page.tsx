@@ -13,6 +13,7 @@ import { loadPortfolio, today as getToday } from "@/lib/perks";
 import { formatDate } from "@/lib/periods";
 import { requireSession } from "@/lib/session";
 import { actionable, buildStatuses, summarizeCards } from "@/lib/summary";
+import { breakEvenStatus } from "@/lib/worth";
 import { addCardAction } from "../actions";
 
 export const metadata: Metadata = { title: "Cards" };
@@ -109,6 +110,7 @@ export default async function CardsPage() {
             const lightFace = isLightHex(finish.from);
             const dueCount = openCount(s.card.id);
             const contentSummary = contents(s.card.id);
+            const be = breakEvenStatus(s.capturedCents, s.card.annualFeeCents, today);
             return (
               <Link
                 key={s.card.id}
@@ -171,16 +173,42 @@ export default async function CardsPage() {
                         {contentSummary || "No credits to track"}
                       </p>
                     )}
-                    <ChevronRight
-                      aria-hidden
-                      className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
-                    />
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {be && (
+                        <span
+                          className={
+                            be.state === "covered"
+                              ? "rounded-full bg-success/12 px-2 py-0.5 text-xs font-semibold tabular-nums text-success"
+                              : be.state === "on-pace"
+                                ? "rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground"
+                                : "rounded-full bg-amber-500/14 px-2 py-0.5 text-xs font-semibold tabular-nums text-amber-800 dark:text-amber-300"
+                          }
+                        >
+                          {be.pct}%{" "}
+                          {be.state === "covered"
+                            ? "· Covered"
+                            : be.state === "on-pace"
+                              ? "· On pace"
+                              : "· Behind"}
+                        </span>
+                      )}
+                      <ChevronRight
+                        aria-hidden
+                        className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+                      />
+                    </div>
                   </div>
 
                   {s.availableCents > 0 && (
                     <Meter
                       value={s.capturedCents}
                       max={s.availableCents}
+                      marker={s.card.annualFeeCents > 0 ? s.card.annualFeeCents : undefined}
+                      markerLabel={
+                        s.card.annualFeeCents > 0
+                          ? `Annual fee break-even: ${formatCents(s.card.annualFeeCents)}`
+                          : undefined
+                      }
                       tone={s.capturedCents >= s.availableCents ? "success" : "primary"}
                     />
                   )}

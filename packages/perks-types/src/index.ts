@@ -133,6 +133,19 @@ export type MobileCardStanding = {
   share: number;
 };
 
+export type BreakEvenStatus = {
+  /** Percentage of the annual fee recovered so far (uncapped when covered, capped at 99 when still short). */
+  pct: number;
+  /** Percentage of the current calendar year elapsed so far (1–100). */
+  expectedPct: number;
+  /** Dollars remaining to cover the annual fee (0 once covered). */
+  remainingCents: number;
+  /** Captured credits minus annual fee (negative when still short). */
+  netCents: number;
+  /** "covered" (>= annual fee), "on-pace" (within 5pp of year elapsed), or "behind". */
+  state: "covered" | "on-pace" | "behind";
+};
+
 export type MobileCard = {
   id: string;
   name: string;
@@ -155,6 +168,7 @@ export type MobileCard = {
   nextFeeOn: string | null;
   msr: MsrStatus | null;
   worth: { advertisedCents: number; worthCents: number; netCents: number };
+  breakEven: BreakEvenStatus | null;
   catalogUpdates: MobileCardCatalogUpdates;
   standings: MobileCardStanding[];
   benefits: MobileBenefit[];
@@ -405,6 +419,7 @@ export type MobileBootstrap = {
     capturedCents: number;
     availableCents: number;
     annualFeesCents: number;
+    breakEven: BreakEvenStatus | null;
     soon: BenefitStatus[];
     later: BenefitStatus[];
     activeBonuses: {

@@ -127,6 +127,33 @@ describe("buildMobileBootstrap", () => {
     expect(snap.overview.activeBonuses[0]?.msr.leftCents).toBe(450_000);
     expect(snap.overview.expiringOffers.map((o) => o.merchant)).toEqual(["lululemon"]);
     expect(snap.overview.feesDue[0]?.nextFeeOn).toBe("2026-12-01");
+    // $14 captured vs $325 fee on Nov 15 -> 4%, behind pace
+    expect(snap.overview.breakEven).toMatchObject({
+      pct: 4,
+      remainingCents: 31_100,
+      netCents: -31_100,
+      state: "behind",
+    });
+  });
+
+  it("computes breakEven per card and returns null for $0-fee cards", () => {
+    const snap = buildMobileBootstrap(
+      baseInput({
+        cards: [card(), card({ id: "freedom", name: "Freedom", annualFeeCents: 0 })],
+        benefits: [benefit({ id: "big", cardId: "gold", cadence: "annual", amountCents: 40_000 })],
+        usage: [{ benefitId: "big", periodKey: "2026", usedCents: 40_000 }],
+      }),
+    );
+    const gold = snap.cards.find((c) => c.id === "gold")!;
+    const freedom = snap.cards.find((c) => c.id === "freedom")!;
+    expect(gold.breakEven).toMatchObject({
+      pct: 123,
+      remainingCents: 0,
+      netCents: 7_500,
+      state: "covered",
+    });
+    expect(freedom.breakEven).toBeNull();
+    expect(snap.overview.breakEven).toMatchObject({ pct: 123, state: "covered" });
   });
 
   it("marks in-app credits, period usage chips, and open past counts on card benefits", () => {

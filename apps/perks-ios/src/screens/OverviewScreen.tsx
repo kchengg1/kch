@@ -202,6 +202,11 @@ export const OverviewScreen = React.memo(function OverviewScreen({
       : 0;
   const fees = data.overview.annualFeesCents;
   const captured = data.overview.capturedCents;
+  const breakEven = data.overview.breakEven;
+  const heroFeeMarkerPct =
+    data.overview.availableCents > 0 && fees > 0 && fees <= data.overview.availableCents
+      ? Math.min(99, Math.max(1, Math.round((fees / data.overview.availableCents) * 100)))
+      : null;
 
   const trimmedPick = pickQuery.trim();
   const valueByProgram = new Map(data.points.programs.map((p) => [p.program, p.centsPerPoint]));
@@ -259,6 +264,31 @@ export const OverviewScreen = React.memo(function OverviewScreen({
                 </View>
               ) : null}
             </View>
+            {breakEven ? (
+              <View
+                style={[
+                  styles.heroBreakEvenPill,
+                  breakEven.state === "covered" && styles.heroBreakEvenCovered,
+                  breakEven.state === "behind" && styles.heroBreakEvenBehind,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.heroBreakEvenText,
+                    NUM_STYLE,
+                    breakEven.state === "covered" && styles.heroBreakEvenCoveredText,
+                    breakEven.state === "behind" && styles.heroBreakEvenBehindText,
+                  ]}
+                >
+                  {breakEven.pct}% of fees ·{" "}
+                  {breakEven.state === "covered"
+                    ? "Covered"
+                    : breakEven.state === "on-pace"
+                      ? "On pace"
+                      : "Behind pace"}
+                </Text>
+              </View>
+            ) : null}
           </View>
           <View style={styles.heroStatPill}>
             <Text style={styles.heroPillLabel}>Expiring soon</Text>
@@ -276,6 +306,12 @@ export const OverviewScreen = React.memo(function OverviewScreen({
         {data.overview.availableCents > 0 ? (
           <View style={styles.heroTrack}>
             <View style={[styles.heroFill, { width: `${capturePct}%` }]} />
+            {heroFeeMarkerPct !== null ? (
+              <View
+                pointerEvents="none"
+                style={[styles.heroMarker, { left: `${heroFeeMarkerPct}%` }]}
+              />
+            ) : null}
           </View>
         ) : null}
 
@@ -843,9 +879,23 @@ export const OverviewScreen = React.memo(function OverviewScreen({
                   </View>
                 </View>
                 <View style={styles.rightNumbers}>
-                  <Text style={[styles.itemTitle, NUM_STYLE]}>
-                    {formatCents(card.capturedCents)}
-                  </Text>
+                  <View style={styles.rightValueRow}>
+                    <Text style={[styles.itemTitle, NUM_STYLE]}>
+                      {formatCents(card.capturedCents)}
+                    </Text>
+                    {card.breakEven ? (
+                      <Badge
+                        label={`${card.breakEven.pct}%`}
+                        tone={
+                          card.breakEven.state === "covered"
+                            ? "green"
+                            : card.breakEven.state === "behind"
+                              ? "amber"
+                              : "neutral"
+                        }
+                      />
+                    ) : null}
+                  </View>
                   <Text style={[styles.itemMeta, NUM_STYLE]}>
                     of {formatCents(card.availableCents)}
                   </Text>
@@ -961,6 +1011,31 @@ const makeStyles = (COLORS: ThemeColors) =>
       fontWeight: "700",
       color: COLORS.heroGold,
     },
+    heroBreakEvenPill: {
+      alignSelf: "flex-start",
+      marginTop: 6,
+      backgroundColor: COLORS.heroSurface,
+      borderRadius: 999,
+      paddingHorizontal: 9,
+      paddingVertical: 3,
+    },
+    heroBreakEvenCovered: {
+      backgroundColor: "rgba(52, 211, 153, 0.22)",
+    },
+    heroBreakEvenBehind: {
+      backgroundColor: "rgba(251, 191, 36, 0.22)",
+    },
+    heroBreakEvenText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: COLORS.heroInk,
+    },
+    heroBreakEvenCoveredText: {
+      color: "#a7f3d0",
+    },
+    heroBreakEvenBehindText: {
+      color: "#fde68a",
+    },
     heroStatPill: {
       backgroundColor: COLORS.heroSurface,
       borderRadius: 12,
@@ -985,6 +1060,7 @@ const makeStyles = (COLORS: ThemeColors) =>
       color: COLORS.heroMuted,
     },
     heroTrack: {
+      position: "relative",
       height: 7,
       borderRadius: 999,
       backgroundColor: "rgba(255,255,255,0.18)",
@@ -994,6 +1070,14 @@ const makeStyles = (COLORS: ThemeColors) =>
       height: "100%",
       borderRadius: 999,
       backgroundColor: COLORS.heroGold,
+    },
+    heroMarker: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      width: 2,
+      backgroundColor: "rgba(255,255,255,0.85)",
+      marginLeft: -1,
     },
     heroFootRow: {
       flexDirection: "row",
@@ -1193,6 +1277,12 @@ const makeStyles = (COLORS: ThemeColors) =>
     },
     rightNumbers: {
       alignItems: "flex-end",
+      gap: 2,
+    },
+    rightValueRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
     },
     pickerCard: {
       gap: 8,

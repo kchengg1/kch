@@ -239,15 +239,22 @@ export function Button({
 export function Meter({
   value,
   max,
+  marker,
   tone = "dark",
 }: {
   value: number;
   max: number;
+  /** Optional threshold position (e.g. annual fee in cents) drawn as a vertical tick. */
+  marker?: number;
   tone?: "dark" | "green" | "amber";
 }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const ratio = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
+  const markerPct =
+    marker !== undefined && marker > 0 && max > 0 && marker <= max
+      ? Math.min(99, Math.max(1, Math.round((marker / max) * 100)))
+      : null;
   const fill =
     tone === "green" ? colors.greenFill : tone === "amber" ? colors.amberFill : colors.primary;
   return (
@@ -255,6 +262,12 @@ export function Meter({
       <View
         style={[styles.meterFill, { width: `${Math.round(ratio * 100)}%`, backgroundColor: fill }]}
       />
+      {markerPct !== null ? (
+        <View
+          pointerEvents="none"
+          style={[styles.meterMarker, { left: `${markerPct}%`, backgroundColor: colors.ink }]}
+        />
+      ) : null}
     </View>
   );
 }
@@ -722,6 +735,7 @@ const makeStyles = (COLORS: ThemeColors) =>
       color: COLORS.redInk,
     },
     meterTrack: {
+      position: "relative",
       height: 7,
       borderRadius: 999,
       backgroundColor: COLORS.subtle,
@@ -730,6 +744,14 @@ const makeStyles = (COLORS: ThemeColors) =>
     meterFill: {
       height: "100%",
       borderRadius: 999,
+    },
+    meterMarker: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      width: 2,
+      opacity: 0.55,
+      marginLeft: -1,
     },
     sectionCard: {
       backgroundColor: COLORS.card,
