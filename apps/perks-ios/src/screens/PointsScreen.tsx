@@ -32,6 +32,56 @@ const PROGRAM_COLORS = [
   "#64748b",
 ] as const;
 
+const PROGRAM_ALIASES: [RegExp, string][] = [
+  [/membership rewards|\bmr\b|\bamex\b.*points/i, "American Express Membership Rewards"],
+  [/ultimate rewards|\bur\b/i, "Chase Ultimate Rewards"],
+  [/capital one|venture/i, "Capital One Venture Rewards"],
+  [/thank ?you/i, "Citi ThankYou"],
+  [/bilt/i, "Bilt Rewards"],
+  [/wells ?fargo/i, "Wells Fargo Rewards"],
+  [/hyatt/i, "Hyatt"],
+  [/marriott|bonvoy/i, "Marriott Bonvoy"],
+  [/hilton/i, "Hilton Honors"],
+  [/\bihg\b/i, "IHG One Rewards"],
+  [/wyndham/i, "Wyndham"],
+  [/choice/i, "Choice Privileges"],
+  [/alaska|atmos|hawaiian/i, "Alaska / Hawaiian Atmos Rewards"],
+  [/aadvantage|american airlines/i, "American AAdvantage"],
+  [/delta|skymiles/i, "Delta SkyMiles"],
+  [/united|mileageplus/i, "United MileagePlus"],
+  [/southwest/i, "Southwest Rapid Rewards"],
+  [/jetblue/i, "JetBlue TrueBlue"],
+  [/aeroplan/i, "Aeroplan"],
+  [/avios|british airways/i, "British Airways Avios"],
+  [/flying blue/i, "Flying Blue"],
+  [/lifemiles|avianca/i, "Avianca LifeMiles"],
+  [/virgin/i, "Virgin Atlantic"],
+  [/\bana\b/i, "ANA Mileage Club"],
+  [/krisflyer|singapore/i, "Singapore KrisFlyer"],
+  [/asia miles|cathay/i, "Cathay Pacific Asia Miles"],
+  [/turkish/i, "Turkish Miles&Smiles"],
+  [/emirates/i, "Emirates Skywards"],
+  [/etihad/i, "Etihad Guest"],
+  [/qatar/i, "Qatar Privilege Club"],
+  [/korean/i, "Korean Air SKYPASS"],
+  [/amtrak/i, "Amtrak Guest Rewards"],
+  [/discover/i, "Discover Cashback"],
+  [/cash ?back/i, "Cash back"],
+];
+
+function matchProgramOption(
+  input: string,
+  programs: MobileBootstrap["points"]["programs"],
+): MobileBootstrap["points"]["programs"][number] | undefined {
+  const trimmed = input.replace(/\s+/g, " ").trim();
+  if (!trimmed) return undefined;
+  const exact = programs.find((p) => p.program.toLowerCase() === trimmed.toLowerCase());
+  if (exact) return exact;
+  const canonical = PROGRAM_ALIASES.find(([re]) => re.test(trimmed))?.[1];
+  if (!canonical) return undefined;
+  return programs.find((p) => p.program === canonical);
+}
+
 export const PointsScreen = React.memo(function PointsScreen({
   data,
   refreshing,
@@ -46,12 +96,14 @@ export const PointsScreen = React.memo(function PointsScreen({
   onAction: (payload: MobileActionPayload, key: string) => Promise<void>;
 }) {
   const styles = useThemedStyles(makeStyles);
+  const initialProgram = data.points.programs[0];
   const [panel, setPanel] = useState<"none" | "add" | "paste">("none");
-  const [addProgram, setAddProgram] = useState(
-    data.points.programs[0]?.program ?? "Chase Ultimate Rewards",
-  );
+  const [addProgram, setAddProgram] = useState(initialProgram?.program ?? "Chase Ultimate Rewards");
   const [addBalance, setAddBalance] = useState("");
-  const [addCpp, setAddCpp] = useState("");
+  const [addCpp, setAddCpp] = useState(
+    initialProgram ? String(initialProgram.centsPerPoint) : "1.5",
+  );
+  const [addCppEdited, setAddCppEdited] = useState(false);
   const [pasteBalances, setPasteBalances] = useState("");
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -68,6 +120,27 @@ export const PointsScreen = React.memo(function PointsScreen({
   const [calcPoints, setCalcPoints] = useState("");
   const [calcFees, setCalcFees] = useState("");
   const [calcNote, setCalcNote] = useState("");
+
+  const matchedAddProgram = useMemo(
+    () => matchProgramOption(addProgram, data.points.programs),
+    [addProgram, data.points.programs],
+  );
+
+  const addPreviewValueCents = useMemo(() => {
+    const bal = Math.round(Number(addBalance.replace(/[,\s]/g, "")));
+    const cppVal = addCpp.trim()
+      ? Number(addCpp.replace(/[¢\s]/g, ""))
+      : (matchedAddProgram?.defaultCentsPerPoint ?? 1);
+    if (!Number.isFinite(bal) || bal <= 0 || !Number.isFinite(cppVal) || cppVal < 0) return null;
+    return Math.round(Math.round((bal * Math.round(cppVal * 100)) / 100) / 100) * 100;
+  }, [addBalance, addCpp, matchedAddProgram]);
+
+  const addIsCustom = useMemo(() => {
+    if (!matchedAddProgram || !addCpp.trim()) return false;
+    const n = Number(addCpp.replace(/[¢\s]/g, ""));
+    if (!Number.isFinite(n)) return false;
+    return Math.round(n * 100) !== Math.round(matchedAddProgram.defaultCentsPerPoint * 100);
+  }, [addCpp, matchedAddProgram]);
 
   const targetCpp = useMemo(() => {
     const match = data.points.programs.find(
@@ -86,6 +159,33 @@ export const PointsScreen = React.memo(function PointsScreen({
       }),
     [calcCash, calcFees, calcPoints, targetCpp],
   );
+
+  function handleAddProgramChange(next: string) {
+    setAddProgram(next);
+    if (!addCppEdited) {
+      const match = matchProgramOption(next, data.points.programs);
+      if (match) setAddCpp(String(match.centsPerPoint));
+    }
+  }
+
+  function handleAddCppChange(next: string) {
+    setAddCpp(next);
+    const trimmed = next.trim();
+    if (!trimmed) {
+      setAddCppEdited(false);
+      return;
+    }
+    const n = Number(trimmed.replace(/[¢\s]/g, ""));
+    if (
+      matchedAddProgram &&
+      Number.isFinite(n) &&
+      Math.round(n * 100) === Math.round(matchedAddProgram.defaultCentsPerPoint * 100)
+    ) {
+      setAddCppEdited(false);
+    } else {
+      setAddCppEdited(true);
+    }
+  }
 
   return (
     <ScrollView
@@ -122,7 +222,7 @@ export const PointsScreen = React.memo(function PointsScreen({
           <FieldInput
             label="Program"
             value={addProgram}
-            onChangeText={setAddProgram}
+            onChangeText={handleAddProgramChange}
             placeholder="Chase Ultimate Rewards, Hyatt, Amex MR..."
           />
           <View style={styles.pillRow}>
@@ -133,6 +233,7 @@ export const PointsScreen = React.memo(function PointsScreen({
                   tapHaptic();
                   setAddProgram(p.program);
                   setAddCpp(String(p.centsPerPoint));
+                  setAddCppEdited(false);
                 }}
                 style={[styles.programPill, addProgram === p.program && styles.programPillActive]}
               >
@@ -160,14 +261,39 @@ export const PointsScreen = React.memo(function PointsScreen({
             </View>
             <View style={styles.flexShrink}>
               <FieldInput
-                label="Value (¢/pt)"
+                label="Value (¢/pt, auto)"
                 value={addCpp}
-                onChangeText={setAddCpp}
-                placeholder="2.0"
+                onChangeText={handleAddCppChange}
+                placeholder={
+                  matchedAddProgram ? String(matchedAddProgram.defaultCentsPerPoint) : "1.5"
+                }
                 keyboardType="decimal-pad"
               />
             </View>
           </View>
+          {matchedAddProgram || addPreviewValueCents !== null ? (
+            <View style={styles.headerRow}>
+              <Text style={[styles.noteText, NUM_STYLE, styles.flexShrink]}>
+                {matchedAddProgram
+                  ? `${data.points.valuationSource.name} est.: ${formatCpp(matchedAddProgram.defaultCentsPerPoint)}/pt`
+                  : ""}
+                {matchedAddProgram && addPreviewValueCents !== null ? " · " : ""}
+                {addPreviewValueCents !== null ? `Est. ${formatCents(addPreviewValueCents)}` : ""}
+              </Text>
+              {addIsCustom && matchedAddProgram ? (
+                <Button
+                  label={`Use auto (${formatCpp(matchedAddProgram.defaultCentsPerPoint)})`}
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => {
+                    tapHaptic();
+                    setAddCpp(String(matchedAddProgram.defaultCentsPerPoint));
+                    setAddCppEdited(false);
+                  }}
+                />
+              ) : null}
+            </View>
+          ) : null}
           <Button
             label="Save balance"
             loading={busyKey === "points.save:new"}
@@ -182,6 +308,7 @@ export const PointsScreen = React.memo(function PointsScreen({
                 "points.save:new",
               ).then(() => {
                 setAddBalance("");
+                setAddCppEdited(false);
                 setPanel("none");
               })
             }
@@ -219,7 +346,8 @@ export const PointsScreen = React.memo(function PointsScreen({
         {data.points.balances.length === 0 ? (
           <SectionCard>
             <Text style={styles.noteText}>
-              Add your airline, hotel, and transferable point balances to see what they are worth.
+              Add your airline, hotel, and transferable point balances to see what they are worth
+              using {data.points.valuationSource.label}.
             </Text>
           </SectionCard>
         ) : (
@@ -227,7 +355,10 @@ export const PointsScreen = React.memo(function PointsScreen({
             {data.points.totalValueCents > 0 ? (
               <View style={styles.portfolioHeader}>
                 <View style={styles.portfolioTopRow}>
-                  <Text style={styles.portfolioEyebrow}>PORTFOLIO VALUE</Text>
+                  <View>
+                    <Text style={styles.portfolioEyebrow}>PORTFOLIO VALUE</Text>
+                    <Text style={styles.metaText}>{data.points.valuationSource.label}</Text>
+                  </View>
                   <Text style={[styles.portfolioTotal, NUM_STYLE]}>
                     {formatCents(data.points.totalValueCents)}
                   </Text>
@@ -286,6 +417,7 @@ export const PointsScreen = React.memo(function PointsScreen({
                         <Text style={styles.programTitle}>{b.program}</Text>
                         <Text style={[styles.metaText, NUM_STYLE]}>
                           {formatInteger(b.balance)} pts at {formatCpp(b.centsPerPointX100 / 100)}
+                          {b.customValue ? " (custom)" : ""}
                         </Text>
                       </View>
                     </View>
@@ -308,6 +440,7 @@ export const PointsScreen = React.memo(function PointsScreen({
                             label="¢ per point"
                             value={editCpp}
                             onChangeText={setEditCpp}
+                            placeholder={String(b.defaultCentsPerPointX100 / 100)}
                             keyboardType="decimal-pad"
                           />
                         </View>
@@ -323,12 +456,31 @@ export const PointsScreen = React.memo(function PointsScreen({
                                 type: "points.save",
                                 program: b.program,
                                 balance: editBalance,
-                                cpp: editCpp,
+                                cpp: editCpp || undefined,
                               },
                               `points.save:${b.id}`,
                             ).then(() => setEditingId(null))
                           }
                         />
+                        {b.customValue ? (
+                          <Button
+                            label={`Reset to auto (${formatCpp(b.defaultCentsPerPointX100 / 100)})`}
+                            size="sm"
+                            variant="secondary"
+                            loading={busyKey === `points.reset:${b.id}`}
+                            onPress={() =>
+                              void onAction(
+                                {
+                                  type: "points.save",
+                                  program: b.program,
+                                  balance: editBalance,
+                                  cpp: undefined,
+                                },
+                                `points.reset:${b.id}`,
+                              ).then(() => setEditingId(null))
+                            }
+                          />
+                        ) : null}
                         <Button
                           label="Delete"
                           size="sm"

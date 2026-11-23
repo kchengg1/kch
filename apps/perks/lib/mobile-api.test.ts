@@ -196,13 +196,41 @@ describe("buildMobileBootstrap", () => {
   });
 
   it("computes points portfolio totals, redemption verdicts, and 5/24 status", () => {
+    // Auto-tracked row (customValue omitted/false) uses Frequent Miler RRV (1.5¢ -> $1,500)
     const snap = buildMobileBootstrap(baseInput());
     expect(snap.points.totalPoints).toBe(100_000);
-    expect(snap.points.totalValueCents).toBe(200_000);
+    expect(snap.points.totalValueCents).toBe(150_000);
+    expect(snap.points.balances[0]).toMatchObject({
+      centsPerPointX100: 150,
+      defaultCentsPerPointX100: 150,
+      customValue: false,
+    });
+    expect(snap.points.valuationSource.name).toBe("Frequent Miler");
     expect(snap.points.redemptions[0]?.centsPerPoint).toBe(3);
     expect(snap.points.redemptions[0]?.check?.verdict).toBe("points");
     expect(snap.bonuses.fiveTwentyFour).toBe(1);
     expect(snap.catalog.length).toBeGreaterThan(10);
+
+    // Custom override preserves user's value (2.0¢ -> $2,000)
+    const customSnap = buildMobileBootstrap(
+      baseInput({
+        points: [
+          {
+            id: "p1",
+            program: "American Express Membership Rewards",
+            balance: 100_000,
+            centsPerPointX100: 200,
+            customValue: true,
+          },
+        ],
+      }),
+    );
+    expect(customSnap.points.totalValueCents).toBe(200_000);
+    expect(customSnap.points.balances[0]).toMatchObject({
+      centsPerPointX100: 200,
+      defaultCentsPerPointX100: 150,
+      customValue: true,
+    });
   });
 
   it("shapes People standings, honours shareRankings privacy, and flags missing offers", () => {
@@ -470,7 +498,25 @@ describe("parseMobileAction", () => {
         type: "points.save",
         program: "American Express Membership Rewards",
         balance: 270_520,
-        centsPerPointX100: 200,
+        centsPerPointX100: 150,
+        customValue: false,
+      },
+    });
+
+    expect(
+      parseMobileAction({
+        type: "points.save",
+        program: "Amex MR",
+        balance: "270,520",
+        cpp: "2.1",
+      }),
+    ).toEqual({
+      action: {
+        type: "points.save",
+        program: "American Express Membership Rewards",
+        balance: 270_520,
+        centsPerPointX100: 210,
+        customValue: true,
       },
     });
 

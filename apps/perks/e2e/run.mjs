@@ -379,18 +379,18 @@ await page.fill(
 await page.click('button:has-text("Update balances")');
 await page.waitForSelector("text=Updated 2 balances");
 check(
-  "pasted balances get the sheet's values",
+  "pasted balances get Frequent Miler RRV values",
   sql(
     `select string_agg(program || '=' || cents_per_point_x100, ',' order by program) from perks_points`,
-  ) === "American Express Membership Rewards=200,Marriott Bonvoy=85",
+  ) === "American Express Membership Rewards=150,Marriott Bonvoy=73",
 );
 await page.reload();
-check("total portfolio value shown", (await bodyText()).includes("worth about $5,419"));
+check("total portfolio value shown", (await bodyText()).includes("worth about $4,065"));
 await page.selectOption("#calc-program", "Marriott Bonvoy");
 await page.fill("#calc-cash", "2300");
 await page.fill("#calc-points", "318000");
-await page.waitForSelector("text=Pay cash");
-check("the sheet's Marriott example says pay cash", (await bodyText()).includes("0.72¢ per point"));
+await page.waitForSelector("text=About even");
+check("the sheet's Marriott example shows 0.72¢", (await bodyText()).includes("0.72¢ per point"));
 await page.click('button:has-text("Log as a redemption I made")');
 await page.waitForSelector("text=Logged.");
 check("redemption logged", sql(`select points from perks_redemption`) === "318000");

@@ -7,7 +7,7 @@ import { CATEGORIES, EARN_REVIEWED, classify, rankCards } from "@/lib/earn";
 import { merchantKey } from "@/lib/offer-groups";
 import { listOffers, listPoints, loadPortfolio, today as getToday } from "@/lib/perks";
 import { formatDate } from "@/lib/periods";
-import { defaultCentsPerPoint, formatCpp } from "@/lib/points";
+import { defaultCentsPerPoint, effectiveCentsPerPointX100, formatCpp } from "@/lib/points";
 import { requireSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Which card?" };
@@ -28,7 +28,7 @@ export default async function PickPage({
     listPoints(user.id),
     listOffers(user.id),
   ]);
-  const myValue = new Map(points.map((p) => [p.program, p.centsPerPointX100 / 100]));
+  const myValue = new Map(points.map((p) => [p.program, effectiveCentsPerPointX100(p) / 100]));
   const valueOf = (program: string) => myValue.get(program) ?? defaultCentsPerPoint(program);
   const target = query ? classify(query) : null;
   const picks = target ? rankCards(cards, target, valueOf) : [];

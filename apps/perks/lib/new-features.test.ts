@@ -4,8 +4,10 @@ import {
   balanceValueCents,
   checkRedemption,
   defaultCentsPerPoint,
+  effectiveCentsPerPointX100,
   normalizeProgram,
   parseBalances,
+  resolvePointValuation,
 } from "./points";
 import { applicationRules, type RuleCard } from "./rules";
 import { cardWorth, faceValueCents, myValueCents } from "./worth";
@@ -21,7 +23,42 @@ describe("points", () => {
     expect(normalizeProgram("Alaska Mileage Plan")).toBe("Alaska / Hawaiian Atmos Rewards");
     expect(normalizeProgram("Marriott Rewards")).toBe("Marriott Bonvoy");
     expect(normalizeProgram("Some new program")).toBe("Some new program");
-    expect(defaultCentsPerPoint("Chase UR")).toBe(2);
+    expect(defaultCentsPerPoint("Chase UR")).toBe(1.5);
+    expect(defaultCentsPerPoint("Hilton")).toBe(0.35);
+    expect(defaultCentsPerPoint("Marriott")).toBe(0.73);
+  });
+
+  it("tracks live Frequent Miler estimates unless explicitly overridden", () => {
+    // Auto-tracked row ignores stale stored centsPerPointX100 and uses live RRV
+    expect(
+      effectiveCentsPerPointX100({
+        program: "Chase Ultimate Rewards",
+        centsPerPointX100: 200,
+        customValue: false,
+      }),
+    ).toBe(150);
+    // Custom override preserves user's value
+    expect(
+      effectiveCentsPerPointX100({
+        program: "Chase Ultimate Rewards",
+        centsPerPointX100: 210,
+        customValue: true,
+      }),
+    ).toBe(210);
+
+    expect(resolvePointValuation("Chase Ultimate Rewards", "")).toEqual({
+      centsPerPointX100: 150,
+      customValue: false,
+    });
+    expect(resolvePointValuation("Chase Ultimate Rewards", "1.5")).toEqual({
+      centsPerPointX100: 150,
+      customValue: false,
+    });
+    expect(resolvePointValuation("Chase Ultimate Rewards", "2.1")).toEqual({
+      centsPerPointX100: 210,
+      customValue: true,
+    });
+    expect(resolvePointValuation("Chase Ultimate Rewards", "nope")).toBeNull();
   });
 
   it("reads the balances block from the sheet", () => {
