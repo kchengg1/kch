@@ -12,6 +12,22 @@ import {
   signOutSession,
   signUpWithEmail,
 } from "./src/lib/api";
+import {
+  clearBiometricCredentials,
+  disableBiometricLock,
+  enableBiometricLock,
+  getBiometricLabel,
+  getBiometricLockEnabled,
+  getBiometricMeta,
+  isBiometricSupported,
+  readBiometricCredentials,
+  saveBiometricCredentials,
+  shouldLockOnAppStateChange,
+  unlockWithBiometrics,
+  type BiometricCredentialsMeta,
+  type BiometricReadResult,
+  type BiometricSignInOutcome,
+} from "./src/lib/biometrics";
 import { successHaptic } from "./src/lib/haptics";
 import {
   getDefaultServerUrl,
@@ -21,6 +37,7 @@ import {
   setStoredToken,
 } from "./src/lib/storage";
 import { AuthScreen } from "./src/screens/AuthScreen";
+import { BiometricLockScreen } from "./src/screens/BiometricLockScreen";
 import { CardDetailModal } from "./src/screens/CardDetailModal";
 import { CardsScreen } from "./src/screens/CardsScreen";
 import { CatchUpModal } from "./src/screens/CatchUpModal";
@@ -82,6 +99,15 @@ function PerksShell() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ text: string; tone: "info" | "error" } | null>(null);
 
+  const [biometricsSupported, setBiometricsSupported] = useState<boolean>(() =>
+    isBiometricSupported(),
+  );
+  const [biometricMeta, setBiometricMeta] = useState<BiometricCredentialsMeta | null>(null);
+  const [biometricLockEnabled, setBiometricLockEnabled] = useState(false);
+  const [appLocked, setAppLocked] = useState(false);
+  const [autoPromptBiometrics, setAutoPromptBiometrics] = useState(false);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [cardsSubTab, setCardsSubTab] = useState<CardsSubTabKey>("cards");
   const [shareTemplateKey, setShareTemplateKey] = useState<string | null>(null);
@@ -94,8 +120,16 @@ function PerksShell() {
 
   const tokenRef = useRef<string | null>(null);
   const serverRef = useRef<string>(serverUrl);
+  const biometricMetaRef = useRef<BiometricCredentialsMeta | null>(null);
+  const biometricLockEnabledRef = useRef(false);
+  const appLockedRef = useRef(false);
+  const biometricPromptInFlightRef = useRef(false);
+
   tokenRef.current = token;
   serverRef.current = serverUrl;
+  biometricMetaRef.current = biometricMeta;
+  biometricLockEnabledRef.current = biometricLockEnabled;
+  appLockedRef.current = appLocked;
 
   const handleTabChange = useCallback((nextTab: TabKey) => {
     setActiveTab(nextTab);
@@ -158,25 +192,66 @@ function PerksShell() {
     setBootError(null);
   }, []);
 
+  const handleSessionExpired = useCallback(async () => {
+    await setStoredToken(null);
+    const supported = isBiometricSupported();
+    const hasSavedBiometrics = supported && biometricMetaRef.current !== null;
+    setBiometricsSupported(supported);
+    setAppLocked(false);
+    setToken(null);
+    setBootstrap(null);
+    setAutoPromptBiometrics(hasSavedBiometrics);
+    setSessionNotice(
+      hasSavedBiometrics
+        ? `Your session expired. Sign in with ${getBiometricLabel()} to continue.`
+        : "Your session expired. Please sign in again.",
+    );
+  }, []);
+
   useEffect(() => {
     let active = true;
     void (async () => {
       try {
-        const [savedUrl, savedToken] = await Promise.all([getStoredServerUrl(), getStoredToken()]);
+        const [savedUrl, savedToken, savedMeta, savedLockEnabled] = await Promise.all([
+          getStoredServerUrl(),
+          getStoredToken(),
+          getBiometricMeta(),
+          getBiometricLockEnabled(),
+        ]);
         if (!active) return;
+        const supported = isBiometricSupported();
         setServerUrl(savedUrl);
+        setBiometricsSupported(supported);
+        setBiometricMeta(savedMeta);
+        setBiometricLockEnabled(savedLockEnabled);
+
         if (savedToken) {
+          if (supported && savedLockEnabled) {
+            setAppLocked(true);
+          }
           setToken(savedToken);
           try {
             await loadSnapshot(savedUrl, savedToken);
           } catch (err) {
             if (err instanceof ApiError && err.status === 401) {
               await setStoredToken(null);
-              if (active) setToken(null);
+              if (active) {
+                const canUseFaceId = supported && savedMeta !== null;
+                setAppLocked(false);
+                setToken(null);
+                setAutoPromptBiometrics(canUseFaceId);
+                setSessionNotice(
+                  canUseFaceId
+                    ? `Your session expired. Sign in with ${getBiometricLabel()} to continue.`
+                    : "Your session expired. Please sign in again.",
+                );
+              }
             } else if (active) {
               setBootError(err instanceof Error ? err.message : "Could not reach server.");
             }
           }
+        } else {
+          setAutoPromptBiometrics(supported && savedMeta !== null);
         }
       } finally {
         if (active) setInitializing(false);
@@ -189,15 +264,28 @@ function PerksShell() {
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active" && tokenRef.current) {
-        void loadSnapshot(serverRef.current, tokenRef.current).catch(() => undefined);
+      const supported = isBiometricSupported();
+      if (
+        shouldLockOnAppStateChange(state, {
+          signedIn: Boolean(tokenRef.current),
+          lockEnabled: biometricLockEnabledRef.current && supported,
+        })
+      ) {
+        setAppLocked(true);
+        return;
+      }
+      if (state === "active") {
+        setBiometricsSupported(supported);
+        if (tokenRef.current && !appLockedRef.current) {
+          void loadSnapshot(serverRef.current, tokenRef.current).catch(() => undefined);
+        }
       }
     });
     return () => sub.remove();
   }, [loadSnapshot]);
 
   // Pre-mount remaining tabs in staggered idle slices after Overview paints so first taps are instant.
-  const hasBootstrap = bootstrap !== null;
+  const hasBootstrap = bootstrap !== null && !appLocked;
   useEffect(() => {
     if (!hasBootstrap) return;
     const queue: TabKey[] = ["cards", "offers", "points", "people"];
@@ -222,9 +310,7 @@ function PerksShell() {
       await loadSnapshot(serverRef.current, activeToken);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        await setStoredToken(null);
-        setToken(null);
-        setBootstrap(null);
+        await handleSessionExpired();
       } else {
         setBanner({
           text: err instanceof Error ? err.message : "Could not refresh.",
@@ -234,7 +320,7 @@ function PerksShell() {
     } finally {
       setRefreshing(false);
     }
-  }, [loadSnapshot]);
+  }, [handleSessionExpired, loadSnapshot]);
 
   const triggerRefresh = useCallback(() => {
     void handleRefresh();
@@ -264,9 +350,7 @@ function PerksShell() {
         return res;
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
-          await setStoredToken(null);
-          setToken(null);
-          setBootstrap(null);
+          await handleSessionExpired();
         } else {
           setBanner({
             text: err instanceof Error ? err.message : "Could not save change.",
@@ -278,7 +362,7 @@ function PerksShell() {
         setBusyKey(null);
       }
     },
-    [],
+    [handleSessionExpired],
   );
 
   const handleAction = useCallback(
@@ -311,6 +395,9 @@ function PerksShell() {
     setSelectedCardId(null);
     setCatchUpOpen(false);
     setYearEndOpen(false);
+    setAppLocked(false);
+    setAutoPromptBiometrics(false);
+    setSessionNotice(null);
     setActiveTab("overview");
     setCardsSubTab("cards");
     setShareTemplateKey(null);
@@ -322,6 +409,153 @@ function PerksShell() {
       await signOutSession({ baseUrl: activeServerUrl, token: activeToken });
     }
   }, []);
+
+  const handleBiometricSignIn = useCallback(async (): Promise<BiometricSignInOutcome> => {
+    if (biometricPromptInFlightRef.current) {
+      return { status: "canceled" };
+    }
+    biometricPromptInFlightRef.current = true;
+    const previousEmail = biometricMetaRef.current?.email;
+    try {
+      const readRes = await readBiometricCredentials();
+      if (readRes.status === "canceled") {
+        return { status: "canceled" };
+      }
+      if (readRes.status === "empty") {
+        setBiometricMeta(null);
+        return { status: "empty", email: previousEmail };
+      }
+      if (readRes.status === "unavailable") {
+        return { status: "error", message: readRes.message };
+      }
+
+      const creds = readRes.value;
+      try {
+        const { token: newToken } = await signInWithEmail({
+          baseUrl: creds.serverUrl,
+          email: creds.email,
+          password: creds.password,
+        });
+        await Promise.all([setStoredServerUrl(creds.serverUrl), setStoredToken(newToken)]);
+        setServerUrl(creds.serverUrl);
+        setSessionNotice(null);
+        setAppLocked(false);
+        setToken(newToken);
+        await loadSnapshot(creds.serverUrl, newToken);
+        successHaptic();
+        return { status: "ok" };
+      } catch (err) {
+        if (err instanceof ApiError && (err.status === 401 || err.status === 400)) {
+          return {
+            status: "invalid_credentials",
+            email: creds.email,
+            message: err.message,
+          };
+        }
+        return {
+          status: "error",
+          message: err instanceof Error ? err.message : "Could not sign in to Perks.",
+        };
+      }
+    } finally {
+      biometricPromptInFlightRef.current = false;
+    }
+  }, [loadSnapshot]);
+
+  const handleUnlockWithBiometrics = useCallback(async (): Promise<BiometricReadResult<true>> => {
+    if (biometricPromptInFlightRef.current) {
+      return { status: "canceled" };
+    }
+    biometricPromptInFlightRef.current = true;
+    try {
+      const res = await unlockWithBiometrics();
+      if (res.status === "ok") {
+        setAppLocked(false);
+        successHaptic();
+        if (tokenRef.current) {
+          void loadSnapshot(serverRef.current, tokenRef.current).catch(() => undefined);
+        }
+      } else if (res.status === "empty") {
+        // Biometrics changed on the device and invalidated the lock sentinel — sign out cleanly
+        // so the user is never permanently locked out of Perks.
+        await disableBiometricLock();
+        setBiometricLockEnabled(false);
+        await handleSignOut();
+        setSessionNotice(
+          `${getBiometricLabel()} settings changed on this device. Please sign in again.`,
+        );
+      }
+      return res;
+    } finally {
+      biometricPromptInFlightRef.current = false;
+    }
+  }, [handleSignOut, loadSnapshot]);
+
+  const handleEnableBiometricSignIn = useCallback(
+    async (password: string): Promise<void> => {
+      const email = bootstrap?.user.email;
+      if (!email) {
+        throw new Error("Could not determine your account email.");
+      }
+      const activeUrl = serverRef.current;
+      const { token: refreshedToken } = await signInWithEmail({
+        baseUrl: activeUrl,
+        email,
+        password,
+      });
+      const savedMeta = await saveBiometricCredentials({
+        email,
+        password,
+        serverUrl: activeUrl,
+      });
+      await setStoredToken(refreshedToken);
+      setToken(refreshedToken);
+      setBiometricMeta(savedMeta);
+      successHaptic();
+    },
+    [bootstrap?.user.email],
+  );
+
+  const handleDisableBiometricSignIn = useCallback(async (): Promise<void> => {
+    await clearBiometricCredentials();
+    setBiometricMeta(null);
+  }, []);
+
+  const handleToggleBiometricLock = useCallback(
+    async (enabled: boolean): Promise<{ ok: boolean; message?: string }> => {
+      const label = getBiometricLabel();
+      if (!enabled) {
+        await disableBiometricLock();
+        setBiometricLockEnabled(false);
+        return { ok: true, message: `${label} app lock turned off.` };
+      }
+      if (biometricPromptInFlightRef.current) {
+        return { ok: false };
+      }
+      biometricPromptInFlightRef.current = true;
+      try {
+        const res = await enableBiometricLock();
+        if (res.status === "ok") {
+          setBiometricLockEnabled(true);
+          successHaptic();
+          return { ok: true, message: `${label} app lock enabled.` };
+        }
+        if (res.status === "canceled") {
+          return { ok: false };
+        }
+        return {
+          ok: false,
+          message:
+            res.status === "unavailable"
+              ? res.message
+              : `Could not enable ${label} lock on this device.`,
+        };
+      } finally {
+        biometricPromptInFlightRef.current = false;
+      }
+    },
+    [],
+  );
 
   if (initializing) {
     return (
@@ -339,23 +573,43 @@ function PerksShell() {
         <AuthScreen
           initialServerUrl={serverUrl}
           defaultServerUrl={getDefaultServerUrl()}
+          biometricsSupported={biometricsSupported}
+          biometricMeta={biometricMeta}
+          autoPromptBiometrics={autoPromptBiometrics}
+          sessionNotice={sessionNotice}
           onSaveServerUrl={async (nextUrl) => {
             const saved = await setStoredServerUrl(nextUrl);
             setServerUrl(saved);
             return saved;
           }}
-          onSignIn={async (email, password, chosenUrl) => {
+          onBiometricSignIn={handleBiometricSignIn}
+          onSignIn={async (email, password, chosenUrl, saveForBiometrics) => {
             const { token: newToken } = await signInWithEmail({
               baseUrl: chosenUrl,
               email,
               password,
             });
             await setStoredToken(newToken);
+            if (saveForBiometrics && isBiometricSupported()) {
+              try {
+                const savedMeta = await saveBiometricCredentials({
+                  email,
+                  password,
+                  serverUrl: chosenUrl,
+                });
+                setBiometricMeta(savedMeta);
+              } catch {
+                // Never block sign-in if saving biometric credentials fails
+              }
+            }
             setServerUrl(chosenUrl);
+            setSessionNotice(null);
+            setAppLocked(false);
             setToken(newToken);
             await loadSnapshot(chosenUrl, newToken);
+            successHaptic();
           }}
-          onSignUp={async (name, email, password, chosenUrl) => {
+          onSignUp={async (name, email, password, chosenUrl, saveForBiometrics) => {
             const { token: newToken } = await signUpWithEmail({
               baseUrl: chosenUrl,
               name,
@@ -363,10 +617,38 @@ function PerksShell() {
               password,
             });
             await setStoredToken(newToken);
+            if (saveForBiometrics && isBiometricSupported()) {
+              try {
+                const savedMeta = await saveBiometricCredentials({
+                  email,
+                  password,
+                  serverUrl: chosenUrl,
+                });
+                setBiometricMeta(savedMeta);
+              } catch {
+                // Never block account creation if saving biometric credentials fails
+              }
+            }
             setServerUrl(chosenUrl);
+            setSessionNotice(null);
+            setAppLocked(false);
             setToken(newToken);
             await loadSnapshot(chosenUrl, newToken);
+            successHaptic();
           }}
+        />
+      </View>
+    );
+  }
+
+  if (appLocked) {
+    return (
+      <View style={[styles.flex, { paddingTop: insets.top }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
+        <BiometricLockScreen
+          email={bootstrap?.user.email ?? biometricMeta?.email ?? null}
+          onUnlock={handleUnlockWithBiometrics}
+          onSignOut={handleSignOut}
         />
       </View>
     );
@@ -519,8 +801,14 @@ function PerksShell() {
         data={bootstrap}
         serverUrl={serverUrl}
         busyKey={busyKey}
+        biometricsSupported={biometricsSupported}
+        biometricMeta={biometricMeta}
+        biometricLockEnabled={biometricLockEnabled}
         onClose={handleCloseSettings}
         onRunRawAction={handleRunRawAction}
+        onEnableBiometricSignIn={handleEnableBiometricSignIn}
+        onDisableBiometricSignIn={handleDisableBiometricSignIn}
+        onToggleBiometricLock={handleToggleBiometricLock}
         onSignOut={handleSignOut}
       />
     </View>

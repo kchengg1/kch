@@ -34,7 +34,14 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-secure-store"],
+    "plugins": [
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Allow Perks to use Face ID to sign in and unlock your account."
+        }
+      ]
+    ],
     "runtimeVersion": {
       "policy": "appVersion"
     },
