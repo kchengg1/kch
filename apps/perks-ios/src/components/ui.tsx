@@ -8,6 +8,7 @@ import {
   View,
   type KeyboardTypeOptions,
   type StyleProp,
+  type TextInputProps,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
@@ -330,6 +331,8 @@ export function FieldInput({
   autoCapitalize = "sentences",
   secureTextEntry = false,
   multiline = false,
+  textContentType,
+  autoComplete,
   hint,
 }: {
   label: string;
@@ -340,6 +343,8 @@ export function FieldInput({
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   secureTextEntry?: boolean;
   multiline?: boolean;
+  textContentType?: TextInputProps["textContentType"];
+  autoComplete?: TextInputProps["autoComplete"];
   hint?: string;
 }) {
   const { colors } = useTheme();
@@ -356,6 +361,8 @@ export function FieldInput({
         autoCapitalize={autoCapitalize}
         secureTextEntry={secureTextEntry}
         multiline={multiline}
+        textContentType={textContentType}
+        autoComplete={autoComplete}
         style={[styles.input, multiline && styles.inputMultiline]}
       />
       {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
@@ -401,6 +408,126 @@ export function SegmentedBar<K extends string>({
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+/** Crisp pure-View geometric Face ID glyph (zero native icon dependencies). */
+export function FaceIdIcon({ size = 26, color }: { size?: number; color: string }) {
+  const stroke = Math.max(2, Math.round(size * 0.085));
+  const corner = Math.round(size * 0.27);
+  const cornerRadius = Math.max(3, Math.round(size * 0.14));
+  const eyeW = stroke;
+  const eyeH = Math.max(3, Math.round(size * 0.14));
+  const eyeTop = Math.round(size * 0.27);
+  const eyeInset = Math.round(size * 0.27);
+  const noseW = stroke;
+  const noseH = Math.max(4, Math.round(size * 0.19));
+  const smileW = Math.round(size * 0.34);
+  const smileH = Math.round(size * 0.15);
+
+  return (
+    <View style={{ width: size, height: size, position: "relative" }}>
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: corner,
+          height: corner,
+          borderTopWidth: stroke,
+          borderLeftWidth: stroke,
+          borderTopLeftRadius: cornerRadius,
+          borderColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          width: corner,
+          height: corner,
+          borderTopWidth: stroke,
+          borderRightWidth: stroke,
+          borderTopRightRadius: cornerRadius,
+          borderColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          width: corner,
+          height: corner,
+          borderBottomWidth: stroke,
+          borderLeftWidth: stroke,
+          borderBottomLeftRadius: cornerRadius,
+          borderColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          bottom: 0,
+          right: 0,
+          width: corner,
+          height: corner,
+          borderBottomWidth: stroke,
+          borderRightWidth: stroke,
+          borderBottomRightRadius: cornerRadius,
+          borderColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          top: eyeTop,
+          left: eyeInset,
+          width: eyeW,
+          height: eyeH,
+          borderRadius: eyeW,
+          backgroundColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          top: eyeTop,
+          right: eyeInset,
+          width: eyeW,
+          height: eyeH,
+          borderRadius: eyeW,
+          backgroundColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          top: Math.round(size * 0.34),
+          left: Math.round((size - noseW) / 2),
+          width: noseW,
+          height: noseH,
+          borderRadius: noseW,
+          backgroundColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          bottom: Math.round(size * 0.24),
+          left: Math.round((size - smileW) / 2),
+          width: smileW,
+          height: smileH,
+          borderBottomWidth: stroke,
+          borderLeftWidth: stroke * 0.6,
+          borderRightWidth: stroke * 0.6,
+          borderBottomLeftRadius: smileW,
+          borderBottomRightRadius: smileW,
+          borderColor: color,
+        }}
+      />
     </View>
   );
 }

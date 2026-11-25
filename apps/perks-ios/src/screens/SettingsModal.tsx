@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Modal, Platform, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Button,
+  FaceIdIcon,
+  FieldInput,
   SectionCard,
   SegmentedBar,
   useTheme,
@@ -10,6 +12,11 @@ import {
   type ThemeColors,
   type ThemeMode,
 } from "../components/ui";
+import {
+  getBiometricLabel,
+  isBiometricMetaForEmail,
+  type BiometricCredentialsMeta,
+} from "../lib/biometrics";
 import { formatDate } from "../lib/format";
 import { formatLastActive } from "../lib/last-active";
 import type { MobileActionPayload, MobileActionResponse, MobileBootstrap } from "../types";
@@ -25,22 +32,112 @@ export function SettingsModal({
   data,
   serverUrl,
   busyKey,
+  biometricsSupported,
+  biometricMeta,
+  biometricLockEnabled,
   onClose,
   onRunRawAction,
+  onEnableBiometricSignIn,
+  onDisableBiometricSignIn,
+  onToggleBiometricLock,
   onSignOut,
 }: {
   visible: boolean;
   data: MobileBootstrap;
   serverUrl: string;
   busyKey: string | null;
+  biometricsSupported: boolean;
+  biometricMeta: BiometricCredentialsMeta | null;
+  biometricLockEnabled: boolean;
   onClose: () => void;
   onRunRawAction: (payload: MobileActionPayload, key: string) => Promise<MobileActionResponse>;
+  onEnableBiometricSignIn: (password: string) => Promise<void>;
+  onDisableBiometricSignIn: () => Promise<void>;
+  onToggleBiometricLock: (enabled: boolean) => Promise<{ ok: boolean; message?: string }>;
   onSignOut: () => Promise<void>;
 }) {
   const insets = useSafeAreaInsets();
-  const { mode, setMode } = useTheme();
+  const { colors, mode, setMode } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const biometricLabel = getBiometricLabel();
   const [digestFeedback, setDigestFeedback] = useState<string | null>(null);
+  const [showPasswordSetup, setShowPasswordSetup] = useState(false);
+  const [setupPassword, setSetupPassword] = useState("");
+  const [biometricBusy, setBiometricBusy] = useState(false);
+  const [lockBusy, setLockBusy] = useState(false);
+  const [biometricFeedback, setBiometricFeedback] = useState<{
+    text: string;
+    tone: "info" | "error";
+  } | null>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      setShowPasswordSetup(false);
+      setSetupPassword("");
+      setBiometricFeedback(null);
+    }
+  }, [visible]);
+
+  const signInEnabledForUser = isBiometricMetaForEmail(biometricMeta, data.user.email);
+
+  async function handleSignInSwitch(next: boolean) {
+    setBiometricFeedback(null);
+    if (!next) {
+      setShowPasswordSetup(false);
+      setSetupPassword("");
+      setBiometricBusy(true);
+      try {
+        await onDisableBiometricSignIn();
+        setBiometricFeedback({ text: `${biometricLabel} sign-in turned off.`, tone: "info" });
+      } finally {
+        setBiometricBusy(false);
+      }
+      return;
+    }
+    setShowPasswordSetup(true);
+  }
+
+  async function handleConfirmPasswordSetup() {
+    if (!setupPassword) {
+      setBiometricFeedback({
+        text: `Enter your password to enable ${biometricLabel} sign-in.`,
+        tone: "error",
+      });
+      return;
+    }
+    setBiometricFeedback(null);
+    setBiometricBusy(true);
+    try {
+      await onEnableBiometricSignIn(setupPassword);
+      setSetupPassword("");
+      setShowPasswordSetup(false);
+      setBiometricFeedback({
+        text: `${biometricLabel} sign-in enabled for ${data.user.email}.`,
+        tone: "info",
+      });
+    } catch (err) {
+      setBiometricFeedback({
+        text: err instanceof Error ? err.message : `Could not enable ${biometricLabel} sign-in.`,
+        tone: "error",
+      });
+    } finally {
+      setBiometricBusy(false);
+    }
+  }
+
+  async function handleLockSwitch(next: boolean) {
+    if (lockBusy) return;
+    setBiometricFeedback(null);
+    setLockBusy(true);
+    try {
+      const res = await onToggleBiometricLock(next);
+      if (res.message) {
+        setBiometricFeedback({ text: res.message, tone: res.ok ? "info" : "error" });
+      }
+    } finally {
+      setLockBusy(false);
+    }
+  }
 
   return (
     <Modal
@@ -60,6 +157,7 @@ export function SettingsModal({
             styles.content,
             { paddingBottom: Math.max(insets.bottom + 24, 32) },
           ]}
+          keyboardShouldPersistTaps="handled"
         >
           <SectionCard style={styles.cardGap}>
             <Text style={styles.sectionTitle}>Appearance</Text>
@@ -67,6 +165,100 @@ export function SettingsModal({
               Choose Light, Dark, or match your iPhone&rsquo;s system appearance automatically.
             </Text>
             <SegmentedBar options={APPEARANCE_OPTIONS} value={mode} onChange={setMode} />
+          </SectionCard>
+
+          <SectionCard style={styles.cardGap}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.faceIdBadge}>
+                <FaceIdIcon size={18} color={colors.primary} />
+              </View>
+              <Text style={styles.sectionTitle}>{biometricLabel}</Text>
+            </View>
+
+            {biometricsSupported ? (
+              <>
+                <View style={styles.switchRow}>
+                  <View style={styles.switchTextCol}>
+                    <Text style={styles.switchLabel}>Sign in with {biometricLabel}</Text>
+                    <Text style={styles.metaText}>
+                      {signInEnabledForUser
+                        ? `Saved in iOS Keychain for ${data.user.email}.`
+                        : "Save credentials securely so you can sign back in with one tap."}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={signInEnabledForUser || showPasswordSetup}
+                    disabled={biometricBusy}
+                    onValueChange={(next) => void handleSignInSwitch(next)}
+                  />
+                </View>
+
+                {showPasswordSetup ? (
+                  <View style={styles.passwordSetupBox}>
+                    <FieldInput
+                      label={`Confirm password for ${data.user.email}`}
+                      value={setupPassword}
+                      onChangeText={setSetupPassword}
+                      placeholder="••••••••"
+                      secureTextEntry
+                      autoCapitalize="none"
+                      textContentType="password"
+                      autoComplete="password"
+                    />
+                    <View style={styles.setupActions}>
+                      <Button
+                        label={`Save & enable ${biometricLabel}`}
+                        size="sm"
+                        loading={biometricBusy}
+                        onPress={() => void handleConfirmPasswordSetup()}
+                      />
+                      <Button
+                        label="Cancel"
+                        size="sm"
+                        variant="ghost"
+                        disabled={biometricBusy}
+                        onPress={() => {
+                          setShowPasswordSetup(false);
+                          setSetupPassword("");
+                          setBiometricFeedback(null);
+                        }}
+                      />
+                    </View>
+                  </View>
+                ) : null}
+
+                <View style={styles.divider} />
+
+                <View style={styles.switchRow}>
+                  <View style={styles.switchTextCol}>
+                    <Text style={styles.switchLabel}>Require {biometricLabel} to open</Text>
+                    <Text style={styles.metaText}>
+                      Lock Perks when launching or returning from the background.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={biometricLockEnabled}
+                    disabled={lockBusy}
+                    onValueChange={(next) => void handleLockSwitch(next)}
+                  />
+                </View>
+
+                {biometricFeedback ? (
+                  <Text
+                    style={
+                      biometricFeedback.tone === "error" ? styles.errorText : styles.feedbackText
+                    }
+                  >
+                    {biometricFeedback.text}
+                  </Text>
+                ) : null}
+              </>
+            ) : (
+              <Text style={styles.noteText}>
+                {biometricLabel} isn&rsquo;t available on this device. Set up {biometricLabel} in
+                iPhone Settings to sign in and unlock Perks with {biometricLabel}.
+              </Text>
+            )}
           </SectionCard>
 
           <SectionCard style={styles.cardGap}>
@@ -200,6 +392,19 @@ const makeStyles = (COLORS: ThemeColors) =>
     cardGap: {
       gap: 10,
     },
+    sectionHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+    },
+    faceIdBadge: {
+      width: 30,
+      height: 30,
+      borderRadius: 8,
+      backgroundColor: COLORS.primarySoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
     sectionTitle: {
       fontSize: 16,
       fontWeight: "700",
@@ -214,20 +419,46 @@ const makeStyles = (COLORS: ThemeColors) =>
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      minHeight: 40,
+      gap: 12,
+      minHeight: 42,
+    },
+    switchTextCol: {
+      flex: 1,
+      gap: 2,
     },
     switchLabel: {
       fontSize: 14,
       fontWeight: "500",
       color: COLORS.ink,
     },
+    passwordSetupBox: {
+      backgroundColor: COLORS.subtle,
+      borderRadius: 12,
+      padding: 12,
+      gap: 10,
+    },
+    setupActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: COLORS.border,
+    },
     metaText: {
       fontSize: 12,
+      lineHeight: 16,
       color: COLORS.muted,
     },
     feedbackText: {
       fontSize: 13,
       color: COLORS.greenInk,
+      fontWeight: "500",
+    },
+    errorText: {
+      fontSize: 13,
+      color: COLORS.redInk,
       fontWeight: "500",
     },
     kvRow: {
