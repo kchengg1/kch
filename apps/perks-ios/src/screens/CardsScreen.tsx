@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -160,7 +160,7 @@ const WhichCardPane = React.memo(function WhichCardPane({
 }: {
   data: MobileBootstrap;
   refreshing: boolean;
-  headerSlot: React.ReactNode;
+  headerSlot?: React.ReactNode;
   onRefresh: () => void;
   onOpenCard: (cardId: string) => void;
   onNavigateTab: (tab: TabKey) => void;
@@ -376,6 +376,21 @@ export const CardsScreen = React.memo(function CardsScreen({
   const [business, setBusiness] = useState(false);
   const [sheetText, setSheetText] = useState("");
 
+  const [mountedSubTabs, setMountedSubTabs] = useState<Record<CardsSubTabKey, boolean>>({
+    cards: true,
+    pick: subTab === "pick",
+    bonuses: subTab === "bonuses",
+  });
+
+  useEffect(() => {
+    setMountedSubTabs((prev) => (prev[subTab] ? prev : { ...prev, [subTab]: true }));
+  }, [subTab]);
+
+  const handleAddFirstCard = useCallback(() => {
+    onSubTabChange("cards");
+    setPanel("add");
+  }, [onSubTabChange]);
+
   const openCards = useMemo(() => data.cards.filter((c) => !c.closed), [data.cards]);
   const closedCards = useMemo(() => data.cards.filter((c) => c.closed), [data.cards]);
 
@@ -386,41 +401,6 @@ export const CardsScreen = React.memo(function CardsScreen({
       (c) => c.name.toLowerCase().includes(q) || c.issuer.toLowerCase().includes(q),
     );
   }, [catalogFilter, data.catalog]);
-
-  const segmentedBar = (
-    <SegmentedBar<CardsSubTabKey> options={SUB_TABS} value={subTab} onChange={onSubTabChange} />
-  );
-
-  if (subTab === "bonuses") {
-    return (
-      <BonusesScreen
-        data={data}
-        refreshing={refreshing}
-        busyKey={busyKey}
-        onRefresh={onRefresh}
-        onAction={onVoidAction}
-        headerSlot={segmentedBar}
-        initialShareTemplateKey={shareTemplateKey}
-      />
-    );
-  }
-
-  if (subTab === "pick") {
-    return (
-      <WhichCardPane
-        data={data}
-        refreshing={refreshing}
-        headerSlot={segmentedBar}
-        onRefresh={onRefresh}
-        onOpenCard={onOpenCard}
-        onNavigateTab={onNavigateTab}
-        onAddFirstCard={() => {
-          onSubTabChange("cards");
-          setPanel("add");
-        }}
-      />
-    );
-  }
 
   async function submitAddCard() {
     const payload: MobileActionPayload =
@@ -452,214 +432,303 @@ export const CardsScreen = React.memo(function CardsScreen({
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      keyboardShouldPersistTaps="handled"
-    >
-      {segmentedBar}
-
-      <View style={styles.headerRow}>
-        <View style={styles.flexShrink}>
-          <Text style={styles.title}>Cards</Text>
-          <Text style={styles.subtitle}>
-            {openCards.length} open
-            {closedCards.length > 0 ? ` · ${closedCards.length} closed` : ""}
-          </Text>
-        </View>
-        <View style={styles.buttonRow}>
-          <Button
-            label={panel === "add" ? "Close" : "Add card"}
-            size="sm"
-            variant={panel === "add" ? "secondary" : "primary"}
-            onPress={() => setPanel(panel === "add" ? "none" : "add")}
-          />
-          <Button
-            label={panel === "import" ? "Close" : "Import"}
-            size="sm"
-            variant="secondary"
-            onPress={() => setPanel(panel === "import" ? "none" : "import")}
-          />
-          <Button label="Catch up" size="sm" variant="secondary" onPress={onOpenCatchUp} />
-        </View>
+    <View style={styles.screenRoot}>
+      <View style={styles.subTabHeader}>
+        <SegmentedBar<CardsSubTabKey> options={SUB_TABS} value={subTab} onChange={onSubTabChange} />
       </View>
 
-      {panel === "add" ? (
-        <SectionCard style={styles.panelGap}>
-          <View style={styles.modeSwitch}>
-            <Pressable
-              onPress={() => setAddMode("catalog")}
-              style={[styles.modeBtn, addMode === "catalog" && styles.modeBtnActive]}
-            >
-              <Text style={[styles.modeText, addMode === "catalog" && styles.modeTextActive]}>
-                Built-in card
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setAddMode("custom")}
-              style={[styles.modeBtn, addMode === "custom" && styles.modeBtnActive]}
-            >
-              <Text style={[styles.modeText, addMode === "custom" && styles.modeTextActive]}>
-                Custom card
-              </Text>
-            </Pressable>
-          </View>
-
-          {addMode === "catalog" ? (
-            <>
-              <FieldInput
-                label="Search built-in cards"
-                value={catalogFilter}
-                onChangeText={setCatalogFilter}
-                placeholder="Platinum, Sapphire, Venture X..."
-              />
-              <View style={styles.templateList}>
-                {filteredCatalog.slice(0, 14).map((t) => {
-                  const active = t.key === selectedTemplate;
-                  return (
-                    <Pressable
-                      key={t.key}
-                      onPress={() => {
-                        tapHaptic();
-                        setSelectedTemplate(t.key);
-                        setAnnualFee(centsToInputDollars(t.annualFeeCents));
-                      }}
-                      style={[styles.templateRow, active && styles.templateRowActive]}
-                    >
-                      <CardSwatch style={t.style} />
-                      <View style={styles.flexShrink}>
-                        <Text style={styles.templateName}>{t.name}</Text>
-                        <Text style={styles.cardSub}>
-                          {t.issuer} · {formatCents(t.annualFeeCents)}/yr
-                        </Text>
-                      </View>
-                      <Text style={styles.radioMark}>{active ? "●" : "○"}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </>
-          ) : (
-            <>
-              <FieldInput
-                label="Card name"
-                value={customName}
-                onChangeText={setCustomName}
-                placeholder="Bilt Palladium"
-              />
-              <FieldInput
-                label="Issuer"
-                value={customIssuer}
-                onChangeText={setCustomIssuer}
-                placeholder="Chase, Amex, Citi..."
-              />
-              <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>Business card</Text>
-                <Switch value={business} onValueChange={setBusiness} />
-              </View>
-            </>
-          )}
-
-          <View style={styles.twoCol}>
-            <View style={styles.flexShrink}>
-              <FieldInput
-                label="Opened date (optional)"
-                value={openedOn}
-                onChangeText={setOpenedOn}
-                placeholder="YYYY-MM-DD"
-                autoCapitalize="none"
-              />
-            </View>
-            <View style={styles.flexShrink}>
-              <FieldInput
-                label="Annual fee ($)"
-                value={annualFee}
-                onChangeText={setAnnualFee}
-                placeholder="95"
-                keyboardType="decimal-pad"
-              />
-            </View>
-          </View>
-
-          <Button
-            label="Add card"
-            loading={busyKey === "card.add"}
-            onPress={() => void submitAddCard()}
-          />
-        </SectionCard>
-      ) : null}
-
-      {panel === "import" ? (
-        <SectionCard style={styles.panelGap}>
-          <FieldInput
-            label="Paste rows from your card spreadsheet"
-            value={sheetText}
-            onChangeText={setSheetText}
-            multiline
-            placeholder={
-              "Amex Platinum\t2024-03-12\t$695\nChase Sapphire Preferred\t2023-08-01\t$95"
+      <View style={styles.subTabHost}>
+        <View
+          style={subTab === "cards" ? styles.subPaneActive : styles.subPaneHidden}
+          pointerEvents={subTab === "cards" ? "auto" : "none"}
+          accessibilityElementsHidden={subTab !== "cards"}
+          importantForAccessibility={subTab === "cards" ? "auto" : "no-hide-descendants"}
+        >
+          <ScrollView
+            contentContainerStyle={styles.content}
+            refreshControl={
+              <RefreshControl refreshing={subTab === "cards" && refreshing} onRefresh={onRefresh} />
             }
-            hint="Tab- or comma-separated lines with card name, open date, annual fee, or closed status."
-          />
-          <Button
-            label="Import cards"
-            loading={busyKey === "card.importSheet"}
-            onPress={() =>
-              void onAction(
-                { type: "card.importSheet", sheet: sheetText },
-                "card.importSheet",
-              ).then(() => {
-                setSheetText("");
-                setPanel("none");
-              })
-            }
-          />
-        </SectionCard>
-      ) : null}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.headerRow}>
+              <View style={styles.flexShrink}>
+                <Text style={styles.title}>Cards</Text>
+                <Text style={styles.subtitle}>
+                  {openCards.length} open
+                  {closedCards.length > 0 ? ` · ${closedCards.length} closed` : ""}
+                </Text>
+              </View>
+              <View style={styles.buttonRow}>
+                <Button
+                  label={panel === "add" ? "Close" : "Add card"}
+                  size="sm"
+                  variant={panel === "add" ? "secondary" : "primary"}
+                  onPress={() => setPanel(panel === "add" ? "none" : "add")}
+                />
+                <Button
+                  label={panel === "import" ? "Close" : "Import"}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => setPanel(panel === "import" ? "none" : "import")}
+                />
+                <Button label="Catch up" size="sm" variant="secondary" onPress={onOpenCatchUp} />
+              </View>
+            </View>
 
-      {openCards.length === 0 ? (
-        <SectionCard>
-          <Text style={styles.cardSub}>
-            No open cards yet. Tap Add card above to pick from {data.catalog.length} built-in
-            templates.
-          </Text>
-        </SectionCard>
-      ) : (
-        <View style={styles.cardStack}>
-          {openCards.map((card) => (
-            <SectionCard key={card.id} style={styles.walletSectionCard}>
-              <CardListItem card={card} today={data.today} walletCard onOpenCard={onOpenCard} />
-            </SectionCard>
-          ))}
-        </View>
-      )}
-
-      {closedCards.length > 0 ? (
-        <CollapsibleSection title="Closed cards" countLabel={`${closedCards.length}`}>
-          {() => (
-            <View style={styles.closedStack}>
-              {closedCards.map((card, idx) => (
-                <View key={card.id} style={idx > 0 ? styles.rowDivider : undefined}>
-                  <CardListItem card={card} today={data.today} onOpenCard={onOpenCard} />
+            {panel === "add" ? (
+              <SectionCard style={styles.panelGap}>
+                <View style={styles.modeSwitch}>
+                  <Pressable
+                    onPress={() => setAddMode("catalog")}
+                    style={[styles.modeBtn, addMode === "catalog" && styles.modeBtnActive]}
+                  >
+                    <Text style={[styles.modeText, addMode === "catalog" && styles.modeTextActive]}>
+                      Built-in card
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setAddMode("custom")}
+                    style={[styles.modeBtn, addMode === "custom" && styles.modeBtnActive]}
+                  >
+                    <Text style={[styles.modeText, addMode === "custom" && styles.modeTextActive]}>
+                      Custom card
+                    </Text>
+                  </Pressable>
                 </View>
-              ))}
-            </View>
-          )}
-        </CollapsibleSection>
-      ) : null}
 
-      <Text style={styles.footNote}>
-        Built-in card benefits last reviewed {formatDate(data.catalogReviewed)}.
-      </Text>
-    </ScrollView>
+                {addMode === "catalog" ? (
+                  <>
+                    <FieldInput
+                      label="Search built-in cards"
+                      value={catalogFilter}
+                      onChangeText={setCatalogFilter}
+                      placeholder="Platinum, Sapphire, Venture X..."
+                    />
+                    <View style={styles.templateList}>
+                      {filteredCatalog.slice(0, 14).map((t) => {
+                        const active = t.key === selectedTemplate;
+                        return (
+                          <Pressable
+                            key={t.key}
+                            onPress={() => {
+                              tapHaptic();
+                              setSelectedTemplate(t.key);
+                              setAnnualFee(centsToInputDollars(t.annualFeeCents));
+                            }}
+                            style={[styles.templateRow, active && styles.templateRowActive]}
+                          >
+                            <CardSwatch style={t.style} />
+                            <View style={styles.flexShrink}>
+                              <Text style={styles.templateName}>{t.name}</Text>
+                              <Text style={styles.cardSub}>
+                                {t.issuer} · {formatCents(t.annualFeeCents)}/yr
+                              </Text>
+                            </View>
+                            <Text style={styles.radioMark}>{active ? "●" : "○"}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <FieldInput
+                      label="Card name"
+                      value={customName}
+                      onChangeText={setCustomName}
+                      placeholder="Bilt Palladium"
+                    />
+                    <FieldInput
+                      label="Issuer"
+                      value={customIssuer}
+                      onChangeText={setCustomIssuer}
+                      placeholder="Chase, Amex, Citi..."
+                    />
+                    <View style={styles.switchRow}>
+                      <Text style={styles.switchLabel}>Business card</Text>
+                      <Switch value={business} onValueChange={setBusiness} />
+                    </View>
+                  </>
+                )}
+
+                <View style={styles.twoCol}>
+                  <View style={styles.flexShrink}>
+                    <FieldInput
+                      label="Opened date (optional)"
+                      value={openedOn}
+                      onChangeText={setOpenedOn}
+                      placeholder="YYYY-MM-DD"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  <View style={styles.flexShrink}>
+                    <FieldInput
+                      label="Annual fee ($)"
+                      value={annualFee}
+                      onChangeText={setAnnualFee}
+                      placeholder="95"
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                </View>
+
+                <Button
+                  label="Add card"
+                  loading={busyKey === "card.add"}
+                  onPress={() => void submitAddCard()}
+                />
+              </SectionCard>
+            ) : null}
+
+            {panel === "import" ? (
+              <SectionCard style={styles.panelGap}>
+                <FieldInput
+                  label="Paste rows from your card spreadsheet"
+                  value={sheetText}
+                  onChangeText={setSheetText}
+                  multiline
+                  placeholder={
+                    "Amex Platinum\t2024-03-12\t$695\nChase Sapphire Preferred\t2023-08-01\t$95"
+                  }
+                  hint="Tab- or comma-separated lines with card name, open date, annual fee, or closed status."
+                />
+                <Button
+                  label="Import cards"
+                  loading={busyKey === "card.importSheet"}
+                  onPress={() =>
+                    void onAction(
+                      { type: "card.importSheet", sheet: sheetText },
+                      "card.importSheet",
+                    ).then(() => {
+                      setSheetText("");
+                      setPanel("none");
+                    })
+                  }
+                />
+              </SectionCard>
+            ) : null}
+
+            {openCards.length === 0 ? (
+              <SectionCard>
+                <Text style={styles.cardSub}>
+                  No open cards yet. Tap Add card above to pick from {data.catalog.length} built-in
+                  templates.
+                </Text>
+              </SectionCard>
+            ) : (
+              <View style={styles.cardStack}>
+                {openCards.map((card) => (
+                  <SectionCard key={card.id} style={styles.walletSectionCard}>
+                    <CardListItem
+                      card={card}
+                      today={data.today}
+                      walletCard
+                      onOpenCard={onOpenCard}
+                    />
+                  </SectionCard>
+                ))}
+              </View>
+            )}
+
+            {closedCards.length > 0 ? (
+              <CollapsibleSection title="Closed cards" countLabel={`${closedCards.length}`}>
+                {() => (
+                  <View style={styles.closedStack}>
+                    {closedCards.map((card, idx) => (
+                      <View key={card.id} style={idx > 0 ? styles.rowDivider : undefined}>
+                        <CardListItem card={card} today={data.today} onOpenCard={onOpenCard} />
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </CollapsibleSection>
+            ) : null}
+
+            <Text style={styles.footNote}>
+              Built-in card benefits last reviewed {formatDate(data.catalogReviewed)}.
+            </Text>
+          </ScrollView>
+        </View>
+
+        {mountedSubTabs.pick ? (
+          <View
+            style={subTab === "pick" ? styles.subPaneActive : styles.subPaneHidden}
+            pointerEvents={subTab === "pick" ? "auto" : "none"}
+            accessibilityElementsHidden={subTab !== "pick"}
+            importantForAccessibility={subTab === "pick" ? "auto" : "no-hide-descendants"}
+          >
+            <WhichCardPane
+              data={data}
+              refreshing={subTab === "pick" && refreshing}
+              onRefresh={onRefresh}
+              onOpenCard={onOpenCard}
+              onNavigateTab={onNavigateTab}
+              onAddFirstCard={handleAddFirstCard}
+            />
+          </View>
+        ) : null}
+
+        {mountedSubTabs.bonuses ? (
+          <View
+            style={subTab === "bonuses" ? styles.subPaneActive : styles.subPaneHidden}
+            pointerEvents={subTab === "bonuses" ? "auto" : "none"}
+            accessibilityElementsHidden={subTab !== "bonuses"}
+            importantForAccessibility={subTab === "bonuses" ? "auto" : "no-hide-descendants"}
+          >
+            <BonusesScreen
+              data={data}
+              refreshing={subTab === "bonuses" && refreshing}
+              busyKey={subTab === "bonuses" ? busyKey : null}
+              onRefresh={onRefresh}
+              onAction={onVoidAction}
+              initialShareTemplateKey={shareTemplateKey}
+            />
+          </View>
+        ) : null}
+      </View>
+    </View>
   );
 });
 
 const makeStyles = (COLORS: ThemeColors) =>
   StyleSheet.create({
+    screenRoot: {
+      flex: 1,
+      backgroundColor: COLORS.bg,
+    },
+    subTabHeader: {
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 6,
+      backgroundColor: COLORS.bg,
+    },
+    subTabHost: {
+      flex: 1,
+      position: "relative",
+      overflow: "hidden",
+    },
+    subPaneActive: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      opacity: 1,
+      zIndex: 1,
+    },
+    subPaneHidden: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      opacity: 0,
+      zIndex: 0,
+    },
     content: {
       paddingHorizontal: 16,
-      paddingTop: 14,
+      paddingTop: 8,
       paddingBottom: 28,
       gap: 14,
     },

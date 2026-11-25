@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -163,7 +163,7 @@ function BenefitEditorForm({
   );
 }
 
-function BenefitCardBlock({
+const BenefitCardBlock = React.memo(function BenefitCardBlock({
   benefit,
   busyKey,
   onAction,
@@ -380,9 +380,20 @@ function BenefitCardBlock({
       ) : null}
     </View>
   );
+});
+
+function buildWorthDrafts(card: MobileCard | null): Record<string, string> {
+  if (!card) return {};
+  const nextWorth: Record<string, string> = {};
+  for (const b of card.benefits) {
+    if (b.myValueCents !== null) {
+      nextWorth[b.id] = centsToInputDollars(b.myValueCents);
+    }
+  }
+  return nextWorth;
 }
 
-export function CardDetailModal({
+export const CardDetailModal = React.memo(function CardDetailModal({
   card,
   today,
   catalog,
@@ -407,29 +418,33 @@ export function CardDetailModal({
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
 
-  const [worthDrafts, setWorthDrafts] = useState<Record<string, string>>({});
-  const [bonusText, setBonusText] = useState("");
-  const [msrDollars, setMsrDollars] = useState("");
-  const [msrDeadline, setMsrDeadline] = useState("");
-  const [msrSpent, setMsrSpent] = useState("");
-  const [bonusReceived, setBonusReceived] = useState("");
+  const [worthDrafts, setWorthDrafts] = useState<Record<string, string>>(() =>
+    buildWorthDrafts(card),
+  );
+  const [bonusText, setBonusText] = useState(() => card?.bonusText ?? "");
+  const [msrDollars, setMsrDollars] = useState(() =>
+    card?.msrCents ? centsToInputDollars(card.msrCents) : "",
+  );
+  const [msrDeadline, setMsrDeadline] = useState(() => card?.msrDeadline ?? "");
+  const [msrSpent, setMsrSpent] = useState(() =>
+    card ? centsToInputDollars(card.msrSpentCents) : "",
+  );
+  const [bonusReceived, setBonusReceived] = useState(() => card?.bonusReceivedOn ?? "");
 
-  const [cardName, setCardName] = useState("");
-  const [cardIssuer, setCardIssuer] = useState("");
-  const [cardFee, setCardFee] = useState("");
-  const [cardOpened, setCardOpened] = useState("");
-  const [cardBusiness, setCardBusiness] = useState(false);
-  const [cardClosed, setCardClosed] = useState(false);
+  const [cardName, setCardName] = useState(() => card?.name ?? "");
+  const [cardIssuer, setCardIssuer] = useState(() => card?.issuer ?? "");
+  const [cardFee, setCardFee] = useState(() =>
+    card ? centsToInputDollars(card.annualFeeCents) : "",
+  );
+  const [cardOpened, setCardOpened] = useState(() => card?.openedOn ?? "");
+  const [cardBusiness, setCardBusiness] = useState(() => card?.business ?? false);
+  const [cardClosed, setCardClosed] = useState(() => card?.closed ?? false);
 
+  const syncedCardRef = useRef<MobileCard | null>(card);
   useEffect(() => {
-    if (!card) return;
-    const nextWorth: Record<string, string> = {};
-    for (const b of card.benefits) {
-      if (b.myValueCents !== null) {
-        nextWorth[b.id] = centsToInputDollars(b.myValueCents);
-      }
-    }
-    setWorthDrafts(nextWorth);
+    if (!card || card === syncedCardRef.current) return;
+    syncedCardRef.current = card;
+    setWorthDrafts(buildWorthDrafts(card));
     setBonusText(card.bonusText);
     setMsrDollars(card.msrCents ? centsToInputDollars(card.msrCents) : "");
     setMsrDeadline(card.msrDeadline ?? "");
@@ -444,22 +459,36 @@ export function CardDetailModal({
     setCardClosed(card.closed);
   }, [card]);
 
+  const credits = useMemo(
+    () => (card ? card.benefits.filter((b) => b.cadence !== "perk") : []),
+    [card],
+  );
+  const perks = useMemo(
+    () => (card ? card.benefits.filter((b) => b.cadence === "perk") : []),
+    [card],
+  );
+  const matchingCatalog = useMemo(
+    () => (card?.templateKey ? catalog.find((t) => t.key === card.templateKey) : undefined),
+    [card?.templateKey, catalog],
+  );
+  const myReferral = useMemo(
+    () =>
+      card?.templateKey
+        ? referrals.mine.find((r) => r.templateKey === card.templateKey)
+        : undefined,
+    [card?.templateKey, referrals.mine],
+  );
+  const friendCardReferrals = useMemo(
+    () =>
+      card?.templateKey ? referrals.others.filter((r) => r.templateKey === card.templateKey) : [],
+    [card?.templateKey, referrals.others],
+  );
+
   if (!card) return null;
 
   const year = today.slice(0, 4);
-  const credits = card.benefits.filter((b) => b.cadence !== "perk");
   const hasStatementCredits =
     !card.closed && credits.some((b) => b.tracked && !b.expired && !b.inApp && b.amountCents > 0);
-  const perks = card.benefits.filter((b) => b.cadence === "perk");
-  const matchingCatalog = card.templateKey
-    ? catalog.find((t) => t.key === card.templateKey)
-    : undefined;
-  const myReferral = card.templateKey
-    ? referrals.mine.find((r) => r.templateKey === card.templateKey)
-    : undefined;
-  const friendCardReferrals = card.templateKey
-    ? referrals.others.filter((r) => r.templateKey === card.templateKey)
-    : [];
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -931,7 +960,7 @@ export function CardDetailModal({
       </KeyboardAvoidingView>
     </Modal>
   );
-}
+});
 
 const makeStyles = (COLORS: ThemeColors) =>
   StyleSheet.create({

@@ -29,7 +29,7 @@ import type {
   StatementPreviewPayload,
 } from "../types";
 
-export function CatchUpModal({
+export const CatchUpModal = React.memo(function CatchUpModal({
   visible,
   data,
   initialCardId,
@@ -46,8 +46,13 @@ export function CatchUpModal({
 }) {
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(makeStyles);
-  const openCards = data.cards.filter((c) => !c.closed);
-  const [selectedCardId, setSelectedCardId] = useState<string>(openCards[0]?.id ?? "");
+  const openCards = React.useMemo(() => data.cards.filter((c) => !c.closed), [data.cards]);
+  const [selectedCardId, setSelectedCardId] = useState<string>(() => {
+    if (initialCardId && openCards.some((c) => c.id === initialCardId)) {
+      return initialCardId;
+    }
+    return openCards[0]?.id ?? "";
+  });
   const [csvText, setCsvText] = useState("");
   const [preview, setPreview] = useState<StatementPreviewPayload | null>(null);
   const [assignedBenefits, setAssignedBenefits] = useState<Record<number, string>>({});
@@ -55,21 +60,29 @@ export function CatchUpModal({
 
   useEffect(() => {
     if (!visible) return;
-    if (initialCardId && data.cards.some((c) => !c.closed && c.id === initialCardId)) {
+    if (
+      initialCardId &&
+      initialCardId !== selectedCardId &&
+      openCards.some((c) => c.id === initialCardId)
+    ) {
       setSelectedCardId(initialCardId);
       setPreview(null);
       setNotice(null);
     }
-  }, [visible, initialCardId, data.cards]);
+  }, [visible, initialCardId, openCards, selectedCardId]);
 
   const activeCardId = openCards.some((c) => c.id === selectedCardId)
     ? selectedCardId
     : (openCards[0]?.id ?? "");
 
-  const inAppItems = openCards.flatMap((card) =>
-    card.benefits
-      .filter((b) => b.tracked && !b.expired && b.inApp && b.cadence !== "perk")
-      .map((benefit) => ({ card, benefit })),
+  const inAppItems = React.useMemo(
+    () =>
+      openCards.flatMap((card) =>
+        card.benefits
+          .filter((b) => b.tracked && !b.expired && b.inApp && b.cadence !== "perk")
+          .map((benefit) => ({ card, benefit })),
+      ),
+    [openCards],
   );
 
   async function pasteClipboardCsv() {
@@ -335,7 +348,7 @@ export function CatchUpModal({
       </KeyboardAvoidingView>
     </Modal>
   );
-}
+});
 
 const makeStyles = (COLORS: ThemeColors) =>
   StyleSheet.create({
