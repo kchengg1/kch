@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Linking,
@@ -202,10 +202,25 @@ export const BonusesScreen = React.memo(function BonusesScreen({
     setShareOpen(false);
   }
 
+  const keyExtractor = useCallback(
+    (item: MobileBootstrap["bonuses"]["offers"][number]) => item.offer.id,
+    [],
+  );
+  const renderBonusItem = useCallback(
+    ({ item }: { item: MobileBootstrap["bonuses"]["offers"][number] }) => (
+      <BonusOfferCard
+        offer={item.offer}
+        verdict={item.verdict}
+        friendReferrals={item.friendReferrals}
+      />
+    ),
+    [],
+  );
+
   return (
     <FlatList
       data={visibleOffers}
-      keyExtractor={(item) => item.offer.id}
+      keyExtractor={keyExtractor}
       initialNumToRender={6}
       maxToRenderPerBatch={8}
       windowSize={5}
@@ -481,13 +496,7 @@ export const BonusesScreen = React.memo(function BonusesScreen({
           </View>
         </View>
       }
-      renderItem={({ item }) => (
-        <BonusOfferCard
-          offer={item.offer}
-          verdict={item.verdict}
-          friendReferrals={item.friendReferrals}
-        />
-      )}
+      renderItem={renderBonusItem}
       ListFooterComponent={
         <CollapsibleSection title="How group referrals work">
           {() => (
@@ -514,7 +523,7 @@ const makeStyles = (COLORS: ThemeColors) =>
   StyleSheet.create({
     content: {
       paddingHorizontal: 16,
-      paddingTop: 14,
+      paddingTop: 8,
       paddingBottom: 28,
     },
     headerContainer: {

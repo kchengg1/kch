@@ -37,7 +37,7 @@ export const NUM_STYLE: TextStyle = {
   fontVariant: ["tabular-nums"],
 };
 
-export function CardSwatch({
+export const CardSwatch = React.memo(function CardSwatch({
   style: cardStyle,
   size = "sm",
 }: {
@@ -87,10 +87,10 @@ export function CardSwatch({
       />
     </View>
   );
-}
+});
 
 /** Tactile metallic card face header used in the iOS Cards Wallet screen. */
-export function CardWalletHeader({
+export const CardWalletHeader = React.memo(function CardWalletHeader({
   cardStyle,
   issuer,
   name,
@@ -138,9 +138,9 @@ export function CardWalletHeader({
       </View>
     </View>
   );
-}
+});
 
-export function Badge({
+export const Badge = React.memo(function Badge({
   label,
   tone = "neutral",
 }: {
@@ -166,7 +166,7 @@ export function Badge({
       </Text>
     </View>
   );
-}
+});
 
 export function Button({
   label,
@@ -237,7 +237,7 @@ export function Button({
   );
 }
 
-export function Meter({
+export const Meter = React.memo(function Meter({
   value,
   max,
   marker,
@@ -271,7 +271,7 @@ export function Meter({
       ) : null}
     </View>
   );
-}
+});
 
 export function SectionCard({
   children,

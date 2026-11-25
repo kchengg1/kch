@@ -259,11 +259,38 @@ export const OffersScreen = React.memo(function OffersScreen({
     data.offers.hiddenMerchants.length > 0 ||
     data.offers.past.length > 0;
 
+  const keyExtractor = useCallback((item: MobileOfferGroup) => item.key, []);
+  const strongLength = sortedStrong.length;
+  const renderOfferItem = useCallback(
+    ({ item: g, index }: { item: MobileOfferGroup; index: number }) => {
+      const isFirst = index === 0;
+      const isLast = index === strongLength - 1;
+      return (
+        <View
+          style={[
+            styles.offerListCell,
+            isFirst && styles.offerListCellFirst,
+            !isFirst && styles.rowDivider,
+            isLast && styles.offerListCellLast,
+          ]}
+        >
+          <OfferGroupCard
+            group={g}
+            busyKey={busyKey}
+            onAction={onAction}
+            onRecordUndo={handleRecordUndo}
+          />
+        </View>
+      );
+    },
+    [busyKey, handleRecordUndo, onAction, strongLength, styles],
+  );
+
   return (
     <FlatList
       ref={listRef}
       data={sortedStrong}
-      keyExtractor={(item) => item.key}
+      keyExtractor={keyExtractor}
       initialNumToRender={8}
       maxToRenderPerBatch={8}
       windowSize={5}
@@ -497,27 +524,7 @@ export const OffersScreen = React.memo(function OffersScreen({
           ) : null}
         </View>
       }
-      renderItem={({ item: g, index }) => {
-        const isFirst = index === 0;
-        const isLast = index === sortedStrong.length - 1;
-        return (
-          <View
-            style={[
-              styles.offerListCell,
-              isFirst && styles.offerListCellFirst,
-              !isFirst && styles.rowDivider,
-              isLast && styles.offerListCellLast,
-            ]}
-          >
-            <OfferGroupCard
-              group={g}
-              busyKey={busyKey}
-              onAction={onAction}
-              onRecordUndo={handleRecordUndo}
-            />
-          </View>
-        );
-      }}
+      renderItem={renderOfferItem}
       ListFooterComponent={
         hasFooter ? (
           <View style={styles.footerStack}>

@@ -63,7 +63,7 @@ const INITIAL_MOUNTED_TABS: Record<TabKey, boolean> = {
   people: false,
 };
 
-function TabPane({
+const TabPane = React.memo(function TabPane({
   active,
   mounted,
   children,
@@ -84,7 +84,7 @@ function TabPane({
       {children}
     </View>
   );
-}
+});
 
 function PerksShell() {
   const insets = useSafeAreaInsets();
@@ -186,6 +186,16 @@ function PerksShell() {
     setYearEndOpen(false);
   }, []);
 
+  const handleYearEndOpenCard = useCallback((id: string) => {
+    setYearEndOpen(false);
+    setSelectedCardId(id);
+  }, []);
+
+  const handleYearEndOpenReferrals = useCallback(() => {
+    setYearEndOpen(false);
+    handleOpenReferrals();
+  }, [handleOpenReferrals]);
+
   const loadSnapshot = useCallback(async (baseUrl: string, authToken: string) => {
     const snap = await fetchBootstrap({ baseUrl, token: authToken });
     setBootstrap(snap);
@@ -284,20 +294,32 @@ function PerksShell() {
     return () => sub.remove();
   }, [loadSnapshot]);
 
-  // Pre-mount remaining tabs in staggered idle slices after Overview paints so first taps are instant.
+  // Pre-mount remaining tabs in gentle staggered slices after Overview finishes painting so
+  // initial launch stays responsive while every tab is pre-laid-out for <16ms tab switches.
   const hasBootstrap = bootstrap !== null && !appLocked;
   useEffect(() => {
     if (!hasBootstrap) return;
+    let cancelled = false;
     const queue: TabKey[] = ["cards", "offers", "points", "people"];
-    const timers = queue.map((tab, idx) =>
-      setTimeout(
-        () => {
-          setMountedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
-        },
-        120 * (idx + 1),
-      ),
-    );
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const rafId = requestAnimationFrame(() => {
+      if (cancelled) return;
+      queue.forEach((tab, idx) => {
+        timers.push(
+          setTimeout(
+            () => {
+              if (!cancelled) {
+                setMountedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
+              }
+            },
+            250 * (idx + 1),
+          ),
+        );
+      });
+    });
     return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafId);
       for (const timer of timers) clearTimeout(timer);
     };
   }, [hasBootstrap]);
@@ -698,12 +720,12 @@ function PerksShell() {
         </Pressable>
       ) : null}
 
-      <View style={styles.flex}>
+      <View style={styles.tabHost}>
         <TabPane active={activeTab === "overview"} mounted={mountedTabs.overview}>
           <OverviewScreen
             data={bootstrap}
-            refreshing={refreshing}
-            busyKey={busyKey}
+            refreshing={activeTab === "overview" && refreshing}
+            busyKey={activeTab === "overview" ? busyKey : null}
             onRefresh={triggerRefresh}
             onAction={handleAction}
             onOpenCard={handleOpenCard}
@@ -718,8 +740,8 @@ function PerksShell() {
         <TabPane active={activeTab === "cards"} mounted={mountedTabs.cards}>
           <CardsScreen
             data={bootstrap}
-            refreshing={refreshing}
-            busyKey={busyKey}
+            refreshing={activeTab === "cards" && refreshing}
+            busyKey={activeTab === "cards" ? busyKey : null}
             subTab={cardsSubTab}
             onSubTabChange={handleCardsSubTabChange}
             shareTemplateKey={shareTemplateKey}
@@ -735,8 +757,8 @@ function PerksShell() {
         <TabPane active={activeTab === "offers"} mounted={mountedTabs.offers}>
           <OffersScreen
             data={bootstrap}
-            refreshing={refreshing}
-            busyKey={busyKey}
+            refreshing={activeTab === "offers" && refreshing}
+            busyKey={activeTab === "offers" ? busyKey : null}
             onRefresh={triggerRefresh}
             onAction={handleAction}
           />
@@ -745,72 +767,79 @@ function PerksShell() {
         <TabPane active={activeTab === "points"} mounted={mountedTabs.points}>
           <PointsScreen
             data={bootstrap}
-            refreshing={refreshing}
-            busyKey={busyKey}
+            refreshing={activeTab === "points" && refreshing}
+            busyKey={activeTab === "points" ? busyKey : null}
             onRefresh={triggerRefresh}
             onAction={handleAction}
           />
         </TabPane>
 
         <TabPane active={activeTab === "people"} mounted={mountedTabs.people}>
-          <PeopleScreen data={bootstrap} refreshing={refreshing} onRefresh={triggerRefresh} />
+          <PeopleScreen
+            data={bootstrap}
+            refreshing={activeTab === "people" && refreshing}
+            onRefresh={triggerRefresh}
+          />
         </TabPane>
       </View>
 
       <TabBar active={activeTab} onChange={handleTabChange} bottomInset={insets.bottom} />
 
-      <CardDetailModal
-        card={selectedCard}
-        today={bootstrap.today}
-        catalog={bootstrap.catalog}
-        referrals={bootstrap.referrals}
-        busyKey={busyKey}
-        onClose={handleCloseCard}
-        onAction={handleAction}
-        onOpenReferrals={handleOpenReferrals}
-        onOpenCatchUp={handleOpenCatchUp}
-      />
+      {selectedCard ? (
+        <CardDetailModal
+          key={selectedCard.id}
+          card={selectedCard}
+          today={bootstrap.today}
+          catalog={bootstrap.catalog}
+          referrals={bootstrap.referrals}
+          busyKey={busyKey}
+          onClose={handleCloseCard}
+          onAction={handleAction}
+          onOpenReferrals={handleOpenReferrals}
+          onOpenCatchUp={handleOpenCatchUp}
+        />
+      ) : null}
 
-      <CatchUpModal
-        visible={catchUpOpen}
-        data={bootstrap}
-        initialCardId={catchUpCardId}
-        busyKey={busyKey}
-        onClose={handleCloseCatchUp}
-        onRunRawAction={handleRunRawAction}
-      />
+      {catchUpOpen ? (
+        <CatchUpModal
+          visible
+          data={bootstrap}
+          initialCardId={catchUpCardId}
+          busyKey={busyKey}
+          onClose={handleCloseCatchUp}
+          onRunRawAction={handleRunRawAction}
+        />
+      ) : null}
 
-      <YearEndModal
-        visible={yearEndOpen}
-        data={bootstrap}
-        busyKey={busyKey}
-        onClose={handleCloseYearEnd}
-        onAction={handleAction}
-        onOpenCard={(id) => {
-          setYearEndOpen(false);
-          setSelectedCardId(id);
-        }}
-        onOpenReferrals={() => {
-          setYearEndOpen(false);
-          handleOpenReferrals();
-        }}
-      />
+      {yearEndOpen ? (
+        <YearEndModal
+          visible
+          data={bootstrap}
+          busyKey={busyKey}
+          onClose={handleCloseYearEnd}
+          onAction={handleAction}
+          onOpenCard={handleYearEndOpenCard}
+          onOpenReferrals={handleYearEndOpenReferrals}
+        />
+      ) : null}
 
-      <SettingsModal
-        visible={settingsOpen}
-        data={bootstrap}
-        serverUrl={serverUrl}
-        busyKey={busyKey}
-        biometricsSupported={biometricsSupported}
-        biometricMeta={biometricMeta}
-        biometricLockEnabled={biometricLockEnabled}
-        onClose={handleCloseSettings}
-        onRunRawAction={handleRunRawAction}
-        onEnableBiometricSignIn={handleEnableBiometricSignIn}
-        onDisableBiometricSignIn={handleDisableBiometricSignIn}
-        onToggleBiometricLock={handleToggleBiometricLock}
-        onSignOut={handleSignOut}
-      />
+      {settingsOpen ? (
+        <SettingsModal
+          visible
+          data={bootstrap}
+          serverUrl={serverUrl}
+          busyKey={busyKey}
+          biometricsSupported={biometricsSupported}
+          biometricMeta={biometricMeta}
+          biometricLockEnabled={biometricLockEnabled}
+          onClose={handleCloseSettings}
+          onRunRawAction={handleRunRawAction}
+          onEnableBiometricSignIn={handleEnableBiometricSignIn}
+          onDisableBiometricSignIn={handleDisableBiometricSignIn}
+          onToggleBiometricLock={handleToggleBiometricLock}
+          onSignOut={handleSignOut}
+        />
+      ) : null}
     </View>
   );
 }
@@ -831,13 +860,29 @@ const makeStyles = (COLORS: ThemeColors) =>
       flex: 1,
       backgroundColor: COLORS.bg,
     },
-    tabPaneActive: {
+    tabHost: {
       flex: 1,
-      display: "flex",
+      position: "relative",
+      overflow: "hidden",
+      backgroundColor: COLORS.bg,
+    },
+    tabPaneActive: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      opacity: 1,
+      zIndex: 1,
     },
     tabPaneHidden: {
-      flex: 1,
-      display: "none",
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      opacity: 0,
+      zIndex: 0,
     },
     centered: {
       flex: 1,

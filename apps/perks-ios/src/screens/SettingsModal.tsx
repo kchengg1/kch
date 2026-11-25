@@ -27,7 +27,7 @@ const APPEARANCE_OPTIONS: { key: ThemeMode; label: string }[] = [
   { key: "dark", label: "Dark" },
 ];
 
-export function SettingsModal({
+export const SettingsModal = React.memo(function SettingsModal({
   visible,
   data,
   serverUrl,
@@ -361,7 +361,7 @@ export function SettingsModal({
       </View>
     </Modal>
   );
-}
+});
 
 const makeStyles = (COLORS: ThemeColors) =>
   StyleSheet.create({

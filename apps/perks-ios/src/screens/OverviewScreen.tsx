@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -192,7 +192,7 @@ export const OverviewScreen = React.memo(function OverviewScreen({
   const [showAllFees, setShowAllFees] = useState(false);
 
   const year = data.today.slice(0, 4);
-  const openCards = data.cards.filter((c) => !c.closed);
+  const openCards = useMemo(() => data.cards.filter((c) => !c.closed), [data.cards]);
   const firstName = data.user.name.trim().split(/\s+/)[0] || "there";
   const capturePct =
     data.overview.availableCents > 0
@@ -210,18 +210,28 @@ export const OverviewScreen = React.memo(function OverviewScreen({
       : null;
 
   const trimmedPick = pickQuery.trim();
-  const valueByProgram = new Map(data.points.programs.map((p) => [p.program, p.centsPerPoint]));
-  const pickTarget = trimmedPick ? classify(trimmedPick) : null;
-  const pickResults = pickTarget
-    ? rankCards(openCards, pickTarget, (program) => valueByProgram.get(program) ?? 1)
-    : [];
-  const cardById = new Map(openCards.map((c) => [c.id, c]));
-  const matchingOffers =
-    trimmedPick.length >= 3
-      ? [...data.offers.strong, ...data.offers.weak].filter((g) =>
-          g.merchant.toLowerCase().includes(trimmedPick.toLowerCase()),
-        )
-      : [];
+  const valueByProgram = useMemo(
+    () => new Map(data.points.programs.map((p) => [p.program, p.centsPerPoint])),
+    [data.points.programs],
+  );
+  const pickTarget = useMemo(() => (trimmedPick ? classify(trimmedPick) : null), [trimmedPick]);
+  const pickResults = useMemo(
+    () =>
+      pickTarget
+        ? rankCards(openCards, pickTarget, (program) => valueByProgram.get(program) ?? 1)
+        : [],
+    [openCards, pickTarget, valueByProgram],
+  );
+  const cardById = useMemo(() => new Map(openCards.map((c) => [c.id, c])), [openCards]);
+  const matchingOffers = useMemo(
+    () =>
+      trimmedPick.length >= 3
+        ? [...data.offers.strong, ...data.offers.weak].filter((g) =>
+            g.merchant.toLowerCase().includes(trimmedPick.toLowerCase()),
+          )
+        : [],
+    [data.offers.strong, data.offers.weak, trimmedPick],
+  );
 
   const shareablePreview = data.referrals.shareableCards
     .slice(0, 2)

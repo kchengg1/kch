@@ -105,7 +105,7 @@ function ChecklistCreditRow({
   );
 }
 
-export function YearEndModal({
+export const YearEndModal = React.memo(function YearEndModal({
   visible,
   data,
   busyKey,
@@ -380,7 +380,7 @@ export function YearEndModal({
       </View>
     </Modal>
   );
-}
+});
 
 const makeStyles = (COLORS: ThemeColors) =>
   StyleSheet.create({

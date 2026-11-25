@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useColorScheme } from "react-native";
 import * as SystemUI from "expo-system-ui";
 import { getStoredThemeMode, setStoredThemeMode, type StoredThemeMode } from "./storage";
+import { getCachedThemedStyles } from "./theme-cache";
 
 export type ThemeMode = StoredThemeMode;
 
@@ -169,5 +170,5 @@ export function useTheme(): ThemeContextValue {
 
 export function useThemedStyles<T>(factory: (colors: ThemeColors) => T): T {
   const { colors } = useTheme();
-  return useMemo(() => factory(colors), [colors, factory]);
+  return getCachedThemedStyles(colors, factory);
 }
